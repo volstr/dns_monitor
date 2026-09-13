@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DNS monitoring — наблюдение за адресами доменов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1F4;
+  --panel:#FAFBFC;
+  --panel-2:#F3F5F8;
+  --ink:#16202B;
+  --ink-soft:#5C6B7A;
+  --ink-faint:#8C9AA8;
+  --line:#D2D9E0;
+  --line-soft:#E2E7EC;
+  --mark:#E8B93B;
+
+  --ok:#2E7D5B;
+  --ok-bg:#E3F0EA;
+  --change:#B5730E;
+  --change-bg:#F8EEDC;
+  --breach:#C42D2D;
+  --breach-bg:#F8E4E4;
+  --fail:#6E5AA8;
+  --fail-bg:#ECE8F6;
+
+  --r:3px;
+  --shadow:0 1px 0 rgba(22,32,43,.04), 0 8px 24px -18px rgba(22,32,43,.5);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font:400 14px/1.5 "IBM Plex Sans",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+/* разграфка кальки */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(to right,rgba(22,32,43,.028) 1px,transparent 1px);
+  background-size:88px 100%;
+}
+code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
+
+.eyebrow{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;
+  font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);
+}
+
+/* ─────────── КАРКАС ─────────── */
+.app{position:relative;z-index:1;min-height:100vh;display:none;grid-template-columns:216px 1fr}
+.app.on{display:grid}
+
+.rail{
+  border-right:1px solid var(--line);background:var(--panel);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+}
+.brand{padding:20px 18px 18px;border-bottom:1px solid var(--line)}
+.brand b{display:block;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.brand .eyebrow{margin-top:3px}
+.nav{padding:10px 8px;flex:1}
+.nav button{
+  display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:var(--r);
+  color:var(--ink-soft);font-weight:500;text-align:left;
+}
+.nav button:hover{background:var(--panel-2);color:var(--ink)}
+.nav button[aria-current="page"]{background:var(--ink);color:var(--panel)}
+.nav button[aria-current="page"] .count{background:rgba(250,251,252,.2);color:var(--panel)}
+.nav .count{
+  margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:500;
+  background:var(--panel-2);border:1px solid var(--line-soft);border-radius:2px;padding:1px 5px;color:var(--ink-soft);
+}
+.nav .count.hot{background:var(--breach-bg);border-color:#EFC7C7;color:var(--breach)}
+.nav .more-btn{display:none}
+.more-sheet{display:none}
+@media (max-width:640px){.more-sheet:not([hidden]){display:block}}
+.rail-foot{padding:14px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-faint)}
+.rail-foot b{display:block;color:var(--ink);font-weight:500;font-size:13px}
+
+.main{min-width:0}
+.head{
+  padding:22px 32px 18px;border-bottom:1px solid var(--line);background:var(--paper);
+  display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;
+}
+.head h1{margin:4px 0 0;font-size:24px;font-weight:600;letter-spacing:-.02em}
+.head p{margin:5px 0 0;color:var(--ink-soft);font-size:13px;max-width:52ch}
+.head .actions{margin-left:auto;display:flex;gap:8px}
+.body{padding:26px 32px 64px}
+
+/* ─────────── АТОМЫ ─────────── */
+.btn{
+  border:1px solid var(--line);background:var(--panel);border-radius:var(--r);
+  padding:7px 13px;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:7px;
+  transition:background .12s,border-color .12s;
+}
+.btn:hover{background:var(--panel-2);border-color:var(--ink-faint)}
+.btn-solid{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.btn-solid:hover{background:#22303F;border-color:#22303F}
+.btn-mark{background:var(--mark);border-color:#D9A825;color:#3A2C05}
+.btn-mark:hover{background:#F0C64F;border-color:#D9A825}
+.btn-sm{padding:4px 9px;font-size:12px}
+.btn-danger{color:var(--breach);border-color:#EFC7C7}
+.btn-danger:hover{background:var(--breach-bg)}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.panel-h{padding:13px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:12px}
+.panel-h h2{margin:0;font-size:14px;font-weight:600}
+.panel-h .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;font-family:"JetBrains Mono",monospace;font-size:12px;
+  border:1px solid var(--line);background:var(--panel-2);border-radius:2px;padding:2px 6px;white-space:nowrap;
+}
+.chip.new{border-color:#A9CBBA;background:var(--ok-bg);color:var(--ok)}
+.chip.gone{border-style:dashed;color:var(--ink-faint);text-decoration:line-through;background:transparent}
+.chip.out{border-color:#E4A5A5;background:var(--breach-bg);color:var(--breach);font-weight:500}
+.chip .glyph{font-size:10px;opacity:.8}
+
+.state{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;white-space:nowrap}
+.state::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+
+/* ─────────── ПОДПИСЬ №2: РЕЕСТР АДРЕСОВ ВО ВРЕМЕНИ ─────────── */
+.reg{padding:4px 0 0}
+.reg-scale{
+  display:grid;grid-template-columns:196px 1fr 92px 92px 152px;gap:14px;
+  padding:0 16px 7px;border-bottom:1px solid var(--line);
+}
+.reg-scale .axis{position:relative;height:14px}
+.reg-scale .axis span{
+  position:absolute;top:0;font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--ink-faint);
+  white-space:nowrap;
+}
+.reg-scale .axis .l{left:0}
+.reg-scale .axis .c{left:50%;transform:translateX(-50%)}
+.reg-scale .axis .r{right:0}
+.reg-scale .th{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:10.5px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);align-self:end;
+}
+.reg-row{
+  display:grid;grid-template-columns:196px 1fr 92px 92px 152px;gap:14px;align-items:center;
+  padding:11px 16px;border-bottom:1px solid var(--line-soft);
+}
+.reg-row:last-child{border-bottom:0}
+.reg-row:hover{background:var(--panel-2)}
+.reg-row .addr{display:block;font-family:"JetBrains Mono",monospace;font-size:12.5px}
+.reg-row .match{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint);margin-top:5px;display:block}
+.reg-row .act{display:block;text-align:right}
+.reg-row .when{font-family:"JetBrains Mono",monospace;font-size:11.5px;color:var(--ink-soft)}
+.trace{display:flex;gap:1px;align-items:center;height:20px}
+.trace i{flex:1;min-width:3px;height:16px;border-radius:1px;background:#E6EAEE;display:block}
+.trace i.a{background:var(--ok)}
+.trace i.d{background:var(--breach)}
+.trace i.s{background:#AEB9C4}
+.state.stale{color:var(--ink-faint)}
+.age{font-size:11.5px;color:var(--ink-faint)}
+.age.hot{color:var(--breach)}
+.reg-legend{
+  display:flex;gap:18px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line-soft);
+  font-size:11.5px;color:var(--ink-soft);background:var(--panel-2);
+}
+.reg-legend span{display:inline-flex;align-items:center;gap:6px}
+.reg-legend i{width:9px;height:14px;border-radius:1px;display:block}
+.reg-legend i.a{background:var(--ok)} .reg-legend i.d{background:var(--breach)}
+.reg-legend i.s{background:#AEB9C4} .reg-legend i.o{background:#E6EAEE}
+
+.state.ok{color:var(--ok)} .state.change{color:var(--change)}
+.state.breach{color:var(--breach)} .state.fail{color:var(--fail)}
+
+.tag{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:2px 7px;
+  border-radius:2px;border:1px solid var(--line);color:var(--ink-soft);background:var(--panel-2);
+}
+.tag.inherit{border-style:dashed;color:var(--ink-faint);background:transparent}
+.tag.override{border-color:#D9A825;background:#FBF2D8;color:#7A5A05}
+
+/* ─────────── ЛЕНТА ПРОВЕРОК ─────────── */
+.tape{display:flex;gap:2px;align-items:flex-end;height:18px}
+.tape i{width:3px;height:9px;background:var(--line);border-radius:1px;display:block}
+.tape i.e-ok{background:#C2CBD4}
+.tape i.e-change{background:var(--change);height:18px}
+.tape i.e-breach{background:var(--breach);height:18px}
+.tape i.e-fail{background:var(--fail);height:14px}
+
+/* ─────────── ТАБЛИЦА ─────────── */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:880px}
+th{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:11px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-faint);text-align:left;padding:9px 16px;
+  border-bottom:1px solid var(--line);white-space:nowrap;
+}
+td{padding:13px 16px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:var(--panel-2)}
+tbody tr.sel{box-shadow:inset 3px 0 0 var(--mark)}
+.dn{font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:500}
+.dn button{font:inherit;text-align:left;border-bottom:1px solid transparent}
+.dn button:hover{border-bottom-color:var(--ink)}
+.sub{font-size:12px;color:var(--ink-faint);margin-top:3px}
+.ips{display:flex;flex-wrap:wrap;gap:4px;max-width:280px}
+
+/* ─────────── СВОДКА ─────────── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;box-shadow:var(--shadow)}
+.stat{padding:16px 18px;border-right:1px solid var(--line-soft)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font-family:"JetBrains Mono",monospace;font-size:30px;font-weight:500;letter-spacing:-.03em;line-height:1.1;margin-top:8px}
+.stat.s-breach b{color:var(--breach)} .stat.s-change b{color:var(--change)} .stat.s-fail b{color:var(--fail)}
+.stat small{display:block;color:var(--ink-faint);font-size:12px;margin-top:4px}
+
+/* ─────────── ЖУРНАЛ СОБЫТИЙ ─────────── */
+.feed{list-style:none;margin:0;padding:0}
+.feed li{display:grid;grid-template-columns:74px 1fr;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+.feed li:last-child{border-bottom:0}
+.feed time{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-faint);padding-top:2px}
+.feed .what{font-size:13px}
+.feed .det{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.feed .note{font-size:12px;color:var(--ink-soft);margin-top:6px}
+
+/* ─────────── ПОДПИСЬ: CIDR-ЛИНЕЙКА ─────────── */
+.ruler-list{display:none}
+.ruler{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:16px 18px 12px;margin-bottom:10px}
+.ruler-h{display:flex;align-items:baseline;gap:10px;margin-bottom:26px;flex-wrap:wrap}
+.ruler-h code{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.ruler-h .cap{font-size:12px;color:var(--ink-faint);font-family:"JetBrains Mono",monospace}
+.ruler-h .st{margin-left:auto}
+.track{position:relative;height:34px;border-left:1px solid var(--ink);border-right:1px solid var(--ink)}
+.track::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--ink)}
+.track .tick{position:absolute;top:50%;width:1px;height:6px;background:var(--line);transform:translateY(-3px)}
+.track .tick.maj{height:11px;background:var(--ink-faint);transform:translateY(-5px)}
+.pin{position:absolute;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center}
+.pin i{width:11px;height:11px;border-radius:50%;background:var(--ok);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--ok);display:block}
+.pin b{
+  position:absolute;bottom:16px;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:500;
+  white-space:nowrap;background:var(--panel);padding:0 3px;color:var(--ok);
+}
+.pin.fresh i{background:var(--change);box-shadow:0 0 0 1px var(--change)}
+.pin.fresh b{color:var(--change)}
+.pin.fresh::after{
+  content:"новый";position:absolute;top:15px;font-family:"IBM Plex Sans Condensed",sans-serif;
+  font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--change);white-space:nowrap;
+}
+/* подпись у самого края не центрируется, иначе обрежется */
+.pin.edge-l b{left:-4px;transform:none}
+.pin.edge-r b{right:-4px;transform:none}
+/* второй ярус подписей + выноска до метки */
+.pin.tier2 b{bottom:31px}
+.pin.tier2::before{content:"";position:absolute;bottom:11px;width:1px;height:20px;background:var(--line)}
+/* склеенные метки */
+.pin.cluster{cursor:pointer;background:none;border:0;padding:0}
+.pin.cluster i{
+  width:17px;height:17px;border-radius:9px;box-shadow:0 0 0 1px var(--ok);
+  display:flex;align-items:center;justify-content:center;
+}
+.pin.cluster em{
+  font-family:"JetBrains Mono",monospace;font-style:normal;font-size:9.5px;font-weight:700;
+  color:var(--panel);line-height:1;
+}
+.pin.cluster.denied i{background:var(--breach);box-shadow:0 0 0 1px var(--breach)}
+.pin.cluster:hover i{box-shadow:0 0 0 3px rgba(46,125,91,.25)}
+.zoom{
+  margin-top:16px;border-top:1px dashed var(--line);padding-top:15px;
+}
+.zoom-h{display:flex;align-items:baseline;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.zoom-h .eyebrow{margin:0}
+.zoom-h code{font-size:13px;font-weight:700}
+.zoom-h .cap{font-size:11.5px;color:var(--ink-faint);font-family:"JetBrains Mono",monospace}
+.scale{display:flex;justify-content:space-between;margin-top:9px;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint)}
+
+.outside{
+  border:1px solid #E4A5A5;border-radius:var(--r);background:var(--breach-bg);
+  padding:13px 16px;display:flex;gap:14px;align-items:flex-start;
+}
+.outside .lbl{font-family:"IBM Plex Sans Condensed",sans-serif;font-size:11px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--breach);padding-top:3px;white-space:nowrap}
+.outside .txt{font-size:12px;color:#7A2020;margin-top:8px}
+
+/* ─────────── ФОРМЫ ─────────── */
+.field{margin-bottom:18px}
+.field > label{display:block;font-weight:500;font-size:13px;margin-bottom:5px}
+.field .hint{font-size:12px;color:var(--ink-soft);margin:-1px 0 7px}
+.inp{
+  width:100%;padding:8px 11px;border:1px solid var(--line);border-radius:var(--r);
+  background:var(--panel);font-size:13px;
+}
+.inp:focus{outline:2px solid var(--ink);outline-offset:-1px;border-color:var(--ink)}
+textarea.inp{font-family:"JetBrains Mono",monospace;font-size:12.5px;resize:vertical;line-height:1.7}
+input.mono,select.inp{font-family:"JetBrains Mono",monospace}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;width:fit-content;max-width:100%;flex-wrap:wrap}
+.seg button{padding:7px 13px;font-size:12.5px;font-weight:500;color:var(--ink-soft);border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--panel-2)}
+.seg button.on{background:var(--ink);color:var(--panel)}
+
+.radio{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.radio label{display:flex;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer;align-items:flex-start}
+.radio label:last-child{border-bottom:0}
+.radio label:hover{background:var(--panel-2)}
+.radio input{margin:2px 0 0;accent-color:var(--ink)}
+.radio label > span{display:block}
+.radio .t{display:block;font-weight:500;font-size:13px}
+.radio .d{display:block;font-size:12px;line-height:1.45;color:var(--ink-soft);margin-top:3px}
+.radio label:has(input:checked){background:#FBF2D8}
+
+.rows{display:grid;gap:0}
+.row{display:grid;grid-template-columns:210px 1fr;gap:20px;padding:16px;border-bottom:1px solid var(--line-soft);align-items:start}
+.row:last-child{border-bottom:0}
+.row .k{font-weight:500;font-size:13px}
+.row .k .d{font-weight:400;font-size:12px;color:var(--ink-soft);margin-top:3px}
+
+/* ─────────── ВХОД ─────────── */
+.auth{position:relative;z-index:1;min-height:100vh;display:none;grid-template-columns:1.05fr .95fr}
+.auth.on{display:grid}
+.auth-art{
+  background:var(--panel);border-right:1px solid var(--line);padding:48px;
+  display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;
+}
+.auth-art h2{font-size:19px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+.auth-art p{color:var(--ink-soft);font-size:13px;margin:0;max-width:40ch}
+.auth-form{display:flex;align-items:center;justify-content:center;padding:32px}
+.auth-card{width:100%;max-width:330px}
+.auth-card h1{font-size:22px;font-weight:600;margin:6px 0 4px;letter-spacing:-.02em}
+.auth-card > p{color:var(--ink-soft);font-size:13px;margin:0 0 26px}
+.auth-note{margin-top:18px;font-size:12px;color:var(--ink-faint);text-align:center}
+.err{
+  border:1px solid #E4A5A5;background:var(--breach-bg);color:#7A2020;
+  border-radius:var(--r);padding:9px 12px;font-size:12.5px;margin-bottom:16px;
+}
+
+/* ─────────── МОДАЛЬ ─────────── */
+.veil{position:fixed;inset:0;background:rgba(22,32,43,.42);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:56px 20px;overflow:auto}
+.veil.on{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);width:100%;max-width:540px;box-shadow:0 30px 70px -30px rgba(22,32,43,.6)}
+.modal-h{padding:18px 22px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center}
+.modal-h h2{margin:3px 0 0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.modal-b{padding:22px}
+.modal-f{padding:14px 22px;border-top:1px solid var(--line-soft);display:flex;gap:8px;justify-content:flex-end;background:var(--panel-2)}
+
+/* ─────────── ПРОЧЕЕ ─────────── */
+.grid2{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+.gcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.gcard{padding:16px 18px}
+.gcard h3{margin:0;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.note-line{margin:7px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-soft)}
+.head .note-line{max-width:56ch;margin-top:8px;padding-left:9px;border-left:2px solid var(--mark)}
+.gcard .meta{margin-top:12px;display:grid;gap:7px;font-size:12px}
+.gcard .meta div{display:flex;gap:9px}
+.gcard .meta .k{color:var(--ink-faint);width:96px;flex:none}
+.gcard .foot{margin-top:15px;padding-top:13px;border-top:1px solid var(--line-soft);display:flex;gap:7px}
+.empty{padding:44px 24px;text-align:center}
+.empty h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.empty p{margin:0 auto 16px;color:var(--ink-soft);font-size:13px;max-width:38ch}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.search{position:relative;flex:1;min-width:190px;max-width:300px}
+.search input{padding-left:30px}
+.search span{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-faint);font-size:13px}
+.back{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-soft);margin-bottom:2px}
+.back:hover{color:var(--ink)}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{display:grid;grid-template-columns:96px 1fr;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line-soft);font-size:13px}
+.hist li:last-child{border-bottom:0}
+.hist time{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-faint)}
+.kv{display:flex;gap:9px;font-size:12.5px;padding:7px 0}
+.kv .k{color:var(--ink-faint);width:120px;flex:none}
+/* ─────────── ПРЕВЬЮ СООБЩЕНИЯ ─────────── */
+.tg{background:#E7EBEF;border:1px solid var(--line);border-radius:3px;padding:16px;display:grid;gap:12px}
+.tg-msg{background:#fff;border-radius:9px 9px 9px 2px;padding:11px 13px;max-width:430px;box-shadow:0 1px 2px rgba(22,32,43,.12);font-size:13px;line-height:1.5}
+.tg-msg .t1{font-weight:600;margin-bottom:3px}
+.tg-msg .dom{font-family:"JetBrains Mono",monospace;font-size:13px;font-weight:500}
+.tg-msg .diff{font-family:"JetBrains Mono",monospace;font-size:12.5px;margin:8px 0;line-height:1.75}
+.tg-msg .diff .p{color:var(--breach);font-weight:500}
+.tg-msg .diff .m{color:var(--ink-faint)}
+.tg-msg .diff .g{color:var(--ok);font-weight:500}
+.tg-msg .meta{font-size:12px;color:var(--ink-soft)}
+.tg-msg .cmt{border-left:2px solid var(--mark);padding:1px 0 1px 9px;margin:9px 0;font-size:12.5px;color:#4A4029;background:#FDF8EA}
+.tg-msg .lnk{color:#2E6BB8;font-size:12.5px}
+.tg-msg .ts{font-size:10.5px;color:var(--ink-faint);text-align:right;margin-top:5px;font-family:"JetBrains Mono",monospace}
+.tg-quote{border-left:2px solid #2E6BB8;padding-left:8px;margin-bottom:8px;font-size:12px;color:var(--ink-soft)}
+.tg-quote b{display:block;color:#2E6BB8;font-weight:500;font-size:11.5px}
+/* ─────────── ВЫБОР ГРУППЫ С ПОИСКОМ ─────────── */
+.combo{position:relative}
+.combo-btn{
+  width:100%;display:flex;align-items:center;gap:9px;padding:8px 11px;
+  border:1px solid var(--line);border-radius:var(--r);background:var(--panel);font-size:13px;text-align:left;
+}
+.combo-btn:hover{border-color:var(--ink-faint)}
+.combo-btn .cur{flex:1;font-weight:500}
+.combo-btn .cur.none{font-weight:400;color:var(--ink-faint)}
+.combo-btn .caret{color:var(--ink-faint);font-size:10px}
+.combo-pop{
+  position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;
+  background:var(--panel);border:1px solid var(--ink-faint);border-radius:var(--r);
+  box-shadow:0 18px 40px -20px rgba(22,32,43,.6);overflow:hidden;
+}
+.combo-pop input{
+  width:100%;border:0;border-bottom:1px solid var(--line-soft);padding:10px 12px;
+  font-size:13px;background:var(--panel-2);
+}
+.combo-pop input:focus{outline:0;background:var(--panel)}
+.combo-list{max-height:214px;overflow:auto;padding:4px}
+.combo-opt{
+  display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;
+  padding:8px 10px;border-radius:2px;font-size:13px;
+}
+.combo-opt:hover,.combo-opt:focus-visible{background:var(--panel-2)}
+.combo-opt .nm{font-weight:500}
+.combo-opt .cn{margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-faint)}
+.combo-opt[aria-selected="true"]{background:#FBF2D8}
+.combo-empty{padding:14px 12px;font-size:12.5px;color:var(--ink-faint)}
+.combo-foot{border-top:1px solid var(--line-soft);padding:4px}
+.combo-foot button{width:100%;text-align:left;padding:8px 10px;font-size:12.5px;color:var(--ink-soft);border-radius:2px}
+.combo-foot button:hover{background:var(--panel-2);color:var(--ink)}
+
+/* ─────────── ПЕРЕНОС: СВОДКА ИЗМЕНЕНИЙ ─────────── */
+.diff-box{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:16px}
+.diff-box .dh{padding:9px 13px;background:var(--panel-2);border-bottom:1px solid var(--line-soft)}
+.diff-row{display:grid;grid-template-columns:1fr auto 1fr;gap:11px;align-items:center;padding:11px 13px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.diff-row:last-child{border-bottom:0}
+.diff-row .was{color:var(--ink-faint)}
+.diff-row .arr{color:var(--ink-faint);font-size:11px}
+.diff-row .now{font-weight:500}
+.diff-row .now.warn{color:var(--change)}
+.diff-row .k{grid-column:1/-1;margin-bottom:-4px}
+.diff-keep{padding:11px 13px;font-size:12.5px;color:var(--ink-soft);background:var(--panel-2);border-top:1px solid var(--line-soft)}
+
+/* ─────────── ИМПОРТ ─────────── */
+.imp-sum{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.imp-sum div{padding:11px 13px;border-right:1px solid var(--line-soft)}
+.imp-sum div:last-child{border-right:0}
+.imp-sum b{display:block;font-family:"JetBrains Mono",monospace;font-size:21px;font-weight:500;margin-top:5px}
+.imp-tbl{border:1px solid var(--line);border-radius:var(--r);max-height:270px;overflow:auto}
+.imp-tbl table{min-width:0;width:100%}
+.imp-tbl th{padding:8px 12px;position:sticky;top:0;background:var(--panel);z-index:1}
+.imp-tbl td{padding:9px 12px;font-size:12.5px;vertical-align:top}
+.imp-tbl .d{font-family:"JetBrains Mono",monospace;font-size:12.5px}
+.imp-tbl tr.bad{background:var(--breach-bg)}
+.imp-tbl tr.dup{opacity:.62}
+.drop{
+  border:1px dashed var(--line);border-radius:var(--r);padding:12px 14px;
+  font-size:12.5px;color:var(--ink-soft);display:flex;align-items:center;gap:11px;margin-top:9px;
+}
+/* ─────────── ПРИГЛАШЕНИЕ ─────────── */
+.banner{
+  display:flex;gap:13px;align-items:flex-start;padding:13px 15px;margin-bottom:20px;
+  border:1px solid #E8CFA0;background:#FBF2D8;border-radius:var(--r);
+}
+.banner .bi{font-size:15px;line-height:1.2;color:#8A6A10}
+.banner b{display:block;font-weight:500;font-size:13px;margin-bottom:3px}
+.banner p{margin:0;font-size:12.5px;color:#6B5310;line-height:1.5}
+.banner .ba{margin-left:auto;flex:none;display:flex;gap:7px}
+
+.seg button:disabled{opacity:.42;cursor:not-allowed}
+.seg button:disabled:hover{background:none}
+
+.cred{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:16px 0}
+.cred-row{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid var(--line-soft)}
+.cred-row:last-child{border-bottom:0}
+.cred-row .ck{
+  font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-faint);width:74px;flex:none;
+}
+.cred-row .cv{flex:1;font-family:"JetBrains Mono",monospace;font-size:13px;word-break:break-all}
+.cred-row .cv.big{font-size:15px;font-weight:700;letter-spacing:.02em}
+
+.done-mark{display:flex;align-items:center;gap:9px;margin-bottom:4px}
+.done-mark .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none}
+.done-mark b{font-size:15px;font-weight:600}
+
+.pw-strength{display:flex;gap:3px;margin-top:8px}
+.pw-strength i{flex:1;height:3px;border-radius:2px;background:var(--line)}
+.pw-strength i.f{background:var(--ok)}
+
+.state.pend{color:var(--change)}
+.open-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line-soft);align-items:center}
+.open-row:last-child{border-bottom:0}
+.open-row .age{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:500;color:var(--breach);display:block;text-align:right}
+.open-row .rem{font-size:11.5px;color:var(--ink-faint);display:block;text-align:right;margin-top:3px}
+.line-err{display:flex;gap:9px;align-items:baseline;padding:7px 10px;border-left:2px solid var(--breach);background:var(--breach-bg);font-size:12px;margin-top:7px}
+.line-err .ln{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--breach);font-weight:700;flex:none}
+.line-warn{display:flex;gap:9px;align-items:baseline;padding:7px 10px;border-left:2px solid #D9A825;background:#FBF2D8;font-size:12px;margin-top:7px;color:#6B5310}
+.line-warn .ln{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;flex:none}
+.danger{border:1px solid #EFC7C7;border-radius:var(--r);margin-top:20px;overflow:hidden}
+.danger .dh{padding:9px 13px;background:var(--breach-bg);border-bottom:1px solid #EFC7C7}
+.danger .dh .eyebrow{color:var(--breach);margin:0}
+.danger .dr{padding:12px 13px;border-bottom:1px solid var(--line-soft);display:flex;gap:12px;align-items:center}
+.danger .dr:last-child{border-bottom:0}
+.danger .dr .dt{flex:1;font-size:12.5px}
+.danger .dr .dt b{display:block;font-weight:500;font-size:13px;margin-bottom:3px}
+.info-box{border:1px solid var(--line);border-radius:var(--r);background:var(--panel-2);overflow:hidden;margin-bottom:18px}
+.info-box .ir{display:flex;gap:12px;align-items:center;padding:10px 13px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.info-box .ir:last-child{border-bottom:0}
+.info-box .ik{width:132px;flex:none;color:var(--ink-faint)}
+.tgl{display:inline-flex;align-items:center;gap:9px;font-size:13px;cursor:pointer}
+.tgl input{accent-color:var(--ink);margin:0}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:1180px){
+  .reg-scale,.reg-row{grid-template-columns:170px 1fr 76px 76px 124px;gap:10px}
+  .reg-row .when{font-size:11px}
+  .reg-scale .axis .c{display:none}
+}
+
+/* ═════════ ПЛАНШЕТ ═════════ */
+@media (max-width:1000px){
+  .app.on{grid-template-columns:1fr}
+  .rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .nav{display:flex;gap:6px;overflow-x:auto;padding:8px}
+  .nav button{width:auto;white-space:nowrap}
+  .rail-foot{display:none}
+  .head,.body{padding-left:20px;padding-right:20px}
+  .stats{grid-template-columns:1fr 1fr}
+  .stat:nth-child(2){border-right:0}
+  .stat:nth-child(-n+2){border-bottom:1px solid var(--line-soft)}
+  .grid2{grid-template-columns:1fr}
+  .row{grid-template-columns:1fr;gap:10px}
+  .auth.on{grid-template-columns:1fr}
+  .auth-art{display:none}
+}
+
+/* ═════════ ТЕЛЕФОН ═════════ */
+@media (max-width:640px){
+  body::before{background-size:44px 100%}
+
+  /* нижняя панель вместо бокового меню */
+  .rail{
+    position:fixed;left:0;right:0;bottom:0;top:auto;z-index:40;
+    border-top:1px solid var(--line);border-bottom:0;flex-direction:column;
+    box-shadow:0 -6px 20px -14px rgba(22,32,43,.5);
+  }
+  .brand{display:none}
+  .nav{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;overflow:visible;padding:5px 5px calc(5px + env(safe-area-inset-bottom))}
+  .nav button{
+    flex-direction:column;gap:2px;justify-content:center;text-align:center;
+    padding:7px 2px;font-size:10.5px;line-height:1.25;border-radius:4px;
+  }
+  .nav button[data-go="settings"],.nav button[data-go="users"]{display:none}
+  .nav .more-btn{display:flex}
+  .nav .count{margin-left:0;font-size:10px;padding:0 4px}
+  .more-sheet{
+    position:absolute;bottom:100%;right:8px;margin-bottom:8px;width:210px;
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    box-shadow:0 14px 34px -16px rgba(22,32,43,.6);padding:6px;
+  }
+  .more-sheet button{display:block;width:100%;text-align:left;padding:10px 11px;border-radius:3px;font-size:14px;font-weight:500}
+  .more-sheet button:hover{background:var(--panel-2)}
+  .more-sheet .who{border-top:1px solid var(--line-soft);margin-top:5px;padding:10px 11px 5px;font-size:12px;color:var(--ink-faint)}
+  .more-sheet .who b{display:block;color:var(--ink);font-weight:500;font-size:13px;margin-bottom:2px}
+
+  .head{padding:16px 14px 14px;gap:12px}
+  .head h1{font-size:19px}
+  .head p{font-size:12.5px}
+  .head .actions{margin-left:0;width:100%;gap:7px}
+  .head .actions .btn{flex:1;justify-content:center}
+  .body{padding:16px 14px 96px}
+  .body[style*="max-width"]{max-width:100%!important}
+
+  .panel-h{padding:12px 14px;flex-wrap:wrap;gap:8px}
+  .panel-h .right{margin-left:0;width:100%}
+  .seg{width:100%}
+  .seg button{flex:1;text-align:center;padding:8px 6px;font-size:12px}
+  .filters{gap:7px}
+  .search{max-width:none;flex:1 1 100%}
+
+  .stats{grid-template-columns:1fr 1fr}
+  .stat{padding:12px 13px}
+  .stat b{font-size:24px;margin-top:5px}
+
+  /* журнал */
+  .feed li{grid-template-columns:1fr;gap:5px;padding:13px 14px}
+  .feed time{font-size:11px}
+  .hist li{grid-template-columns:1fr;gap:5px}
+
+  /* таблица доменов превращается в карточки */
+  table{min-width:0!important}
+  [data-screen="domains"] thead{display:none}
+  [data-screen="domains"] table,[data-screen="domains"] tbody,
+  [data-screen="domains"] tr,[data-screen="domains"] td{display:block;width:auto}
+  [data-screen="domains"] tr{padding:14px;border-bottom:1px solid var(--line)}
+  [data-screen="domains"] tr:last-child{border-bottom:0}
+  [data-screen="domains"] td{padding:0;border:0;margin-top:9px}
+  [data-screen="domains"] td:first-child{margin-top:0}
+  [data-screen="domains"] td[data-l]::before{
+    content:attr(data-l);display:block;
+    font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:10px;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:4px;
+  }
+  [data-screen="domains"] td:last-child{margin-top:12px}
+  [data-screen="domains"] td:last-child .btn{width:100%;justify-content:center}
+  [data-screen="domains"] .ips{max-width:none}
+
+  /* реестр адресов */
+  .reg{min-width:0!important}
+  .reg-scale{display:none}
+  .reg-row{display:flex;flex-wrap:wrap;gap:9px;padding:14px}
+  .reg-row .addr{order:1;flex:1 1 auto}
+  .reg-row .act{order:2;flex:0 0 auto;text-align:right}
+  .reg-row .trace{order:3;flex:1 1 100%;height:26px}
+  .reg-row .trace i{height:22px}
+  .reg-row .when{order:4;flex:0 0 calc(50% - 5px);font-size:11px}
+  .reg-row .when::before{
+    content:attr(data-l);display:block;
+    font-family:"IBM Plex Sans Condensed",sans-serif;font-weight:600;font-size:10px;
+    letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:2px;
+  }
+  .reg-row .when br{display:none}
+  .reg-legend{gap:8px 14px;font-size:11px}
+
+  /* линейка: подписи заменяются списком под ней */
+  .ruler{padding:14px 13px 12px}
+  .ruler-h{margin-bottom:14px;gap:6px}
+  .ruler-h .st{margin-left:0;flex:1 1 100%}
+  .track:not(.zoomed) .pin b{display:none}
+  .track:not(.zoomed) .pin.tier2::before{display:none}
+  .track:not(.zoomed) .pin.tier2 b{bottom:16px}
+  .ruler-list{display:flex;gap:5px;flex-wrap:wrap;margin-top:13px}
+  .zoomed .pin b{font-size:10px}
+  .scale{font-size:10px}
+  .outside{flex-wrap:wrap;padding:13px 14px}
+  .outside .lbl{flex:1 1 100%}
+  .outside .lbl br{display:none}
+  .outside > div:last-child{flex:1 1 100%;flex-direction:row!important}
+  .outside > div:last-child .btn{flex:1;justify-content:center}
+
+  /* группы, формы, сообщения */
+  .gcards{grid-template-columns:1fr}
+  .gcard .meta .k{width:88px}
+  .radio label{padding:11px 12px}
+  .tg{padding:12px}
+  .tg-msg{max-width:100%}
+  .veil{padding:14px 12px}
+  .modal-f{flex-direction:column-reverse}
+  .modal-f .btn{width:100%;justify-content:center}
+  .auth-form{padding:24px 18px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ ВХОД ══════════ -->
+<div class="auth on" id="auth">
+  <div class="auth-art">
+    <div>
+      <div class="eyebrow">DNS monitoring</div>
+      <h2 style="margin-top:14px">Домен указывает не туда — вы узнаёте первым</h2>
+      <p>Сервис резолвит A- и AAAA-записи по расписанию, сравнивает с предыдущим ответом и со списком разрешённых адресов и подсетей. Расхождение уходит в Telegram.</p>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:3px;background:var(--paper);padding:16px">
+      <div class="eyebrow" style="margin-bottom:12px">Пример проверки</div>
+      <div class="mono" style="font-size:12px;line-height:2">
+        <div style="color:var(--ink-soft)">pay-gw.contoso.ru → 3 адреса</div>
+        <div><span style="color:var(--ok)">✓</span> 10.20.1.14 &nbsp;<span style="color:var(--ink-faint)">10.20.0.0/22</span></div>
+        <div><span style="color:var(--ok)">✓</span> 10.20.2.61 &nbsp;<span style="color:var(--ink-faint)">10.20.0.0/22</span></div>
+        <div><span style="color:var(--breach)">✕</span> <b style="color:var(--breach)">185.44.9.201</b> &nbsp;<span style="color:var(--breach)">не решён</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-card">
+      <div class="eyebrow">DNS monitoring</div>
+      <h1>Вход</h1>
+      <p>Доступ только для участников рабочего пространства.</p>
+      <div class="err" id="loginErr" hidden>Неверная почта или пароль. Осталось 4 попытки до блокировки на 15 минут.</div>
+      <div class="field">
+        <label for="lg-mail">Рабочая почта</label>
+        <input class="inp mono" id="lg-mail" type="email" value="a.kirilova@contoso.ru" autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="lg-pass">Пароль</label>
+        <input class="inp" id="lg-pass" type="password" value="••••••••••••" autocomplete="current-password">
+      </div>
+      <div class="field" style="margin-bottom:22px" id="otpField" hidden>
+        <label for="lg-otp">Код из приложения</label>
+        <div class="hint">Шесть цифр, обновляются каждые 30 секунд.</div>
+        <input class="inp mono" id="lg-otp" inputmode="numeric" maxlength="6" placeholder="000000" style="letter-spacing:.4em">
+      </div>
+      <button class="btn btn-solid" style="width:100%;justify-content:center" onclick="signIn()">Войти</button>
+      <div class="auth-note">Забыли пароль — напишите администратору рабочего пространства.</div>
+      <div class="auth-note" style="margin-top:22px;padding-top:14px;border-top:1px dashed var(--line)">
+        <span class="eyebrow">Только в прототипе</span><br>
+        <button onclick="toggle2fa()" style="text-decoration:underline;font-size:12px;margin-top:6px" id="otpSwitch">Показать вариант с AUTH_2FA_ENABLED=true</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ПРИЛОЖЕНИЕ ══════════ -->
+<div class="app" id="app">
+  <aside class="rail">
+    <div class="brand">
+      <b>DNS monitoring</b>
+      <div class="eyebrow">contoso.ru</div>
+    </div>
+    <nav class="nav">
+      <button data-go="overview" aria-current="page">Обзор <span class="count hot">2</span></button>
+      <button data-go="domains">Домены <span class="count">18</span></button>
+      <button data-go="groups">Группы <span class="count">4</span></button>
+      <button data-go="events">Журнал</button>
+      <button data-go="settings">Настройки</button>
+      <button data-go="users">Пользователи <span class="count">2</span></button>
+      <button class="more-btn" onclick="toggleMore()">Ещё</button>
+    </nav>
+    <div class="more-sheet" id="moreSheet" hidden>
+      <button data-go="settings">Настройки</button>
+      <button data-go="users">Пользователи</button>
+      <div class="who"><b>Анна Кирилова</b>Администратор · выйти</div>
+    </div>
+    <div class="rail-foot">
+      <b>Анна Кирилова</b>
+      Администратор
+    </div>
+  </aside>
+
+  <div class="main">
+
+    <!-- ── ОБЗОР ── -->
+    <section data-screen="overview">
+      <div class="head">
+        <div>
+          <div class="eyebrow">Обзор</div>
+          <h1>Сегодня два расхождения</h1>
+          <p>Последний круг проверок закончился в 14:38. Следующий — через 4 минуты.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" data-go="domains">Все домены</button>
+        </div>
+      </div>
+      <div class="body">
+        <div class="stats" style="margin-bottom:22px">
+          <div class="stat"><div class="eyebrow">Под наблюдением</div><b>18</b><small>в 4 группах</small></div>
+          <div class="stat s-breach"><div class="eyebrow">Не решены</div><b>1</b><small>pay-gw.contoso.ru</small></div>
+          <div class="stat s-change"><div class="eyebrow">Адреса изменились</div><b>1</b><small>за последние сутки</small></div>
+          <div class="stat s-fail"><div class="eyebrow">Не резолвится</div><b>1</b><small>3 попытки подряд</small></div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Открытые расхождения</h2>
+            <div class="right"><span class="state breach">1 инцидент</span></div>
+          </div>
+          <div class="open-row">
+            <div>
+              <div class="dn"><button onclick="go('domain')">pay-gw.contoso.ru</button></div>
+              <div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+                <span class="chip out"><span class="glyph">✕</span>185.44.9.201</span>
+                <span style="font-size:12px;color:var(--ink-faint)">Платёжный контур</span>
+              </div>
+            </div>
+            <div>
+              <span class="age">3 ч 12 мин</span>
+              <span class="rem">напоминание 2 ч назад,<br>следующее через 3 ч 48 мин</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="panel">
+            <div class="panel-h">
+              <h2>Что произошло</h2>
+              <div class="right"><button class="btn btn-sm" data-go="events">Весь журнал</button></div>
+            </div>
+            <ul class="feed">
+              <li>
+                <time>14:38</time>
+                <div>
+                  <div class="what"><span class="state breach">Адрес не решён</span> — <code>pay-gw.contoso.ru</code></div>
+                  <div class="det">
+                    <span class="chip out"><span class="glyph">✕</span>185.44.9.201</span>
+                    <span style="font-size:12px;color:var(--ink-faint)">не совпал ни с одной из 5 разрешённых записей</span>
+                  </div>
+                  <div class="note">Уведомление доставлено в Telegram → «Дежурная смена». В сообщение вошёл комментарий домена.</div>
+                </div>
+              </li>
+              <li>
+                <time>11:04</time>
+                <div>
+                  <div class="what"><span class="state change">Набор адресов изменился</span> — <code>cdn.contoso.ru</code></div>
+                  <div class="det">
+                    <span class="chip new"><span class="glyph">+</span>93.184.216.34</span>
+                    <span class="chip gone">93.184.215.12</span>
+                  </div>
+                  <div class="note">Разрешённые адреса не заданы — проверялось только изменение.</div>
+                </div>
+              </li>
+              <li>
+                <time>09:12</time>
+                <div>
+                  <div class="what"><span class="state fail">Домен не резолвится</span> — <code>legacy.contoso.ru</code></div>
+                  <div class="det"><span style="font-size:12px;color:var(--ink-faint)">NXDOMAIN, три попытки подряд начиная с 08:12</span></div>
+                </div>
+              </li>
+              <li>
+                <time>Вчера<br>18:47</time>
+                <div>
+                  <div class="what"><span class="state ok">Адрес снова решён</span> — <code>vpn.hq.contoso.ru</code></div>
+                  <div class="det"><span class="chip"><span class="glyph">✓</span>10.30.4.8</span></div>
+                  <div class="note">Уведомление доставлено в Telegram → «Дежурная смена». Проблема держалась 26 минут.</div>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div style="display:grid;gap:20px">
+            <div class="panel">
+              <div class="panel-h"><h2>Доставка уведомлений</h2></div>
+              <div style="padding:14px 16px">
+                <div class="kv"><span class="k">Telegram</span><span class="state ok">Подключён</span></div>
+                <div class="kv"><span class="k">Получатель</span><code style="font-size:12px">«Дежурная смена»</code></div>
+                <div class="kv"><span class="k">За сутки</span><span>3 сообщения, все доставлены</span></div>
+                <div style="margin-top:12px"><button class="btn btn-sm" data-go="settings">Настроить доставку</button></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-h"><h2>Расписание</h2></div>
+              <div style="padding:14px 16px">
+                <div class="kv"><span class="k">Базовый период</span><span><b class="mono">5 мин</b></span></div>
+                <div class="kv"><span class="k">Свой у групп</span><span>2 из 3</span></div>
+                <div class="kv"><span class="k">Круг проверок</span><span>18 доменов ≈ 11 с</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ДОМЕНЫ ── -->
+    <section data-screen="domains" hidden>
+      <div class="head">
+        <div>
+          <div class="eyebrow">Домены</div>
+          <h1>Под наблюдением</h1>
+          <p>Адреса сравниваются с прошлым ответом, а при заданных подсетях — ещё и с ними.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="openModal('impVeil')">Импорт списком</button>
+          <button class="btn btn-mark" onclick="openAdd()">Добавить домен</button>
+        </div>
+      </div>
+      <div class="body">
+        <div class="filters">
+          <div class="search"><span>⌕</span><input class="inp mono" placeholder="домен или IP"></div>
+          <div class="seg">
+            <button class="on">Все</button>
+            <button>Расхождения</button>
+            <button>Без разрешённых</button>
+            <button>Выключенные</button>
+          </div>
+          <div style="min-width:210px"><div class="combo" id="filterCombo">
+                  <button class="combo-btn" onclick="openCombo(this)" aria-haspopup="listbox" aria-expanded="false"><span class="cur">Все группы</span><span class="caret">▼</span></button>
+                  <div class="combo-pop" hidden>
+                    <input placeholder="Найти группу" oninput="filterCombo(this)" aria-label="Поиск по группам">
+                    <div class="combo-list" role="listbox"><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Без группы</span><span class="cn">—</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Платёжный контур</span><span class="cn">4</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Продакшн-периметр</span><span class="cn">9</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внешние подрядчики</span><span class="cn">5</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внутренние сервисы</span><span class="cn">12</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Партнёрские API</span><span class="cn">7</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Тестовые стенды</span><span class="cn">6</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Устаревшее, под снос</span><span class="cn">3</span></button></div>
+                    <div class="combo-empty" hidden>Ничего не найдено</div>
+                    
+                  </div>
+                </div></div>
+        </div>
+
+        <div class="panel">
+          <div class="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>Домен</th><th>Адреса</th><th>Проверка адресов</th><th>Проверка</th><th>Уведомления</th><th title="20 последних проверок домена, слева направо. Ось — последовательность проверок, а не время. Пустая отметка означает, что проверки не было.">История</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="sel">
+                  <td>
+                    <div class="dn"><button onclick="go('domain')">pay-gw.contoso.ru</button></div>
+                    <div class="sub">Платёжный контур</div>
+                    <div class="sub" title="Точка входа платёжного шлюза. Адреса статические, смена возможна только по заявке.">Платёжный шлюз, адреса статические</div>
+                  </td>
+                  <td data-l="Адреса">
+                    <div class="ips">
+                      <span class="chip">10.20.1.14</span>
+                      <span class="chip">10.20.2.61</span>
+                      <span class="chip out"><span class="glyph">✕</span>185.44.9.201</span>
+                    </div>
+                  </td>
+                  <td data-l="Проверка адресов"><span class="state breach">1 не решён</span><div class="sub mono">3 записи в списке</div></td>
+                  <td data-l="Проверка"><span class="mono">5 мин</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="Уведомления"><span style="font-size:12px">Выход из разрешённых</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="История"><div class="tape"><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-breach"></i><i class="e-breach"></i></div><div class="sub">14:38</div></td>
+                  <td><button class="btn btn-sm" onclick="go('domain')">Открыть</button></td>
+                </tr>
+                <tr>
+                  <td><div class="dn"><button onclick="go('domain')">cdn.contoso.ru</button></div><div class="sub">Внешние подрядчики</div></td>
+                  <td data-l="Адреса"><div class="ips"><span class="chip new"><span class="glyph">+</span>93.184.216.34</span><span class="chip">93.184.216.35</span></div></td>
+                  <td data-l="Проверка адресов"><span style="font-size:12px;color:var(--ink-faint)">Ничего не задано</span><div class="sub">только изменения</div></td>
+                  <td data-l="Проверка"><span class="mono">15 мин</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="Уведомления"><span style="font-size:12px">Изменение адресов</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="История"><div class="tape"><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-change"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i></div><div class="sub">11:04</div></td>
+                  <td><button class="btn btn-sm">Открыть</button></td>
+                </tr>
+                <tr>
+                  <td><div class="dn"><button>vpn.hq.contoso.ru</button></div><div class="sub">Продакшн-периметр</div></td>
+                  <td data-l="Адреса"><div class="ips"><span class="chip">10.30.4.8</span></div></td>
+                  <td data-l="Проверка адресов"><span class="state ok">Решён</span><div class="sub mono">10.30.4.0/24</div></td>
+                  <td data-l="Проверка"><span class="mono">5 мин</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="Уведомления"><span style="font-size:12px">Выход из разрешённых</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="История"><div class="tape"><i class="e-ok"></i><i class="e-ok"></i><i class="e-breach"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i></div><div class="sub">14:35</div></td>
+                  <td><button class="btn btn-sm">Открыть</button></td>
+                </tr>
+                <tr>
+                  <td><div class="dn"><button>api.contoso.ru</button></div><div class="sub">Продакшн-периметр</div></td>
+                  <td data-l="Адреса"><div class="ips"><span class="chip">10.20.1.9</span><span class="chip">10.20.1.10</span><span class="chip">2a02:6b8::1</span></div></td>
+                  <td data-l="Проверка адресов"><span class="state ok">Все решены</span><div class="sub mono">4 записи в списке</div></td>
+                  <td data-l="Проверка"><span class="mono">5 мин</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="Уведомления"><span style="font-size:12px">Выход из разрешённых</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="История"><div class="tape"><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i></div><div class="sub">14:35</div></td>
+                  <td><button class="btn btn-sm">Открыть</button></td>
+                </tr>
+                <tr>
+                  <td><div class="dn"><button>legacy.contoso.ru</button></div><div class="sub">Продакшн-периметр</div></td>
+                  <td data-l="Адреса"><div class="ips"><span class="chip gone">10.20.7.4</span></div></td>
+                  <td data-l="Проверка адресов"><span class="state fail">Нет ответа</span><div class="sub">NXDOMAIN ×3</div></td>
+                  <td data-l="Проверка"><span class="mono">5 мин</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="Уведомления"><span style="font-size:12px">Выход из разрешённых</span><div class="sub"><span class="tag inherit">от группы</span></div></td>
+                  <td data-l="История"><div class="tape"><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-ok"></i><i class="e-fail"></i><i class="e-fail"></i><i class="e-fail"></i></div><div class="sub">14:35</div></td>
+                  <td><button class="btn btn-sm">Открыть</button></td>
+                </tr>
+                <tr style="opacity:.55">
+                  <td><div class="dn"><button>status.contoso.ru</button></div><div class="sub">Без группы · наблюдение выключено</div></td>
+                  <td data-l="Адреса"><div class="ips"><span class="chip">104.21.9.77</span></div></td>
+                  <td data-l="Проверка адресов"><span style="font-size:12px;color:var(--ink-faint)">Не заданы</span></td>
+                  <td data-l="Проверка"><span style="font-size:12px;color:var(--ink-faint)">—</span></td>
+                  <td data-l="Уведомления"><span style="font-size:12px;color:var(--ink-faint)">Не уведомлять</span></td>
+                  <td data-l="История"><div class="tape"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="sub">12 мая</div></td>
+                  <td><button class="btn btn-sm">Открыть</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── КАРТОЧКА ДОМЕНА ── -->
+    <section data-screen="domain" hidden>
+      <div class="head">
+        <div>
+          <button class="back" data-go="domains">← Домены</button>
+          <h1 class="mono" style="font-size:22px">pay-gw.contoso.ru</h1>
+          <p>Группа «Платёжный контур» · проверка раз в 5 минут · последний ответ в 14:38</p>
+          <p class="note-line">Точка входа платёжного шлюза. Адреса статические, смена возможна только по заявке — при неожиданном изменении сначала звонить дежурному инфраструктуры.</p>
+        </div>
+        <div class="actions">
+          <button class="btn">Проверить сейчас</button>
+          <button class="btn">Приостановить</button>
+        </div>
+      </div>
+      <div class="body">
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Разрешённые адреса и подсети</h2>
+            <div class="right"><span class="state breach">1 из 3 адресов не решён</span></div>
+          </div>
+          <div style="padding:18px 16px 16px">
+
+            <div class="ruler">
+              <div class="ruler-h">
+                <code>10.20.0.0/22</code>
+                <span class="cap">10.20.0.0 — 10.20.3.255 · 1024 адреса · 1 адрес ≈ 0,6 px</span>
+                <span class="st"><span class="state ok">3 адреса внутри</span></span>
+              </div>
+              <div class="track">
+                <span class="tick maj" style="left:0%"></span>
+                <span class="tick" style="left:12.5%"></span>
+                <span class="tick maj" style="left:25%"></span>
+                <span class="tick" style="left:37.5%"></span>
+                <span class="tick maj" style="left:50%"></span>
+                <span class="tick" style="left:62.5%"></span>
+                <span class="tick maj" style="left:75%"></span>
+                <span class="tick" style="left:87.5%"></span>
+                <span class="pin" style="left:26.37%"><b>10.20.1.14</b><i></i></span>
+                <button class="pin cluster" style="left:55.9%" onclick="toggleZoom()" aria-expanded="false" title="10.20.2.60 и 10.20.2.61 — соседние адреса"><b>10.20.2.60–61</b><i><em>2</em></i></button>
+              </div>
+              <div class="scale"><span>10.20.0.0</span><span>10.20.1.255</span><span>10.20.3.255</span></div>
+              <div class="ruler-list"><span class="chip">10.20.1.14</span><span class="chip">10.20.2.60</span><span class="chip">10.20.2.61</span></div>
+
+              <div class="zoom" id="zoomBlock" hidden>
+                <div class="zoom-h">
+                  <span class="eyebrow">Увеличено</span>
+                  <code>10.20.2.48 — 10.20.2.63</code>
+                  <span class="cap">16 адресов из 1024 · 1 адрес ≈ 37 px</span>
+                  <button class="btn btn-sm" style="margin-left:auto" onclick="toggleZoom()">Свернуть</button>
+                </div>
+                <div class="track zoomed">
+                  <span class="tick maj" style="left:0%"></span>
+                  <span class="tick" style="left:6.25%"></span>
+                  <span class="tick" style="left:12.5%"></span>
+                  <span class="tick" style="left:18.75%"></span>
+                  <span class="tick maj" style="left:25%"></span>
+                  <span class="tick" style="left:31.25%"></span>
+                  <span class="tick" style="left:37.5%"></span>
+                  <span class="tick" style="left:43.75%"></span>
+                  <span class="tick maj" style="left:50%"></span>
+                  <span class="tick" style="left:56.25%"></span>
+                  <span class="tick" style="left:62.5%"></span>
+                  <span class="tick" style="left:68.75%"></span>
+                  <span class="tick maj" style="left:75%"></span>
+                  <span class="tick" style="left:81.25%"></span>
+                  <span class="tick" style="left:87.5%"></span>
+                  <span class="tick" style="left:93.75%"></span>
+                  <span class="pin tier2" style="left:78.1%"><b>10.20.2.60</b><i></i></span>
+                  <span class="pin" style="left:84.4%"><b>10.20.2.61</b><i></i></span>
+                </div>
+                <div class="scale"><span>10.20.2.48</span><span>10.20.2.56</span><span>10.20.2.63</span></div>
+              </div>
+            </div>
+
+            <div class="ruler">
+              <div class="ruler-h">
+                <code>10.30.4.0/24</code>
+                <span class="cap">10.30.4.0 — 10.30.4.255 · 256 адресов</span>
+                <span class="st"><span class="state" style="color:var(--ink-faint)">пусто</span></span>
+              </div>
+              <div class="track">
+                <span class="tick maj" style="left:0%"></span>
+                <span class="tick" style="left:12.5%"></span>
+                <span class="tick maj" style="left:25%"></span>
+                <span class="tick" style="left:37.5%"></span>
+                <span class="tick maj" style="left:50%"></span>
+                <span class="tick" style="left:62.5%"></span>
+                <span class="tick maj" style="left:75%"></span>
+                <span class="tick" style="left:87.5%"></span>
+              </div>
+              <div class="scale"><span>10.30.4.0</span><span>10.30.4.127</span><span>10.30.4.255</span></div>
+              <div class="ruler-list"><span style="font-size:12px;color:var(--ink-faint)">Ни один адрес не попадает в этот диапазон</span></div>
+            </div>
+
+            <div class="ruler" style="padding-bottom:16px">
+              <div class="ruler-h" style="margin-bottom:12px">
+                <code>Записи без маски</code>
+                <span class="cap">шкалу рисовать не из чего — совпадение проверяется точным сравнением</span>
+                <span class="st"><span class="state stale">не отдаётся 10 дней</span></span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span class="chip gone">10.20.3.7</span>
+              </div>
+            </div>
+
+            <div class="outside">
+              <div class="lbl">Не<br>решён</div>
+              <div style="flex:1">
+                <span class="chip out" style="font-size:13px;padding:4px 8px"><span class="glyph">✕</span>185.44.9.201</span>
+                <div class="txt">Появился в 14:38, держится две проверки подряд. Не совпадает ни с одним разрешённым адресом и не входит ни в одну подсеть.</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <button class="btn btn-sm">Разрешить адрес</button>
+                <button class="btn btn-sm">Добавить подсеть</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Реестр адресов</h2>
+            <div class="right">
+              <div class="seg">
+                <button>Решённые</button><button>Нерешённые</button><button>Неактуальные</button><button class="on">Все</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:13px 0 0">
+            <div style="padding:0 16px 13px;font-size:12.5px;color:var(--ink-soft);max-width:88ch">
+              Каждый адрес, который домен когда-либо отдавал. Одна отметка — одни сутки: закрашена, если адрес был хотя бы в одном ответе за этот день.
+              Обрыв следа и есть момент, когда адрес перестал отдаваться.
+            </div>
+
+            <div style="padding:0 16px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span class="eyebrow" style="margin-right:2px">Масштаб</span>
+              <div class="seg"><button>24 часа</button><button>7 дней</button><button>30 дней</button><button class="on">Всё наблюдение</button></div>
+              <span id="traceCap" style="font-size:12px;color:var(--ink-faint)">110 суток</span>
+            </div>
+
+            <div class="tw">
+            <div class="reg" style="min-width:860px">
+              <div class="reg-scale">
+                <div class="th">Адрес</div>
+                <div class="axis"><span class="l">12 мая</span><span class="c">6 июля</span><span class="r">сегодня</span></div>
+                <div class="th">Первый раз</div>
+                <div class="th">Последний</div>
+                <div class="th">Статус</div>
+              </div>
+
+              <div class="reg-row">
+                <div class="addr"><span class="chip">10.20.1.14</span><span class="match">входит в 10.20.0.0/22</span></div>
+                <div class="trace" data-spans="0-109" data-gaps="" data-cls="a"></div>
+                <div class="when" data-l="Первый раз">12.05 10:02</div>
+                <div class="when" data-l="Последний">сегодня<br>14:38</div>
+                <div class="act"><span class="state ok">Решён</span><span class="age" style="display:block;margin-top:4px">отдавался в последней проверке</span></div>
+              </div>
+
+              <div class="reg-row">
+                <div class="addr"><span class="chip">10.20.2.61</span><span class="match">входит в 10.20.0.0/22</span></div>
+                <div class="trace" data-spans="52-109" data-gaps="" data-cls="a"></div>
+                <div class="when" data-l="Первый раз">03.07 21:40</div>
+                <div class="when" data-l="Последний">сегодня<br>14:38</div>
+                <div class="act"><span class="state ok">Решён</span><span class="age" style="display:block;margin-top:4px">отдавался в последней проверке</span></div>
+              </div>
+
+              <div class="reg-row">
+                <div class="addr"><span class="chip">10.20.2.60</span><span class="match">входит в 10.20.0.0/22</span></div>
+                <div class="trace" data-spans="108-109" data-gaps="" data-cls="a"></div>
+                <div class="when" data-l="Первый раз">28.08 03:11</div>
+                <div class="when" data-l="Последний">сегодня<br>14:37</div>
+                <div class="act"><span class="state ok">Решён</span><span class="age" style="display:block;margin-top:4px">отдавался 1 минуту назад</span></div>
+              </div>
+
+              <div class="reg-row">
+                <div class="addr"><span class="chip out"><span class="glyph">✕</span>185.44.9.201</span><span class="match">нет совпадений</span></div>
+                <div class="trace" data-spans="109-109" data-gaps="" data-cls="d"></div>
+                <div class="when" data-l="Первый раз">сегодня<br>14:38</div>
+                <div class="when" data-l="Последний">сегодня<br>14:38</div>
+                <div class="act"><span class="state breach">Не решён</span><span class="age" style="display:block;margin-top:4px">появился впервые за всё время</span></div>
+              </div>
+
+              <div class="reg-row">
+                <div class="addr"><span class="chip gone">10.20.3.7</span><span class="match">точное совпадение с 10.20.3.7</span></div>
+                <div class="trace" data-spans="53-99" data-gaps="57,58,64,71,72,80,86,93" data-cls="s"></div>
+                <div class="when" data-l="Первый раз">04.07 06:15</div>
+                <div class="when" data-l="Последний">19.08 13:20</div>
+                <div class="act"><span class="state stale">Не актуален</span><span class="age" style="display:block;margin-top:4px">не отдаётся 10 дней</span></div>
+              </div>
+
+              <div class="reg-row">
+                <div class="addr"><span class="chip gone">10.20.1.15</span><span class="match">входит в 10.20.0.0/22</span></div>
+                <div class="trace" data-spans="0-39" data-gaps="" data-cls="s"></div>
+                <div class="when" data-l="Первый раз">12.05 10:02</div>
+                <div class="when" data-l="Последний">20.06 04:55</div>
+                <div class="act"><span class="state stale">Не актуален</span><span class="age" style="display:block;margin-top:4px">не отдаётся 70 дней</span></div>
+              </div>
+            </div>
+            </div>
+
+            <div class="reg-legend">
+              <span><i class="a"></i> отдавался в этот день, адрес решён</span>
+              <span><i class="d"></i> отдавался, но не решён</span>
+              <span><i class="s"></i> отдавался, сейчас уже не отдаётся</span>
+              <span><i class="o"></i> в этот день не отдавался</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="panel">
+            <div class="panel-h">
+              <h2>История</h2>
+              <div class="right">
+                <div class="seg">
+                  <button class="on">Все</button><button>Изменения</button><button>Выходы</button><button>Ошибки</button>
+                </div>
+              </div>
+            </div>
+            <ul class="hist">
+              <li><time>Сегодня<br>14:38</time><div><span class="state breach">Вышел из разрешённых</span><div class="det" style="margin-top:6px"><span class="chip out">185.44.9.201</span></div></div></li>
+              <li><time>Сегодня<br>14:38</time><div><span class="state change">Адреса изменились</span><div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap"><span class="chip new"><span class="glyph">+</span>185.44.9.201</span><span class="chip gone">10.20.2.60</span></div></div></li>
+              <li><time>Вчера<br>03:11</time><div><span class="state change">Адреса изменились</span><div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap"><span class="chip new"><span class="glyph">+</span>10.20.2.60</span></div><div class="sub">Новый адрес входит в 10.20.0.0/22 — уведомление не отправлялось.</div></div></li>
+              <li><time>12 мая<br>10:02</time><div><span class="state ok">Наблюдение включено</span><div class="sub">Анна Кирилова</div></div></li>
+            </ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-h"><h2>Настройки домена</h2></div>
+            <div style="padding:16px">
+
+              <div style="border:1px solid var(--line);border-radius:3px;background:var(--panel-2);padding:13px 14px;margin-bottom:20px">
+                <div class="eyebrow" style="margin-bottom:9px">Взято из группы</div>
+                <div class="kv"><span class="k">Группа</span><span><b style="font-weight:500">Платёжный контур</b></span></div>
+                <div class="kv"><span class="k">Проверка</span><span class="mono">раз в 5 минут</span></div>
+                <div class="kv"><span class="k">Считать пропавшим</span><span class="mono">через 24 часа</span></div>
+                <div class="kv"><span class="k">Уведомлять</span><span>при выходе из разрешённых, и о возврате в норму</span></div>
+                <div class="kv"><span class="k">Напоминать</span><span>раз в 6 часов</span></div>
+                <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
+                  <button class="btn btn-sm" data-go="group">Настроить группу</button>
+                  <button class="btn btn-sm" onclick="openModal('moveVeil')">Перенести в другую группу</button>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="d-sub">Разрешённые адреса и подсети</label>
+                <div class="hint">По одной записи в строке. Отдельный адрес — <code style="font-size:11.5px">10.20.3.7</code>, диапазон — <code style="font-size:11.5px">10.20.0.0/22</code>. Пустой список означает, что проверять вхождение не с чем.</div>
+                <textarea class="inp" id="d-sub" rows="5" style="border-color:#E4A5A5">10.20.0.0/22
+10.30.4.0/24
+10.20.3.7
+10.20.999.0/24</textarea>
+                <div class="line-err"><span class="ln">стр. 4</span><span>999 — недопустимый октет. Значение каждого октета от 0 до 255.</span></div>
+                <div class="line-warn"><span class="ln">стр. 3</span><span>10.20.3.7 уже входит в 10.20.0.0/22 из строки 1 — запись, скорее всего, лишняя.</span></div>
+                <div class="hint" style="margin:9px 0 0;color:var(--breach)">Пока есть ошибочная строка, сохранить нельзя.</div>
+              </div>
+
+              <div class="field">
+                <label for="d-note">Комментарий</label>
+                <div class="hint">Что это за домен и что делать, если адрес изменился. Уходит в текст уведомления — дежурный увидит его ночью раньше, чем откроет интерфейс.</div>
+                <textarea class="inp" id="d-note" rows="3" style="font-family:inherit;font-size:13px" placeholder="Например: платёжный шлюз, при смене адреса писать в инфраструктуру">Точка входа платёжного шлюза. Адреса статические, смена возможна только по заявке — при неожиданном изменении сначала звонить дежурному инфраструктуры, потом разбираться.</textarea>
+              </div>
+
+              <div class="field">
+                <label>Типы записей</label>
+                <div style="display:flex;gap:16px;margin-top:6px">
+                  <label class="tgl"><input type="checkbox" checked> A</label>
+                  <label class="tgl"><input type="checkbox" checked> AAAA</label>
+                  <label class="tgl"><input type="checkbox"> CNAME</label>
+                </div>
+              </div>
+
+              <div class="field" style="margin-bottom:0">
+                <label class="tgl"><input type="checkbox" checked> Наблюдение включено</label>
+                <div class="hint" style="margin:6px 0 0">Выключенный домен не проверяется и не шлёт уведомлений, но реестр адресов сохраняется.</div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft);display:flex;gap:8px">
+                <button class="btn btn-solid">Сохранить</button>
+                <button class="btn btn-danger">Удалить домен</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ГРУППЫ ── -->
+    <section data-screen="groups" hidden>
+      <div class="head">
+        <div>
+          <div class="eyebrow">Группы</div>
+          <h1>Здесь задаются период и уведомления</h1>
+          <p>Домен берёт расписание и режим уведомлений у своей группы. Разрешённые адреса складываются: общий список плюс список группы плюс список домена.</p>
+        </div>
+        <div class="actions"><button class="btn btn-mark">Создать группу</button></div>
+      </div>
+      <div class="body">
+        <div class="gcards">
+          <div class="panel gcard">
+            <h3>Платёжный контур <span class="state breach" style="font-size:11px">1</span></h3>
+            <p class="note-line">Эквайринг и 3-D Secure. Адреса меняются только через заявку.</p>
+            <div class="meta">
+              <div><span class="k">Доменов</span><span>4</span></div>
+              <div><span class="k">Проверка</span><span class="mono">5 мин</span> <span class="tag override">своё</span></div>
+              <div><span class="k">Уведомлять</span><span>при выходе из разрешённых<br><span style="color:var(--ink-faint)">и о возврате в норму</span></span></div>
+            </div>
+            <div class="foot"><button class="btn btn-sm" data-go="group">Настроить</button><button class="btn btn-sm" data-go="domains">Домены группы</button></div>
+          </div>
+
+          <div class="panel gcard">
+            <h3>Продакшн-периметр</h3>
+            <p class="note-line">Всё, что смотрит наружу с боевого контура.</p>
+            <div class="meta">
+              <div><span class="k">Доменов</span><span>9</span></div>
+              <div><span class="k">Проверка</span><span class="mono">5 мин</span> <span class="tag inherit">по умолчанию</span></div>
+              <div><span class="k">Уведомлять</span><span>при выходе из разрешённых <span class="tag inherit">по умолчанию</span></span></div>
+            </div>
+            <div class="foot"><button class="btn btn-sm" data-go="group">Настроить</button><button class="btn btn-sm" data-go="domains">Домены группы</button></div>
+          </div>
+
+          <div class="panel gcard">
+            <h3>Внешние подрядчики</h3>
+            <p class="note-line">Чужая инфраструктура — адреса плавают, следим только за фактом смены.</p>
+            <div class="meta">
+              <div><span class="k">Доменов</span><span>5</span></div>
+              <div><span class="k">Проверка</span><span class="mono">15 мин</span> <span class="tag override">своё</span></div>
+              <div><span class="k">Уведомлять</span><span>при изменении адресов</span></div>
+            </div>
+            <div class="foot"><button class="btn btn-sm" data-go="group">Настроить</button><button class="btn btn-sm" data-go="domains">Домены группы</button></div>
+          </div>
+
+          <div class="panel gcard">
+            <h3>Без группы</h3>
+            <p class="note-line">Домены, которые ещё не разложили по группам.</p>
+            <div class="meta">
+              <div><span class="k">Доменов</span><span>1</span></div>
+              <div><span class="k">Проверка</span><span class="mono">5 мин</span> <span class="tag inherit">общая</span></div>
+              <div><span class="k">Уведомлять</span><span>при выходе из разрешённых <span class="tag inherit">общая</span></span></div>
+            </div>
+            <div class="foot"><button class="btn btn-sm" data-go="settings">Открыть общие настройки</button></div>
+          </div>
+
+          <div class="panel gcard" style="border-style:dashed;background:transparent;box-shadow:none">
+            <div class="empty" style="padding:26px 8px">
+              <h3>Новая группа</h3>
+              <p>Домены с одним расписанием и одними разрешёнными адресами — настроите один раз.</p>
+              <button class="btn">Создать группу</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── НАСТРОЙКА ГРУППЫ ── -->
+    <section data-screen="group" hidden>
+      <div class="head">
+        <div>
+          <button class="back" data-go="groups">← Группы</button>
+          <h1>Платёжный контур</h1>
+          <p>4 домена · период и уведомления берутся отсюда. Разрешённые адреса каждый домен задаёт сам.</p>
+        </div>
+        <div class="actions"><button class="btn">Проверить домены группы</button></div>
+      </div>
+      <div class="body" style="max-width:840px">
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Группа</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Название</div>
+              <div><input class="inp" style="max-width:340px" value="Платёжный контур"></div>
+            </div>
+            <div class="row">
+              <div class="k">Комментарий<div class="d">Зачем эта группа и кто за неё отвечает. Подставляется в уведомление, если у домена нет своего комментария.</div></div>
+              <div><textarea class="inp" rows="3" style="font-family:inherit;font-size:13px" placeholder="Например: контур эквайринга, дежурит команда платежей">Домены эквайринга и 3-D Secure. Адреса меняются только через заявку в инфраструктуру, любое изменение — повод разбираться.</textarea></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Проверка</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Период<div class="d">Как часто резолвить домены группы.</div></div>
+              <div>
+                <div class="seg"><button>По умолчанию</button><button>1 мин</button><button class="on">5 мин</button><button>15 мин</button><button>1 ч</button><button>6 ч</button><button>Своё</button></div>
+                <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <span class="tag override">своё</span>
+                  <span style="font-size:12px;color:var(--ink-soft)">по умолчанию — 5 мин</span>
+                  <button class="btn btn-sm">Вернуть значение по умолчанию</button>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Считать адрес пропавшим через<div class="d">Сколько адрес должен не отдаваться, чтобы стать неактуальным.</div></div>
+              <div>
+                <div class="seg"><button>По умолчанию</button><button>1 ч</button><button>6 ч</button><button class="on">24 ч</button><button>7 дней</button><button>Своё</button></div>
+                <div style="margin-top:11px;padding:11px 13px;border:1px solid var(--line);border-radius:3px;background:var(--panel-2);font-size:12.5px;color:var(--ink-soft);max-width:62ch">
+                  Если DNS перебирает адреса по кругу, каждый из них регулярно выпадает из ответа и возвращается. Такие пропуски событием не считаются: адрес объявляется пропавшим, только когда молчит дольше указанного срока. Тогда же он получает статус «Не актуален».
+                </div>
+                <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <span class="tag override">своё</span>
+                  <span style="font-size:12px;color:var(--ink-soft)">по умолчанию — 24 ч</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Уведомления</h2></div>
+          <div style="padding:16px">
+            <div class="field" style="margin-bottom:0">
+              <label>Когда уведомлять</label>
+              <div class="radio" style="margin-top:7px">
+                <label><input type="radio" name="ng"><span><span class="t">По умолчанию</span><span class="d">Взять из общих настроек — сейчас это «при выходе из разрешённых»</span></span></label>
+                <label><input type="radio" name="ng"><span><span class="t">Не уведомлять</span><span class="d">События пишутся в журнал, сообщения не уходят</span></span></label>
+                <label><input type="radio" name="ng"><span><span class="t">При изменении адресов</span><span class="d">Появился адрес, которого раньше не было, или прежний адрес пропал насовсем</span></span></label>
+                <label><input type="radio" name="ng" checked><span><span class="t">При выходе из разрешённых</span><span class="d">Адрес не совпал ни с одной записью — ни с отдельным адресом, ни с подсетью</span></span></label>
+              </div>
+              <div style="margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:3px;background:var(--panel-2)">
+                <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+                  <span><span style="font-weight:500">Сообщать и о возврате в норму</span>
+                  <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:2px">Второе сообщение, когда адрес снова стал решённым. Оно ссылается на первое и несёт длительность проблемы.</span></span>
+                </label>
+              </div>
+              <div style="margin-top:9px;display:flex;gap:8px;align-items:center">
+                <span class="tag override">своё</span>
+                <button class="btn btn-sm">Вернуть значение по умолчанию</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-h">
+            <h2>Домены группы</h2>
+            <div class="right"><button class="btn btn-sm">Добавить домен</button></div>
+          </div>
+          <div class="tw">
+            <table style="min-width:560px">
+              <thead><tr><th>Домен</th><th>Адреса</th><th>Состояние</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="dn"><button data-go="domain">pay-gw.contoso.ru</button></td><td><div class="ips"><span class="chip">10.20.1.14</span><span class="chip">10.20.2.61</span><span class="chip out">185.44.9.201</span></div></td><td><span class="state breach">1 не решён</span></td><td><button class="btn btn-sm">Убрать</button></td></tr>
+                <tr><td class="dn"><button>pay-api.contoso.ru</button></td><td><div class="ips"><span class="chip">10.20.1.20</span></div></td><td><span class="state ok">Решён</span></td><td><button class="btn btn-sm">Убрать</button></td></tr>
+                <tr><td class="dn"><button>acq.contoso.ru</button></td><td><div class="ips"><span class="chip">10.30.4.11</span></div></td><td><span class="state ok">Решён</span></td><td><button class="btn btn-sm">Убрать</button></td></tr>
+                <tr><td class="dn"><button>3ds.contoso.ru</button></td><td><div class="ips"><span class="chip">10.20.2.9</span></div></td><td><span class="state ok">Решён</span></td><td><button class="btn btn-sm">Убрать</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ЖУРНАЛ ── -->
+    <section data-screen="events" hidden>
+      <div class="head">
+        <div>
+          <div class="eyebrow">Журнал</div>
+          <h1>Все события</h1>
+          <p>Хранится 90 дней. Отправленные уведомления помечены каналом доставки.</p>
+        </div>
+        <div class="actions"><button class="btn">Выгрузить CSV</button></div>
+      </div>
+      <div class="body">
+        <div class="filters">
+          <div class="search"><span>⌕</span><input class="inp mono" placeholder="домен или IP"></div>
+          <div class="seg">
+            <button class="on">Все</button><button>Выходы из разрешённых</button><button>Изменения</button><button>Ошибки резолва</button>
+          </div>
+          <select class="inp" style="width:auto"><option>Сегодня</option><option>7 дней</option><option>30 дней</option></select>
+        </div>
+        <div class="panel">
+          <ul class="feed">
+            <li><time>14:38</time><div><div class="what"><span class="state breach">Адрес не решён</span> — <code>pay-gw.contoso.ru</code></div><div class="det"><span class="chip out">185.44.9.201</span></div><div class="note">Telegram → «Дежурная смена», доставлено 14:38:04.</div></div></li>
+            <li><time>14:38</time><div><div class="what"><span class="state change">Набор адресов изменился</span> — <code>pay-gw.contoso.ru</code></div><div class="det"><span class="chip new"><span class="glyph">+</span>185.44.9.201</span><span class="chip gone">10.20.2.60</span></div></div></li>
+            <li><time>11:04</time><div><div class="what"><span class="state change">Набор адресов изменился</span> — <code>cdn.contoso.ru</code></div><div class="det"><span class="chip new"><span class="glyph">+</span>93.184.216.34</span><span class="chip gone">93.184.215.12</span></div><div class="note">Telegram → «Дежурная смена», доставлено 11:04:11.</div></div></li>
+            <li><time>09:12</time><div><div class="what"><span class="state fail">Домен не резолвится</span> — <code>legacy.contoso.ru</code></div><div class="note">NXDOMAIN, третья попытка подряд.</div></div></li>
+            <li><time>08:12</time><div><div class="what"><span class="state fail">Домен не резолвится</span> — <code>legacy.contoso.ru</code></div><div class="note">NXDOMAIN, первая попытка.</div></div></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── НАСТРОЙКИ ── -->
+    <section data-screen="settings" hidden>
+      <div class="head">
+        <div>
+          <div class="eyebrow">Настройки</div>
+          <h1>Расписание, уведомления, доступ</h1>
+          <p>Значения отсюда применяются ко всем доменам, у которых нет своих.</p>
+        </div>
+      </div>
+      <div class="body" style="max-width:840px">
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Проверка</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Период по умолчанию<div class="d">Применяется к группам, которые не задали свой, и к доменам без группы.</div></div>
+              <div>
+                <div class="seg"><button>1 мин</button><button class="on">5 мин</button><button>15 мин</button><button>1 ч</button><button>6 ч</button><button>Своё</button></div>
+                <div style="margin-top:9px;font-size:12px;color:var(--ink-soft)">Свой период задан у 2 групп из 3.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Считать адрес пропавшим через<div class="d">Сколько адрес должен не отдаваться, чтобы стать неактуальным. Более короткие пропуски считаются перестановкой в ответе DNS и событием не являются.</div></div>
+              <div>
+                <div class="seg"><button>1 ч</button><button>6 ч</button><button class="on">24 ч</button><button>7 дней</button><button>Своё</button></div>
+                <div style="margin-top:9px;font-size:12px;color:var(--ink-soft)">Должно быть заметно больше периода проверки, иначе за срок не успеет пройти полный круг адресов.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">DNS-серверы<div class="d">Опрашиваются по очереди, пока не будет ответа. Локальный резолвер роутера можно вписать сюда же — например, чтобы проверять внутренние имена.</div></div>
+              <div>
+                <textarea class="inp" rows="3">192.168.1.1
+1.1.1.1
+8.8.8.8</textarea>
+                <div class="hint" style="margin:7px 0 0">Порядок важен: первым спрашивают верхний.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Повторы при ошибке<div class="d">Сколько неудачных резолвов подряд считать сбоем домена.</div></div>
+              <div><input class="inp mono" style="width:90px" value="3"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Уведомления по умолчанию</h2>
+            <div class="right"><span class="tag">действуют, пока группа не задала своё</span></div>
+          </div>
+          <div style="padding:16px">
+            <div class="radio" style="max-width:520px">
+              <label><input type="radio" name="n0"><span><span class="t">Не уведомлять</span><span class="d">События пишутся в журнал, сообщения не уходят</span></span></label>
+              <label><input type="radio" name="n0"><span><span class="t">При изменении адресов</span><span class="d">Появился адрес, которого раньше не было, или прежний адрес пропал насовсем</span></span></label>
+              <label><input type="radio" name="n0" checked><span><span class="t">При выходе из разрешённых</span><span class="d">Адрес не совпал ни с одной записью — ни с отдельным адресом, ни с подсетью. Домены, у которых ничего не разрешено, при этом режиме молчат</span></span></label>
+            </div>
+            <div style="max-width:520px;margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:3px;background:var(--panel-2)">
+              <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+                <span><span style="font-weight:500">Сообщать и о возврате в норму</span>
+                <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:2px">Второе сообщение, когда адрес снова стал решённым. Без него дежурный видит только начало проблемы.</span></span>
+              </label>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:var(--ink-soft)">Своё значение задано у 2 групп из 3. <button style="text-decoration:underline;font-size:12px" data-go="groups">Посмотреть группы</button></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Каналы доставки</h2>
+            <div class="right"><button class="btn btn-sm">Добавить канал</button></div>
+          </div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Telegram <span class="state ok" style="margin-left:6px">Подключён</span><div class="d">Бот отправляет сообщения в чат или канал.</div></div>
+              <div>
+                <div class="field"><label for="tg-t">Токен бота</label><input class="inp mono" id="tg-t" value="7•••••••••:AA••••••••••••••••••••••••••"></div>
+                <div class="field"><label for="tg-c">Чат</label><input class="inp mono" id="tg-c" value="-1001234567890"><div class="hint" style="margin:6px 0 0">Определён как «Дежурная смена».</div></div>
+                <div style="display:flex;gap:8px"><button class="btn">Отправить тестовое</button><button class="btn btn-danger">Отключить</button></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Почта <span class="state" style="color:var(--ink-faint);margin-left:6px">Не настроена</span><div class="d">Письмо на адреса участников.</div></div>
+              <div>
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:9px">
+                  <span class="tag inherit">из окружения</span>
+                </div>
+                <div class="hint" style="margin:0 0 10px">Адрес сервера, порт, учётные данные и адрес отправителя задаются переменными <code style="font-size:11.5px">SMTP_HOST</code>, <code style="font-size:11.5px">SMTP_PORT</code>, <code style="font-size:11.5px">SMTP_USER</code>, <code style="font-size:11.5px">SMTP_PASSWORD</code>, <code style="font-size:11.5px">SMTP_FROM</code>. Из интерфейса не меняются: доступ к почтовому серверу — слишком чувствительная настройка, чтобы отдавать её администратору приложения.</div>
+                <button class="btn" disabled style="opacity:.45;cursor:not-allowed">Отправить тестовое письмо</button>
+              </div>
+            </div>
+            <div class="row" style="opacity:.6">
+              <div class="k">Вебхук<div class="d">POST с телом события на ваш адрес.</div></div>
+              <div><button class="btn">Подключить</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Что уходит в сообщении</h2>
+            <div class="right"><button class="btn btn-sm">Отправить пример себе</button></div>
+          </div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Состав<div class="d">Telegram не умеет таблицы и цвет, поэтому смысл несут порядок строк и моноширинный шрифт.</div></div>
+              <div>
+                <div style="display:grid;gap:11px;margin-bottom:4px">
+                  <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+                    <span><span style="display:block;font-weight:500">Комментарий домена</span>
+                    <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:3px">Если у домена комментария нет, подставляется комментарий его группы. Если нет и его — строка не выводится.</span></span></label>
+                  <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+                    <span><span style="display:block;font-weight:500">Полный список адресов</span>
+                    <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:3px">Кроме изменившихся — то, что домен отдаёт прямо сейчас</span></span></label>
+                  <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+                    <span><span style="display:block;font-weight:500">Ссылка на карточку домена</span>
+                    <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:3px">Открывает реестр адресов и историю</span></span></label>
+                  <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+                    <span><span style="display:block;font-weight:500">Возврат в норму — ответом на исходное сообщение</span>
+                    <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:3px">В шумном чате иначе не понять, какая именно проблема закрылась</span></span></label>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Как это выглядит<div class="d">Чат «Дежурная смена».</div></div>
+              <div>
+                <div class="tg">
+
+                  <div class="tg-msg">
+                    <div class="t1">Адрес не решён</div>
+                    <div class="dom">pay-gw.contoso.ru</div>
+                    <div class="diff">
+                      <div><span class="p">+ 185.44.9.201</span> — не совпал ни с одной записью</div>
+                    </div>
+                    <div class="meta">Сейчас отдаёт: 10.20.1.14, 10.20.2.61, 185.44.9.201<br>Группа: Платёжный контур</div>
+                    <div class="cmt">Точка входа платёжного шлюза. Адреса статические, смена только по заявке — сначала звонить дежурному инфраструктуры.</div>
+                    <div class="lnk">Открыть домен →</div>
+                    <div class="ts">14:38</div>
+                  </div>
+
+                  <div class="tg-msg">
+                    <div class="tg-quote"><b>Адрес не решён</b>pay-gw.contoso.ru · 185.44.9.201</div>
+                    <div class="t1">Снова решён</div>
+                    <div class="dom">pay-gw.contoso.ru</div>
+                    <div class="diff"><div><span class="m">− 185.44.9.201</span></div></div>
+                    <div class="meta">Проблема держалась 26 минут.</div>
+                    <div class="lnk">Открыть домен →</div>
+                    <div class="ts">15:04</div>
+                  </div>
+
+                  <div class="tg-msg">
+                    <div class="t1">Адреса изменились</div>
+                    <div class="dom">cdn.contoso.ru</div>
+                    <div class="diff">
+                      <div><span class="g">+ 93.184.216.34</span></div>
+                      <div><span class="m">− 93.184.215.12</span></div>
+                    </div>
+                    <div class="meta">Группа: Внешние подрядчики</div>
+                    <div class="cmt">Чужая инфраструктура — адреса плавают, следим только за фактом смены.</div>
+                    <div class="lnk">Открыть домен →</div>
+                    <div class="ts">11:04</div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-h"><h2>Хранение</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Журнал событий<div class="d">Сколько держать записи о проверках и уведомлениях.</div></div>
+              <div><select class="inp" style="width:auto"><option>30 дней</option><option selected>90 дней</option><option>1 год</option></select></div>
+            </div>
+            <div class="row">
+              <div class="k">Реестр адресов<div class="d">Даты первого и последнего обнаружения хранятся дольше журнала — по ним оценивают актуальность адреса.</div></div>
+              <div><select class="inp" style="width:auto"><option>1 год</option><option selected>Бессрочно</option></select></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ПОЛЬЗОВАТЕЛИ ── -->
+    <section data-screen="users" hidden>
+      <div class="head">
+        <div>
+          <div class="eyebrow">Пользователи</div>
+          <h1>Кто имеет доступ</h1>
+          <p>Администратор меняет настройки и состав доменов. Наблюдатель только смотрит и получает уведомления.</p>
+        </div>
+        <div class="actions"><button class="btn btn-mark" onclick="openInvite()">Пригласить</button></div>
+      </div>
+      <div class="body" style="max-width:840px">
+
+        <div class="banner">
+          <span class="bi">✉</span>
+          <div>
+            <b>Почтовый сервер не подключён</b>
+            <p>Письма с приглашениями отправить не получится. Выдайте ссылку для входа или задайте пароль — оба способа доступны в окне приглашения.</p>
+            <p style="margin-top:7px">Подключение настраивается переменными <code style="font-size:11.5px">SMTP_*</code> в <code style="font-size:11.5px">.env</code> и требует перезапуска. Обратитесь к тем, у кого есть доступ к серверу.</p>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h">
+            <h2>Участники</h2>
+            <div class="right"><button class="btn btn-sm" onclick="openInvite()">Пригласить</button></div>
+          </div>
+          <div class="tw">
+            <table style="min-width:660px">
+              <thead><tr><th>Участник</th><th>Роль</th><th>Состояние</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><b style="font-weight:500;cursor:pointer" onclick="openModal('userVeil')">Анна Кирилова</b><div class="sub mono">a.kirilova@contoso.ru</div></td>
+                  <td>Администратор <span class="tag" style="margin-left:4px">это вы</span></td>
+                  <td><span class="state ok">Активен</span><div class="sub">вход сегодня, 09:41</div></td>
+                  <td><button class="btn btn-sm" onclick="openModal('userVeil')">Изменить</button></td>
+                </tr>
+                <tr>
+                  <td><b style="font-weight:500;cursor:pointer" onclick="openModal('userVeil')">Дмитрий Осипов</b><div class="sub mono">d.osipov@contoso.ru</div></td>
+                  <td>Наблюдатель</td>
+                  <td><span class="state ok">Активен</span><div class="sub">вход вчера, 20:15</div></td>
+                  <td><button class="btn btn-sm" onclick="openModal('userVeil')">Изменить</button></td>
+                </tr>
+                <tr>
+                  <td><b style="font-weight:500;cursor:pointer" onclick="openModal('userVeil')">Сергей Гаврилов</b><div class="sub mono">s.gavrilov@contoso.ru</div></td>
+                  <td>Наблюдатель</td>
+                  <td><span class="state pend">Ссылка не открыта</span><div class="sub">создана вчера, истекает через 6 дней</div></td>
+                  <td style="white-space:nowrap"><button class="btn btn-sm">Скопировать ссылку</button> <button class="btn btn-sm" onclick="openModal('userVeil')">Изменить</button></td>
+                </tr>
+                <tr>
+                  <td><b style="font-weight:500;cursor:pointer" onclick="openModal('userVeil')">Мария Луценко</b><div class="sub mono">m.lutsenko@contoso.ru</div></td>
+                  <td>Наблюдатель</td>
+                  <td><span class="state pend">Пароль выдан, не менялся</span><div class="sub">создан 3 дня назад, вход был</div></td>
+                  <td><button class="btn btn-sm" onclick="openModal('userVeil')">Изменить</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-h"><h2>Вход</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Второй фактор<div class="d">Код из приложения-аутентификатора при каждом входе.</div></div>
+              <div>
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                  <span class="state" style="color:var(--ink-faint)">Выключен</span>
+                  <span class="tag inherit">из окружения</span>
+                </div>
+                <div class="hint" style="margin:8px 0 0">Задаётся переменной <code style="font-size:11.5px">AUTH_2FA_ENABLED</code> в <code style="font-size:11.5px">.env</code> и требует перезапуска. Из интерфейса не меняется: иначе тот, кто угнал учётную запись администратора, смог бы отключить второй фактор для всех.</div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Срок сессии<div class="d">Через сколько бездействия потребуется войти заново.</div></div>
+              <div><select class="inp" style="width:auto"><option>8 часов</option><option selected>7 дней</option><option>30 дней</option></select></div>
+            </div>
+            <div class="row">
+              <div class="k">Блокировка<div class="d">После скольких неудачных попыток закрывать вход на 15 минут. Счёт ведётся по паре «логин и адрес», окно фиксированное.</div></div>
+              <div><input class="inp mono" style="width:90px" value="5"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- ══════════ УЧАСТНИК ══════════ -->
+<div class="veil" id="userVeil">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-h">
+      <div><div class="eyebrow">Участник</div><h2>Дмитрий Осипов</h2></div>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="closeModal('userVeil')">Закрыть</button>
+    </div>
+
+    <div class="modal-b">
+      <div class="info-box">
+        <div class="ir"><span class="ik">Состояние</span><span class="state ok">Активен</span></div>
+        <div class="ir"><span class="ik">Последний вход</span><span class="mono">вчера, 20:15</span></div>
+        <div class="ir"><span class="ik">Добавлен</span><span class="mono">12.05.2026, Анна Кирилова</span></div>
+        <div class="ir"><span class="ik">Второй фактор</span><span style="color:var(--ink-faint)">не требуется</span> <span class="tag inherit">из окружения</span></div>
+      </div>
+
+      <div class="field">
+        <label for="u-name">Имя</label>
+        <input class="inp" id="u-name" value="Дмитрий Осипов">
+      </div>
+
+      <div class="field">
+        <label for="u-mail">Почта</label>
+        <div class="hint">Служит логином. После смены все сессии участника завершатся, и войти он сможет уже по новому адресу.</div>
+        <input class="inp mono" id="u-mail" value="d.osipov@contoso.ru">
+      </div>
+
+      <div class="field">
+        <label>Роль</label>
+        <div class="radio" style="margin-top:6px">
+          <label><input type="radio" name="urole" checked><span><span class="t">Наблюдатель</span><span class="d">Видит домены, реестр и журнал. Ничего не меняет</span></span></label>
+          <label><input type="radio" name="urole"><span><span class="t">Администратор</span><span class="d">Меняет настройки, состав доменов и участников</span></span></label>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label>Доступ</label>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">
+          <button class="btn btn-sm" onclick="togglePwReset()">Сбросить пароль</button>
+          <button class="btn btn-sm">Завершить все сессии</button>
+          <button class="btn btn-sm" disabled style="opacity:.45;cursor:not-allowed" title="Второй фактор выключен в окружении">Отвязать аутентификатор</button>
+        </div>
+
+        <div id="pwReset" hidden style="margin-top:14px;border:1px solid var(--line);border-radius:3px;padding:13px">
+          <div class="eyebrow" style="margin-bottom:9px">Как передать новый доступ</div>
+          <div class="seg" style="width:100%">
+            <button style="flex:1" disabled title="Нужен настроенный почтовый сервер">Письмом</button>
+            <button style="flex:1" class="on">Ссылкой</button>
+            <button style="flex:1">Задать пароль</button>
+          </div>
+          <div class="cred" style="margin-bottom:10px">
+            <div class="cred-row"><span class="ck">Ссылка</span><span class="cv">https://dns-monitoring.contoso.ru/reset/7b21e0c4-51aa</span><button class="btn btn-sm">Копировать</button></div>
+            <div class="cred-row"><span class="ck">Истекает</span><span class="cv">через 24 часа</span></div>
+          </div>
+          <div class="hint" style="margin:0">Прежний пароль перестал действовать в момент сброса. Сессии участника завершены.</div>
+        </div>
+      </div>
+
+      <div class="danger">
+        <div class="dh"><span class="eyebrow">Необратимые действия</span></div>
+        <div class="dr">
+          <div class="dt">
+            <b>Отключить участника</b>
+            Вход прекратится в течение 30 секунд. Записи в журнале о его действиях сохранятся, роль можно вернуть позже.
+          </div>
+          <button class="btn btn-sm btn-danger">Отключить</button>
+        </div>
+        <div class="dr">
+          <div class="dt">
+            <b>Удалить участника</b>
+            Недоступно: участник уже входил в систему, и на него ссылаются записи журнала. Удалять можно только тех, кто ни разу не входил.
+          </div>
+          <button class="btn btn-sm" disabled style="opacity:.45;cursor:not-allowed">Удалить</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-f">
+      <button class="btn" onclick="closeModal('userVeil')">Отмена</button>
+      <button class="btn btn-solid" onclick="closeModal('userVeil')">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ПРИГЛАШЕНИЕ ══════════ -->
+<div class="veil" id="invVeil">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-h">
+      <div><div class="eyebrow">Пользователи</div><h2 id="invTitle">Новый участник</h2></div>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="closeModal('invVeil')">Закрыть</button>
+    </div>
+
+    <!-- ── форма ── -->
+    <div class="modal-b" id="invForm">
+      <div class="field">
+        <label>Как передать доступ</label>
+        <div class="seg" style="width:100%">
+          <button style="flex:1" disabled title="Нужен подключённый почтовый сервер">Письмом</button>
+          <button style="flex:1" class="on" onclick="invMode('link',this)">Ссылкой</button>
+          <button style="flex:1" onclick="invMode('pass',this)">Задать пароль</button>
+        </div>
+        <div class="hint" style="margin-top:8px" id="invModeHint">Письмо недоступно: почтовый сервер не подключён. Ссылку можно переслать любым способом — человек откроет её и придумает пароль сам.</div>
+      </div>
+
+      <div class="field">
+        <label for="inv-name">Имя</label>
+        <input class="inp" id="inv-name" placeholder="Сергей Гаврилов">
+      </div>
+
+      <div class="field">
+        <label for="inv-mail">Почта</label>
+        <div class="hint">Используется как логин. Письма на неё сейчас не уходят.</div>
+        <input class="inp mono" id="inv-mail" placeholder="s.gavrilov@contoso.ru">
+      </div>
+
+      <div class="field">
+        <label>Роль</label>
+        <div class="radio" style="margin-top:6px">
+          <label><input type="radio" name="invrole" checked><span><span class="t">Наблюдатель</span><span class="d">Видит домены, реестр и журнал. Ничего не меняет</span></span></label>
+          <label><input type="radio" name="invrole"><span><span class="t">Администратор</span><span class="d">Меняет настройки, состав доменов и участников</span></span></label>
+        </div>
+      </div>
+
+      <!-- вариант «ссылкой» -->
+      <div id="invLinkFields">
+        <div class="field" style="margin-bottom:0">
+          <label>Срок действия ссылки</label>
+          <div class="seg"><button>24 часа</button><button class="on">7 дней</button><button>30 дней</button></div>
+          <div class="hint" style="margin-top:8px">Ссылка одноразовая: после того как человек задаст пароль, она перестаёт работать.</div>
+        </div>
+      </div>
+
+      <!-- вариант «задать пароль» -->
+      <div id="invPassFields" hidden>
+        <div class="field">
+          <label for="inv-pw">Пароль</label>
+          <div class="hint">Вы увидите его только сейчас — в базе он хранится в виде хеша.</div>
+          <div style="display:flex;gap:7px">
+            <input class="inp mono" id="inv-pw" value="tuman-9-krisa-vody" style="flex:1">
+            <button class="btn" onclick="genPw()">Сгенерировать</button>
+          </div>
+          <div class="pw-strength"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label class="tgl" style="align-items:flex-start"><input type="checkbox" checked style="margin-top:3px">
+            <span><span style="display:block;font-weight:500">Потребовать смену при первом входе</span>
+            <span style="display:block;font-size:12px;color:var(--ink-soft);margin-top:3px">Иначе вы останетесь единственным, кто знает чужой пароль</span></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── результат: ссылка ── -->
+    <div class="modal-b" id="invDoneLink" hidden>
+      <div class="done-mark"><span class="dot"></span><b>Ссылка готова</b></div>
+      <p style="margin:0;font-size:13px;color:var(--ink-soft)">Перешлите её Сергею любым удобным способом. Он откроет ссылку, задаст пароль и подключит второй фактор.</p>
+      <div class="cred">
+        <div class="cred-row"><span class="ck">Ссылка</span><span class="cv">https://dns-monitoring.contoso.ru/join/4f8c2ae1-9d33</span><button class="btn btn-sm">Копировать</button></div>
+        <div class="cred-row"><span class="ck">Истекает</span><span class="cv">через 7 дней, 5 сентября</span></div>
+      </div>
+      <div class="hint" style="margin-top:0">Пока ссылку не открыли, участник будет виден в списке со статусом «Ссылка не открыта». Оттуда её можно скопировать снова или отозвать.</div>
+    </div>
+
+    <!-- ── результат: пароль ── -->
+    <div class="modal-b" id="invDonePass" hidden>
+      <div class="done-mark"><span class="dot"></span><b>Участник создан</b></div>
+      <p style="margin:0;font-size:13px;color:var(--ink-soft)">Передайте доступ лично или через защищённый канал.</p>
+      <div class="cred">
+        <div class="cred-row"><span class="ck">Логин</span><span class="cv">s.gavrilov@contoso.ru</span><button class="btn btn-sm">Копировать</button></div>
+        <div class="cred-row"><span class="ck">Пароль</span><span class="cv big">tuman-9-krisa-vody</span><button class="btn btn-sm">Копировать</button></div>
+      </div>
+      <div class="err" style="border-color:#E8CFA0;background:#FBF2D8;color:#6B5310;margin:0">
+        Пароль больше не будет показан — он хранится только в виде хеша. Если потеряете, останется лишь выдать новый.
+      </div>
+      <div style="margin-top:14px"><button class="btn">Скопировать логин и пароль вместе</button></div>
+    </div>
+
+    <div class="modal-f">
+      <button class="btn" onclick="closeModal('invVeil')" id="invCancel">Отмена</button>
+      <button class="btn btn-solid" id="invSubmit" onclick="invSubmit()">Создать ссылку</button>
+      <button class="btn btn-solid" id="invDoneBtn" hidden onclick="closeModal('invVeil')">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ПЕРЕНОС В ГРУППУ ══════════ -->
+<div class="veil" id="moveVeil">
+  <div class="modal">
+    <div class="modal-h">
+      <div><div class="eyebrow">Платёжный контур</div><h2>Перенести в другую группу</h2></div>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="closeModal('moveVeil')">Закрыть</button>
+    </div>
+    <div class="modal-b">
+      <div class="field" style="margin-bottom:0">
+        <label>Домен</label>
+        <div class="mono" style="font-size:13px;font-weight:500;margin-bottom:16px">pay-gw.contoso.ru</div>
+        <label id="moveLbl">Новая группа</label>
+        <div class="hint">Начните печатать, чтобы найти нужную среди 7.</div>
+        <div class="combo" id="moveCombo">
+                  <button class="combo-btn" onclick="openCombo(this)" aria-haspopup="listbox" aria-expanded="false"><span class="cur">Внешние подрядчики</span><span class="caret">▼</span></button>
+                  <div class="combo-pop" hidden>
+                    <input placeholder="Найти группу" oninput="filterCombo(this)" aria-label="Поиск по группам">
+                    <div class="combo-list" role="listbox"><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Без группы</span><span class="cn">—</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Платёжный контур</span><span class="cn">4</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Продакшн-периметр</span><span class="cn">9</span></button><button class="combo-opt" role="option" aria-selected="true" onclick="pickCombo(this)"><span class="nm">Внешние подрядчики</span><span class="cn">5</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внутренние сервисы</span><span class="cn">12</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Партнёрские API</span><span class="cn">7</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Тестовые стенды</span><span class="cn">6</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Устаревшее, под снос</span><span class="cn">3</span></button></div>
+                    <div class="combo-empty" hidden>Ничего не найдено</div>
+                    <div class="combo-foot"><button>Создать новую группу…</button></div>
+                  </div>
+                </div>
+      </div>
+
+      <div class="diff-box">
+        <div class="dh"><span class="eyebrow">Что изменится после переноса</span></div>
+        <div class="diff-row">
+          <span class="k eyebrow">Период проверки</span>
+          <span class="was mono">5 мин</span><span class="arr">▶</span><span class="now warn mono">15 мин</span>
+        </div>
+        <div class="diff-row">
+          <span class="k eyebrow">Когда уведомлять</span>
+          <span class="was">при выходе из разрешённых</span><span class="arr">▶</span><span class="now warn">при изменении адресов</span>
+        </div>
+        <div class="diff-keep">
+          Разрешённые адреса, комментарий и реестр адресов домена не меняются — они принадлежат домену, а не группе.
+        </div>
+      </div>
+
+      <div class="err" style="margin:16px 0 0;border-color:#E8CFA0;background:#FBF2D8;color:#6B5310">
+        Новая группа не следит за выходом из разрешённых. Домен перестанет присылать уведомление о непрошеном адресе — а сейчас у него как раз есть такой.
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn" onclick="closeModal('moveVeil')">Отмена</button>
+      <button class="btn btn-solid" onclick="closeModal('moveVeil')">Перенести</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ИМПОРТ СПИСКОМ ══════════ -->
+<div class="veil" id="impVeil">
+  <div class="modal" style="max-width:660px">
+    <div class="modal-h">
+      <div><div class="eyebrow">Домены</div><h2>Импорт списком</h2></div>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="closeModal('impVeil')">Закрыть</button>
+    </div>
+
+    <div class="modal-b" id="impStep1">
+      <div class="field">
+        <label for="imp-src">Вставьте список</label>
+        <div class="hint">По домену в строке. Через точку с запятой можно дописать разрешённые адреса и подсети, а затем комментарий — оба поля необязательны.</div>
+        <textarea class="inp" id="imp-src" rows="7">api-v2.contoso.ru; 10.20.0.0/22; боевой API, вторая версия
+billing.contoso.ru; 10.20.1.0/24 10.20.3.7
+docs.contoso.ru
+api.contoso.ru
+cdn-2.contoso.ru; 10.20.999.0/24
+контосо.рф; 10.20.0.0/22; кириллический домен</textarea>
+        <div class="drop">
+          <span style="font-size:15px">⤓</span>
+          <span>Или перетащите сюда файл <code style="font-size:11.5px">.txt</code>, <code style="font-size:11.5px">.csv</code></span>
+          <button class="btn btn-sm" style="margin-left:auto">Выбрать файл</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Группа для всех строк</label>
+        <div class="hint">Домен возьмёт у неё период проверки и режим уведомлений.</div>
+        <div class="combo" id="impCombo">
+                  <button class="combo-btn" onclick="openCombo(this)" aria-haspopup="listbox" aria-expanded="false"><span class="cur">Продакшн-периметр</span><span class="caret">▼</span></button>
+                  <div class="combo-pop" hidden>
+                    <input placeholder="Найти группу" oninput="filterCombo(this)" aria-label="Поиск по группам">
+                    <div class="combo-list" role="listbox"><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Без группы</span><span class="cn">—</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Платёжный контур</span><span class="cn">4</span></button><button class="combo-opt" role="option" aria-selected="true" onclick="pickCombo(this)"><span class="nm">Продакшн-периметр</span><span class="cn">9</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внешние подрядчики</span><span class="cn">5</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внутренние сервисы</span><span class="cn">12</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Партнёрские API</span><span class="cn">7</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Тестовые стенды</span><span class="cn">6</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Устаревшее, под снос</span><span class="cn">3</span></button></div>
+                    <div class="combo-empty" hidden>Ничего не найдено</div>
+                    <div class="combo-foot"><button>Создать новую группу…</button></div>
+                  </div>
+                </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label class="tgl"><input type="checkbox" checked> Проверить домены сразу после импорта</label>
+        <div class="hint" style="margin:6px 0 0">Первый ответ DNS станет отправной точкой: с ним будут сравниваться все следующие.</div>
+      </div>
+    </div>
+
+    <div class="modal-b" id="impStep2" hidden>
+      <div class="imp-sum">
+        <div><span class="eyebrow">Добавим</span><b style="color:var(--ok)">3</b></div>
+        <div><span class="eyebrow">Уже есть</span><b style="color:var(--ink-faint)">1</b></div>
+        <div><span class="eyebrow">С ошибкой</span><b style="color:var(--breach)">2</b></div>
+      </div>
+
+      <div class="imp-tbl">
+        <table>
+          <thead><tr><th>Строка</th><th>Разбор</th><th>Что будет</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="d">api-v2.contoso.ru</td>
+              <td><span class="chip">10.20.0.0/22</span><div class="sub">боевой API, вторая версия</div></td>
+              <td><span class="state ok">Добавим</span></td>
+            </tr>
+            <tr>
+              <td class="d">billing.contoso.ru</td>
+              <td><span class="chip">10.20.1.0/24</span> <span class="chip">10.20.3.7</span></td>
+              <td><span class="state ok">Добавим</span></td>
+            </tr>
+            <tr>
+              <td class="d">docs.contoso.ru</td>
+              <td><span style="color:var(--ink-faint)">без разрешённых адресов</span></td>
+              <td><span class="state change">Добавим</span><div class="sub">следить сможем только за изменением</div></td>
+            </tr>
+            <tr class="dup">
+              <td class="d">api.contoso.ru</td>
+              <td><span style="color:var(--ink-faint)">—</span></td>
+              <td><span class="state" style="color:var(--ink-faint)">Пропустим</span><div class="sub">уже в «Продакшн-периметр»</div></td>
+            </tr>
+            <tr class="bad">
+              <td class="d">cdn-2.contoso.ru</td>
+              <td><span class="chip out">10.20.999.0/24</span></td>
+              <td><span class="state breach">Ошибка</span><div class="sub">999 — недопустимый октет</div></td>
+            </tr>
+            <tr class="bad">
+              <td class="d">контосо.рф</td>
+              <td><span class="chip">10.20.0.0/22</span></td>
+              <td><span class="state breach">Ошибка</span><div class="sub">нужен punycode: xn--80acaggflb0i.xn--p1ai</div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap">
+        <label class="tgl"><input type="checkbox" checked> Пропустить строки с ошибками</label>
+        <label class="tgl"><input type="checkbox"> Обновить домены, которые уже есть</label>
+      </div>
+      <div class="hint" style="margin-top:9px">Две строки с ошибками останутся в поле ввода — исправите и повторите импорт.</div>
+    </div>
+
+    <div class="modal-f">
+      <button class="btn" id="impBack" hidden onclick="impStep(1)">Назад</button>
+      <button class="btn" onclick="closeModal('impVeil')">Отмена</button>
+      <button class="btn btn-solid" id="impNext" onclick="impStep(2)">Разобрать список</button>
+      <button class="btn btn-solid" id="impGo" hidden onclick="closeModal('impVeil')">Добавить 3 домена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ДОБАВЛЕНИЕ ДОМЕНА ══════════ -->
+<div class="veil" id="addVeil">
+  <div class="modal">
+    <div class="modal-h">
+      <div><div class="eyebrow">Наблюдение</div><h2>Добавить домен</h2></div>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="closeAdd()">Закрыть</button>
+    </div>
+    <div class="modal-b">
+      <div class="field">
+        <label for="a-d">Доменные имена</label>
+        <div class="hint">По одному в строке — можно добавить сразу несколько.</div>
+        <textarea class="inp" id="a-d" rows="3" placeholder="api.contoso.ru"></textarea>
+      </div>
+      <div class="field">
+        <label>Группа</label>
+        <div class="combo" id="addCombo">
+                  <button class="combo-btn" onclick="openCombo(this)" aria-haspopup="listbox" aria-expanded="false"><span class="cur">Платёжный контур</span><span class="caret">▼</span></button>
+                  <div class="combo-pop" hidden>
+                    <input placeholder="Найти группу" oninput="filterCombo(this)" aria-label="Поиск по группам">
+                    <div class="combo-list" role="listbox"><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Без группы</span><span class="cn">—</span></button><button class="combo-opt" role="option" aria-selected="true" onclick="pickCombo(this)"><span class="nm">Платёжный контур</span><span class="cn">4</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Продакшн-периметр</span><span class="cn">9</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внешние подрядчики</span><span class="cn">5</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Внутренние сервисы</span><span class="cn">12</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Партнёрские API</span><span class="cn">7</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Тестовые стенды</span><span class="cn">6</span></button><button class="combo-opt" role="option" aria-selected="false" onclick="pickCombo(this)"><span class="nm">Устаревшее, под снос</span><span class="cn">3</span></button></div>
+                    <div class="combo-empty" hidden>Ничего не найдено</div>
+                    <div class="combo-foot"><button>Создать новую группу…</button></div>
+                  </div>
+                </div>
+        <div class="hint" style="margin:7px 0 0">Домен возьмёт у группы период проверки и режим уведомлений.</div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Разрешённые адреса и подсети</label>
+        <div class="hint">Необязательно — можно заполнить позже, когда станет понятно, куда домен резолвится.</div>
+        <textarea class="inp" rows="2" placeholder="10.20.0.0/22&#10;10.20.3.7"></textarea>
+      </div>
+    </div>
+    <div class="modal-f">
+      <button class="btn" onclick="closeAdd()">Отмена</button>
+      <button class="btn btn-solid" onclick="closeAdd()">Добавить и проверить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggle2fa(){
+  const f=document.getElementById('otpField');
+  f.hidden=!f.hidden;
+  document.getElementById('otpSwitch').textContent = f.hidden
+    ? 'Показать вариант с AUTH_2FA_ENABLED=true'
+    : 'Вернуть вариант с AUTH_2FA_ENABLED=false';
+}
+function signIn(){
+  document.getElementById('auth').classList.remove('on');
+  document.getElementById('app').classList.add('on');
+  window.scrollTo(0,0);
+  renderTraces();
+}
+function go(name){
+  document.querySelectorAll('[data-screen]').forEach(s=>s.hidden = s.dataset.screen!==name);
+  const map = {domain:'domains', group:'groups'};
+  const navKey = map[name] || name;
+  document.querySelectorAll('.nav button').forEach(b=>{
+    if(b.dataset.go===navKey) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+  });
+  window.scrollTo(0,0);
+  renderTraces();
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-go]');
+  if(t){ go(t.dataset.go); document.getElementById('moreSheet').hidden=true; }
+  const s=e.target.closest('.seg button');
+  if(s){ s.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on')); s.classList.add('on'); }
+});
+const TRACE_DAYS=110, TRACE_START=new Date(2026,4,12);
+function dayLabel(d){
+  const m=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+  const t=new Date(TRACE_START); t.setDate(t.getDate()+d);
+  return t.getDate()+' '+m[t.getMonth()];
+}
+function bucketCount(w){ return Math.max(20, Math.min(TRACE_DAYS, Math.floor(w/5))); }
+function renderTraces(){
+  const nodes=document.querySelectorAll('.trace');
+  if(!nodes.length) return;
+  let per=1;
+  nodes.forEach(el=>{
+    const w=el.clientWidth;
+    if(!w) return;
+    const n=bucketCount(w); per=TRACE_DAYS/n;
+    const spans=(el.dataset.spans||'').split(',').filter(Boolean).map(x=>x.split('-').map(Number));
+    const gaps=new Set((el.dataset.gaps||'').split(',').filter(Boolean).map(Number));
+    const cls=el.dataset.cls||'a';
+    let out='';
+    for(let i=0;i<n;i++){
+      const a=Math.floor(i*per), b=Math.min(TRACE_DAYS-1, Math.ceil((i+1)*per)-1);
+      let on=false;
+      for(let d=a;d<=b && !on;d++){
+        if(!gaps.has(d) && spans.some(([x,y])=>d>=x&&d<=y)) on=true;
+      }
+      const t = a===b ? dayLabel(a) : dayLabel(a)+' — '+dayLabel(b);
+      out += on ? '<i class="'+cls+'" title="'+t+' · отдавался"></i>'
+                : '<i title="'+t+' · не отдавался"></i>';
+    }
+    el.innerHTML=out;
+  });
+  const cap=document.getElementById('traceCap');
+  if(cap){
+    const r=Math.round(per);
+    let unit = per<1.5 ? 'сутки' : (r%10===1&&r%100!==11 ? r+' сутки' : (r>=2&&r<=4 ? r+' суток' : r+' суток'));
+    cap.textContent='110 суток · одна отметка — '+unit;
+  }
+}
+let traceTimer;
+window.addEventListener('resize',()=>{clearTimeout(traceTimer);traceTimer=setTimeout(renderTraces,120)});
+document.addEventListener('DOMContentLoaded',renderTraces);
+function toggleMore(){
+  const m=document.getElementById('moreSheet');
+  m.hidden=!m.hidden;
+}
+function toggleZoom(){
+  const z=document.getElementById('zoomBlock');
+  const btn=document.querySelector('.pin.cluster');
+  z.hidden=!z.hidden;
+  btn.setAttribute('aria-expanded', String(!z.hidden));
+}
+function openModal(id){document.getElementById(id).classList.add('on')}
+function closeModal(id){document.getElementById(id).classList.remove('on')}
+function openAdd(){openModal('addVeil')}
+function closeAdd(){closeModal('addVeil')}
+
+/* выбор группы с поиском */
+function closeCombos(except){
+  document.querySelectorAll('.combo').forEach(c=>{
+    if(c===except) return;
+    c.querySelector('.combo-pop').hidden=true;
+    c.querySelector('.combo-btn').setAttribute('aria-expanded','false');
+  });
+}
+function openCombo(btn){
+  const combo=btn.closest('.combo'), pop=combo.querySelector('.combo-pop');
+  const willOpen=pop.hidden;
+  closeCombos(combo);
+  pop.hidden=!willOpen;
+  btn.setAttribute('aria-expanded',String(willOpen));
+  if(willOpen){ const f=pop.querySelector('input'); f.value=''; filterCombo(f); f.focus(); }
+}
+function filterCombo(input){
+  const pop=input.closest('.combo-pop');
+  const q=input.value.trim().toLowerCase();
+  let shown=0;
+  pop.querySelectorAll('.combo-opt').forEach(o=>{
+    const hit=o.querySelector('.nm').textContent.toLowerCase().includes(q);
+    o.hidden=!hit; if(hit) shown++;
+  });
+  pop.querySelector('.combo-empty').hidden = shown>0;
+  const foot=pop.querySelector('.combo-foot');
+  if(foot){
+    const b=foot.querySelector('button');
+    b.textContent = q ? 'Создать группу «'+input.value.trim()+'»' : 'Создать новую группу…';
+  }
+}
+function pickCombo(opt){
+  const combo=opt.closest('.combo');
+  combo.querySelectorAll('.combo-opt').forEach(o=>o.setAttribute('aria-selected','false'));
+  opt.setAttribute('aria-selected','true');
+  const cur=combo.querySelector('.cur');
+  const name=opt.querySelector('.nm').textContent;
+  cur.textContent=name;
+  cur.classList.toggle('none', name==='Без группы');
+  combo.querySelector('.combo-pop').hidden=true;
+  combo.querySelector('.combo-btn').setAttribute('aria-expanded','false');
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('.combo')) closeCombos(null); });
+
+function togglePwReset(){
+  const b=document.getElementById('pwReset');
+  b.hidden=!b.hidden;
+}
+
+/* приглашение */
+let invCurrent='link';
+function openInvite(){
+  invMode('link', document.querySelector('#invVeil .seg button.on') || null);
+  document.getElementById('invForm').hidden=false;
+  document.getElementById('invDoneLink').hidden=true;
+  document.getElementById('invDonePass').hidden=true;
+  document.getElementById('invSubmit').hidden=false;
+  document.getElementById('invCancel').hidden=false;
+  document.getElementById('invDoneBtn').hidden=true;
+  document.getElementById('invTitle').textContent='Новый участник';
+  openModal('invVeil');
+}
+function invMode(m,btn){
+  invCurrent=m;
+  if(btn){ btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
+  document.getElementById('invLinkFields').hidden = m!=='link';
+  document.getElementById('invPassFields').hidden = m!=='pass';
+  document.getElementById('invSubmit').textContent = m==='pass' ? 'Создать участника' : 'Создать ссылку';
+  document.getElementById('invModeHint').textContent = m==='pass'
+    ? 'Вы зададите пароль сами и передадите его человеку. Способ на крайний случай: до первой смены пароль знают двое.'
+    : 'Письмо недоступно: почтовый сервер не подключён. Ссылку можно переслать любым способом — человек откроет её и придумает пароль сам.';
+}
+function invSubmit(){
+  document.getElementById('invForm').hidden=true;
+  document.getElementById('invDoneLink').hidden = invCurrent!=='link';
+  document.getElementById('invDonePass').hidden = invCurrent!=='pass';
+  document.getElementById('invSubmit').hidden=true;
+  document.getElementById('invCancel').hidden=true;
+  document.getElementById('invDoneBtn').hidden=false;
+  document.getElementById('invTitle').textContent = invCurrent==='pass' ? 'Доступ создан' : 'Ссылка на вход';
+}
+function genPw(){
+  const w=['tuman','krisa','vody','sopka','ivolga','klever','parus','zolа','vishnya','kamen','sirop','moroz'];
+  const p=[w[Math.floor(Math.random()*w.length)],Math.floor(Math.random()*90+10),
+           w[Math.floor(Math.random()*w.length)],w[Math.floor(Math.random()*w.length)]];
+  document.getElementById('inv-pw').value=p.join('-');
+}
+
+/* шаги импорта */
+function impStep(n){
+  document.getElementById('impStep1').hidden = n!==1;
+  document.getElementById('impStep2').hidden = n!==2;
+  document.getElementById('impBack').hidden = n!==2;
+  document.getElementById('impNext').hidden = n!==1;
+  document.getElementById('impGo').hidden   = n!==2;
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape') return;
+  const open=document.querySelector('.veil.on');
+  if(open){ open.classList.remove('on'); return; }
+  closeCombos(null);
+});
+document.querySelectorAll('.veil').forEach(v=>{
+  v.addEventListener('click',e=>{ if(e.target===v) v.classList.remove('on'); });
+});
+</script>
+</body>
+</html>
