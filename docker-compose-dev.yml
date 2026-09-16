@@ -1,0 +1,64 @@
+name: dns-monitoring
+
+# Один образ, три команды: web, checker, notifier.
+# Миграции не применяются при старте:
+#   docker compose -f docker-compose-dev.yml run --rm web python manage.py migrate
+x-app: &app
+  build:
+    context: .
+    args:
+      APP_UID: ${APP_UID:-1000}
+      APP_GID: ${APP_GID:-1000}
+      DEPS: dev
+  image: dns-monitoring:dev
+  env_file: .env
+  init: true
+  volumes:
+    - .:/app
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dns_monitoring}
+      POSTGRES_USER: ${POSTGRES_USER:-dns_monitoring}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dns_monitoring}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    # Один процесс, noeviction (Q-A1). Без сохранения на диск: Redis не источник истины (ТЗ 11.11).
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    <<: *app
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "8000:8000"
+
+  checker:
+    <<: *app
+    command: ["python", "manage.py", "run_checker"]
+
+  notifier:
+    <<: *app
+    command: ["python", "manage.py", "run_notifier"]
+
+volumes:
+  postgres-data:
