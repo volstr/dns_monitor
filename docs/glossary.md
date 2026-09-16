@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | Домен | `Domain` (`apps.catalog`) | `domain`, `domain_id`; имя — `Domain.name` | `/domains/`, `/domains/<id>/` | Имя хранится нормализованным (10.1). |
 | Группа | `Group` (`apps.catalog`) | `group`, `group_id` | `/groups/`, `/groups/<id>/` | Не путать с `django.contrib.auth.models.Group`. Группы Django в проекте не используются, импорт только из `apps.catalog.models`. |
-| Проверка | `Check` (`apps.monitoring`) | `check`, `checked_at`; сервис `run_check()` | — | Ключи Redis `check:cooldown:*` (11.11). У модели Django есть служебный классовый метод `check()`, поле или метод с этим именем на модели не заводить. |
+| Проверка | `Check` (`apps.monitoring`) | `check`, `checked_at`; сервис `run_check()` | — | Ключи Redis `check:cooldown:*` (11.11). У модели Django есть служебный классовый метод `check()`, поле или метод с этим именем на модели не заводить. **«Проверка вхождения» в белый список (6.3) — другое понятие**, см. `AllowlistMatch` и раздел 3. |
 | Ответ | — | `answer: frozenset[IPAddress]` | — | ⚠ Q-E3: в `plan.md` это поле называется `ResolveResult.addresses`. |
 | Разрешённые адреса и подсети | — | `allowlist` (`domain.allowlist`) | `/domains/<id>/allowlist/` | **Только `allowlist`**. Слова `allowed`/`resolved` в этом значении не использовать. |
 | Запись списка | `AllowlistEntry` | `entry`, `allowlist_entries` | — | Отдельный адрес — запись с полной маской (6.3, 12). Тип колонки ⚠ Q-13.3. |
@@ -78,7 +78,7 @@
 | Совпавшая запись, причина совпадения | `AllowlistMatch` | `matched_entry` | — | «входит в …» / «точное совпадение с …» (6.3). |
 | Нормализованная запись | — | `normalized` | — | 10.2 |
 | Исход проверки (колонка «История») | `CheckOutcome` | `outcome` | — | |
-| ↳ норма / набор изменился / нерешённый / ошибка резолва | `NORMAL` / `ADDRESS_SET_CHANGED` / `UNRESOLVED` / `RESOLVE_ERROR` | — | — | Исход несостоявшейся проверки — ⚠ Q-D5. |
+| ↳ норма / набор изменился / нерешённый / ошибка резолва | `NORMAL` / `ADDRESS_SET_CHANGED` / `UNRESOLVED` / `RESOLVE_ERROR` | — | — | Исход несостоявшейся проверки — ⚠ Q-D5. `UNRESOLVED` здесь — исход проверки, в `AddressStatus` — статус адреса: одно слово в двух перечислениях, оба зависят от ⚠ Q-13.8. |
 | Колонка «История» | — | `check_history` | — | 20 отметок, ось — последовательность проверок. |
 | Планировщик | — | `scheduler`; команда `run_checker` | — | Ключ `sched:lock:domain:{id}`. |
 | Время следующей проверки | — | `next_check_at` | — | Единственное место расписания. |
@@ -139,7 +139,9 @@
 | `whitelist`, `allowed_ips`, `allowed` для списка | `allowlist` | Раздел 2 |
 | `resolved` для записи списка | `allowlist_entry` | Раздел 2 |
 | `actual`, `current` для актуальности | `fresh` | Ложный друг переводчика / занято «текущим ответом» |
-| `user` в доменном коде | `member` | ⚠ Q-C14 |
+| `check` для вхождения в белый список | `match`, `contains`, `AllowlistMatch` | Раздел 2 называет проверкой цикл резолва (`Check`), а 6.3 тем же словом — вхождение адреса в список. Разные вещи |
+| голые `entry`, `record` | `allowlist_entry`, `registry_entry`, `record_type`, `event` | Слово «запись» в ТЗ означает четыре разных понятия: 4.0, 4.3, 4.4 и 7.1 |
+| `user` в доменном коде | `member` | ⚠ Q-C14. Запрет распространяется на доменный код и наши идентификаторы; штатные `request.user`, `AUTH_USER_MODEL`, `get_user_model()` остаются как есть |
 | `journal`, `log` для журнала событий | `events` | Один термин на одно понятие |
 | `registry` без уточнения | `address_registry` | Конфликт с реестром приложений Django |
 | `Outcome` без уточнения | `ResolveOutcome` / `CheckOutcome` | Два разных исхода |
