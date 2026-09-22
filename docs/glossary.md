@@ -131,6 +131,7 @@
 | График реестра, след | — | `registry_trace`, `trace` | — | Ключ `cache:trace:*`. |
 | Корзина / отметка / масштаб | `BucketSize.HOUR` / `DAY` | `bucket`, `bucket_size`, `mark`, `scale` | — | 9.2. «Размер корзины» — термин из ключа `cache:trace:*` (11.12), не новое понятие. |
 | Линейка подсети | — | `subnet_ruler` | — | 11.4 |
+| Хранилище рабочего состояния | `StateStore` (порт), `StateKey` | `acquire()`, `release()`, `is_held()`, `ping()` | — | 11.11. Ключ без срока жизни выразить нельзя: `StateKey` несёт TTL в себе, записи по голой строке в порте нет. Боевая реализация — `RedisStateStore` (база `REDIS_DB_STATE`, `noeviction`), тестовая — `FakeStateStore` на часах. Имена и сроки ключей дословно из таблицы 11.11 плюс `auth:invite:*` (Q-D16) и `session:*` (Q-D20). |
 | Проба работоспособности | — | `healthcheck` | `/health/` | 11.13 |
 | Авария | — | `outage` | — | 11.13 |
 
