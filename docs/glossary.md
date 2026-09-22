@@ -32,7 +32,7 @@
 | Реестр адресов | — | `address_registry` (обратная связь `domain.address_registry`) | `/domains/<id>/registry/` | Просто `registry` не использовать: занято `django.apps.registry`. |
 | Запись реестра адресов (4.4) | `AddressRegistryEntry`, `AddressObservationBucket` | `first_seen_at`, `last_seen_at`, `consecutive_misses`; у корзины — `bucket_start`, `bucket_size` | — | Q-E1 закрыт: часовые корзины за 30 суток и суточные бессрочно, свёртка в `checker`. Q-13.2 закрыт: `consecutive_misses` считает подряд идущие `ANSWERED` без этого адреса, инцидент закрывается при K = 3 (константа). |
 | Инцидент | `Incident` (`apps.monitoring`) | `incident`, `opened_at`, `closed_at` | — | |
-| Событие | `Event`, `EventType` (`apps.monitoring`) | `event`, `event_type`, `payload` | `/events/` | Значения `EventType` — ровно имена из 7.1: `ADDRESS_APPEARED`, `ADDRESS_GONE`, `NOT_ALLOWED`, `BACK_TO_NORMAL`, `RESOLVE_FAILED`, `RESOLVE_RECOVERED`, `WATCH_STARTED`. Расширение списка — ⚠ Q-D4. |
+| Событие | `Event`, `EventType` (`apps.monitoring`) | `event`, `event_type`, `payload`, `author`, `author_name` | `/events/` | Значения `EventType` — ровно имена из 7.1: `ADDRESS_APPEARED`, `ADDRESS_GONE`, `NOT_ALLOWED`, `BACK_TO_NORMAL`, `RESOLVE_FAILED`, `RESOLVE_RECOVERED`, `WATCH_STARTED`. Q-D4 закрыт: домен обязателен, автор обнуляемый со снимком имени (Q-D17). Записи без домена — в `AuditRecord`. |
 | Уведомление | `Notification` (`apps.notifications`) | `notification`, `delivery_status` | — | Строка очереди исходящих: `attempt`, `next_attempt_at`, `last_error`. |
 
 ---
@@ -107,7 +107,8 @@
 |---|---|---|---|---|
 | Участник | `Member` (`AUTH_USER_MODEL`) | `member` | `/members/` | ТЗ и прототип называют вкладку «Пользователи» ⚠ Q-C14. |
 | Роль | `Role.ADMIN` / `Role.OBSERVER` | `role` | — | «Администратор» / «Наблюдатель». |
-| Приглашение | `Invitation` | `invitation`, `token` | `/join/<token>/` | URL из прототипа. |
+| Приглашение | `Invitation` | `invitation`, `token_hash` | `/join/<token>/` | URL из прототипа. Q-D16 закрыт: в БД хранится только хеш, открытый текст — ключ `auth:invite:{id}` в базе состояния со сроком жизни приглашения. |
+| Сессия | — | ключи `session:{ключ}` и `session:member:{id}` | — | Q-D20 закрыт: Redis, база **состояния**, не кэш. Набор `session:member:*` нужен для «Завершить все сессии» (3.1). |
 | Сброс пароля | — | `reset_password()` | `/reset/<token>/` | URL из прототипа. |
 | Потребовать смену при первом входе | — | `must_change_password` | — | |
 | Второй фактор / аутентификатор | — | `totp_secret`, `unbind_authenticator()` | — | Включается `AUTH_2FA_ENABLED`. |
@@ -121,7 +122,7 @@
 |---|---|---|---|---|
 | Обзор | — | `overview` | `/` | Ключ `cache:view:overview`. |
 | Открытые расхождения | — | `open_incidents` | — | 11.9 |
-| Журнал событий | — | `events` | `/events/` | Отдельного идентификатора `journal` нет, чтобы не заводить синоним. |
+| Журнал событий | `AuditRecord` (`apps.accounts`) | `events`, `audit_records` | `/events/` | Отдельного идентификатора `journal` нет, чтобы не заводить синоним. Q-D4: в интерфейсе журнал **один**, под ним две таблицы — `Event` (домен обязателен) и `AuditRecord` (действия с участниками по 3.1 и остановка проверок по 11.13). Склейка — в селекторе, `AuditRecord` пользователю как отдельный термин не показывается. |
 | Выгрузка журнала | — | `export_events_csv()` | `/events/export.csv` | |
 | Импорт списком | — | модуль `domain_import` | `/domains/import/` | `import` — ключевое слово Python. |
 | Перенос домена в другую группу | — | `move_domain()` | `/domains/<id>/move/` | |
