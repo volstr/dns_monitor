@@ -22,10 +22,10 @@ def test_21_group_with_default_period_takes_the_global_one() -> None:
     group = Group.objects.create(name="Продакшн-периметр", check_period_seconds=None)
     domain = make_domain("api.contoso.ru", group)
 
-    resolved = effective_settings(domain.pk)
+    effective = effective_settings(domain.pk)
 
-    assert resolved.check_period.value == timedelta(minutes=15)
-    assert resolved.check_period.origin is SettingOrigin.GLOBAL
+    assert effective.check_period.value == timedelta(minutes=15)
+    assert effective.check_period.origin is SettingOrigin.GLOBAL
 
 
 def test_22_changing_the_global_period_moves_only_inheriting_groups() -> None:
@@ -57,19 +57,19 @@ def test_23_domain_without_group_takes_everything_from_global_settings() -> None
     settings.save()
     domain = make_domain("status.contoso.ru", group=None)
 
-    resolved = effective_settings(domain.pk)
+    effective = effective_settings(domain.pk)
 
-    assert resolved.check_period.value == timedelta(minutes=1)
-    assert resolved.freshness_threshold.value == timedelta(days=7)
-    assert resolved.notification_mode.value is NotificationMode.ADDRESS_CHANGE
-    assert resolved.notify_back_to_normal.value is False
-    assert resolved.reminder_interval.value == timedelta(hours=1)
+    assert effective.check_period.value == timedelta(minutes=1)
+    assert effective.freshness_threshold.value == timedelta(days=7)
+    assert effective.notification_mode.value is NotificationMode.ADDRESS_CHANGE
+    assert effective.notify_back_to_normal.value is False
+    assert effective.reminder_interval.value == timedelta(hours=1)
     origins = {
-        resolved.check_period.origin,
-        resolved.freshness_threshold.origin,
-        resolved.notification_mode.origin,
-        resolved.notify_back_to_normal.origin,
-        resolved.reminder_interval.origin,
+        effective.check_period.origin,
+        effective.freshness_threshold.origin,
+        effective.notification_mode.origin,
+        effective.notify_back_to_normal.origin,
+        effective.reminder_interval.origin,
     }
     assert origins == {SettingOrigin.GLOBAL}
 
@@ -96,17 +96,17 @@ def test_group_value_of_false_is_not_mistaken_for_default() -> None:
     group = Group.objects.create(name="Платёжный контур", notify_back_to_normal=False)
     domain = make_domain("pay-gw.contoso.ru", group)
 
-    resolved = effective_settings(domain.pk).notify_back_to_normal
+    effective = effective_settings(domain.pk).notify_back_to_normal
 
-    assert resolved.value is False
-    assert resolved.origin is SettingOrigin.GROUP
+    assert effective.value is False
+    assert effective.origin is SettingOrigin.GROUP
 
 
 def test_reminder_interval_zero_means_do_not_remind() -> None:
     group = Group.objects.create(name="Тестовые стенды", reminder_interval_seconds=0)
     domain = make_domain("stage.contoso.ru", group)
 
-    resolved = effective_settings(domain.pk).reminder_interval
+    effective = effective_settings(domain.pk).reminder_interval
 
-    assert resolved.value is None
-    assert resolved.origin is SettingOrigin.GROUP
+    assert effective.value is None
+    assert effective.origin is SettingOrigin.GROUP
