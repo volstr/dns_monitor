@@ -1,9 +1,13 @@
 """Корневые маршруты.
 
-TODO(ТЗ 11.13): проба работоспособности ``/health/`` и страница 503 при недоступном Redis — этап 4,
-см. Q-E4.
+Пока здесь только проба работоспособности (11.13, Q-E4). Экраны продукта — списки доменов,
+карточка, группы, журнал, участники — приходят на этапе 6.
 """
 
-from django.urls import URLPattern, URLResolver
+from django.urls import URLPattern, URLResolver, path
 
-urlpatterns: list[URLPattern | URLResolver] = []
+from apps.monitoring.views import healthcheck
+
+urlpatterns: list[URLPattern | URLResolver] = [
+    path("health/", healthcheck, name="healthcheck"),
+]

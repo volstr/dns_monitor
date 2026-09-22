@@ -33,6 +33,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Первым: при аварии инфраструктуры ответ 503 отдаётся раньше любой другой работы (11.13).
+    "config.middleware.InfrastructureHealthMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
