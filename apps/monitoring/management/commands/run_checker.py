@@ -1,8 +1,9 @@
-"""Процесс планировщика проверок.
+"""Процесс планировщика проверок — ТЗ 11.1.
 
-TODO(ТЗ 11.1, plan.md этап 4): тик раз в 5–10 секунд, выборка наступивших доменов с
-``FOR UPDATE SKIP LOCKED``, резолв в ``ThreadPoolExecutor``. Пока команда только держит процесс
-живым, чтобы сервис ``checker`` в компоузе поднимался и корректно останавливался.
+Команда разбирает аргументы и зовёт сервис, логики не содержит (`CLAUDE.md`). Весь обход — это
+`run_one_tick`, который вызывается и отсюда, и из тестов, только там момент времени задают явно.
+
+Расписание живёт в `next_check_at`: периодических задач на домен нет, второго места нет.
 """
 
 import logging
@@ -11,21 +12,50 @@ import threading
 from types import FrameType
 from typing import Any
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandParser
+
+from apps.monitoring.services.runner import describe, run_one_tick
+from core.adapters.redis_state import RedisStateStore
+from core.adapters.system_clock import SystemClock
 
 logger = logging.getLogger(__name__)
 
+#: Тик раз в 5 секунд (plan.md: 5-10 секунд). Домены разнесены во времени, поэтому частый
+#: холостой тик дёшев: он либо забирает наступившие домены, либо не забирает ничего.
+TICK_INTERVAL_SECONDS = 5.0
+
 
 class Command(BaseCommand):
-    help = "Планировщик проверок доменов (ТЗ 11.1). Пока заглушка."
+    help = "Планировщик проверок доменов (ТЗ 11.1)"
+
+    def add_arguments(self, parser: CommandParser) -> None:
+        parser.add_argument(
+            "--once",
+            action="store_true",
+            help="выполнить один тик и выйти — для отладки и ручного прогона",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        from django.conf import settings
+
+        clock = SystemClock()
+        state_store = RedisStateStore.from_url(
+            settings.ENV.redis_url, db=settings.ENV.redis_db_state
+        )
+
         stop = threading.Event()
 
         def request_stop(signum: int, frame: FrameType | None) -> None:
+            logger.info("run_checker: получен сигнал, останавливаюсь")
             stop.set()
 
         signal.signal(signal.SIGTERM, request_stop)
         signal.signal(signal.SIGINT, request_stop)
-        logger.warning("run_checker: проверки не реализованы (TODO ТЗ 11.1), ожидаю остановки")
-        stop.wait()
+
+        while not stop.is_set():
+            at = clock.now()
+            report = run_one_tick(clock=clock, state_store=state_store)
+            logger.info(describe(report, at))
+            if options["once"]:
+                return
+            stop.wait(TICK_INTERVAL_SECONDS)
