@@ -1,10 +1,6 @@
-"""Реестр адресов, корзины наблюдений и инциденты — ТЗ 4.4, 4.6, 9.2.
+"""Реестр адресов, корзины наблюдений, инциденты и события — ТЗ 4.4, 4.5, 4.6, 9.2."""
 
-Событий здесь пока нет: по Q-D4 у события появляется автор, то есть внешний ключ на участника,
-а состав модели участника держат Q-D16, Q-D17, Q-D20 и Q-D21. TODO(ТЗ 4.5): ``Event`` вместе
-с ``apps.accounts``.
-"""
-
+from django.conf import settings
 from django.db import models
 
 from apps.catalog.models import Domain
@@ -12,6 +8,8 @@ from core.fields import InetField
 
 CHANNEL_MESSAGE_ID_MAX_LENGTH = 64
 BUCKET_SIZE_MAX_LENGTH = 8
+ENUM_MAX_LENGTH = 32
+NAME_MAX_LENGTH = 160
 
 
 class BucketSize(models.TextChoices):
@@ -110,3 +108,57 @@ class Incident(models.Model):
 
     def __str__(self) -> str:
         return f"{self.domain.name} с {self.opened_at:%Y-%m-%d %H:%M}"
+
+
+class EventType(models.TextChoices):
+    """Закрытый список типов событий — ТЗ 7.1. Русские названия — ⚠ Q-C11."""
+
+    ADDRESS_APPEARED = "address_appeared", "Адрес появился"
+    ADDRESS_GONE = "address_gone", "Адрес пропал"
+    NOT_ALLOWED = "not_allowed", "Адрес не решён"
+    BACK_TO_NORMAL = "back_to_normal", "Возврат в норму"
+    RESOLVE_FAILED = "resolve_failed", "Домен не резолвится"
+    RESOLVE_RECOVERED = "resolve_recovered", "Домен снова резолвится"
+    WATCH_STARTED = "watch_started", "Наблюдение начато"
+
+
+class Event(models.Model):
+    """Запись журнала, относящаяся к домену — ТЗ 4.5.
+
+    Q-D4: домена без события не бывает, поле обязательное. Записи, у которых домена нет по
+    определению — действия с участниками (3.1) и остановка проверок (11.13), — живут в
+    ``apps.accounts.AuditRecord``, а в интерфейсе оба источника склеиваются в один журнал.
+
+    Автор обнуляемый со снимком имени (Q-D17): прототип показывает «Наблюдение включено ·
+    Анна Кирилова», а у событий, порождённых проверкой, автора нет вовсе.
+    """
+
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="events")
+    event_type = models.CharField(max_length=ENUM_MAX_LENGTH, choices=EventType.choices)
+    occurred_at = models.DateTimeField()
+    # core.types.events.EventPayload — какие адреса затронуты (4.5).
+    payload = models.JSONField(default=dict, blank=True)
+    incident = models.ForeignKey(
+        Incident, on_delete=models.SET_NULL, null=True, blank=True, related_name="events"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="events_authored",
+    )
+    author_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default="")
+
+    # TODO(ТЗ 4.5, 8.3): ссылка на отправленное уведомление появится вместе с apps.notifications
+    # на этапе 5 — это добавление поля, переделки схемы не требует.
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["domain", "occurred_at"], name="event_domain_occurred"),
+            # Журнал и выгрузка сортируются по времени с фильтром по типу (ТЗ 11.7).
+            models.Index(fields=["occurred_at"], name="event_occurred_at"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_event_type_display()} · {self.domain.name}"
