@@ -22,11 +22,10 @@ ALLOWED_HOSTS = [APP_HOST]
 CSRF_TRUSTED_ORIGINS = [ENV.app_base_url]
 
 INSTALLED_APPS = [
+    "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.postgres",
     "django.contrib.staticfiles",
-    # django.contrib.auth подключается на этапе 2 вместе с моделью участника: AUTH_USER_MODEL
-    # нельзя сменить после первой миграции auth без пересоздания базы.
     "apps.accounts",
     "apps.catalog",
     "apps.monitoring",
@@ -65,6 +64,12 @@ DATABASES = {"default": django_database(ENV.database_url)}
 
 # ТЗ 4.0: все первичные и внешние ключи — bigint.
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ТЗ 3: почта служит логином. Сменить после первой миграции auth нельзя.
+AUTH_USER_MODEL = "accounts.Member"
+
+# TODO(ТЗ 3, Q-D20): SESSION_ENGINE на Redis в базе состояния и скользящий срок сессии —
+# вместе с обёрткой над Redis на этапе 4. Штатная таблица сессий не используется.
 
 LANGUAGE_CODE = "ru"
 # ТЗ 4.0: хранение в UTC. Часовой пояс отображения установки — Q-A3, этап 6.
