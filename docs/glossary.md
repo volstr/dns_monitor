@@ -21,7 +21,7 @@
 | Проверка | `Check` (`apps.monitoring`) | `check`, `checked_at`; сервис `run_check()` | — | Ключи Redis `check:cooldown:*` (11.11). У модели Django есть служебный классовый метод `check()`, поле или метод с этим именем на модели не заводить. **«Проверка вхождения» в белый список (6.3) — другое понятие**, см. `AllowlistMatch` и раздел 3. |
 | Ответ | — | `answer: frozenset[IPAddress]` | — | ⚠ Q-E3: в `plan.md` это поле называется `ResolveResult.addresses`. |
 | Разрешённые адреса и подсети | — | `allowlist` (`domain.allowlist`) | `/domains/<id>/allowlist/` | **Только `allowlist`**. Слова `allowed`/`resolved` в этом значении не использовать. |
-| Запись списка | `AllowlistEntry` | `entry`, `allowlist_entries` | — | Отдельный адрес — запись с полной маской (6.3, 12). Тип колонки ⚠ Q-13.3. |
+| Запись списка | `AllowlistEntry` | `entry`, `raw`, `allowlist_entries` | — | Отдельный адрес — запись с полной маской (6.3, 12). Q-13.3 закрыт: `entry cidr` с индексом GiST `(entry inet_ops)`, исходный текст пользователя — `raw varchar(49)`. |
 | Актуальный адрес | — | `is_fresh` | — | `actual` не использовать: по-английски это «фактический». `current` не использовать: занят «текущим ответом». |
 | Порог актуальности | — | `freshness_threshold_seconds`; в вычислениях `freshness_threshold: timedelta` | — | В формулах ТЗ обозначен `W`. |
 | Актуальный набор | — | `fresh_set: frozenset[IPAddress]` | — | |
@@ -30,7 +30,7 @@
 | ↳ «Не решён» | `AddressStatus.UNRESOLVED` = `"unresolved"` | — | — | ⚠ Q-13.8 |
 | ↳ «Не актуален» | `AddressStatus.STALE` = `"stale"` | — | — | |
 | Реестр адресов | — | `address_registry` (обратная связь `domain.address_registry`) | `/domains/<id>/registry/` | Просто `registry` не использовать: занято `django.apps.registry`. |
-| Запись реестра адресов (4.4) | `AddressRegistryEntry` | `first_seen_at`, `last_seen_at` | — | Корзины — ⚠ Q-E1. |
+| Запись реестра адресов (4.4) | `AddressRegistryEntry`, `AddressObservationBucket` | `first_seen_at`, `last_seen_at`; у корзины — `bucket_start`, `bucket_size` | — | Q-E1 закрыт: часовые корзины за 30 суток и суточные бессрочно, свёртка в `checker`. |
 | Инцидент | `Incident` (`apps.monitoring`) | `incident`, `opened_at`, `closed_at` | — | |
 | Событие | `Event`, `EventType` (`apps.monitoring`) | `event`, `event_type`, `payload` | `/events/` | Значения `EventType` — ровно имена из 7.1: `ADDRESS_APPEARED`, `ADDRESS_GONE`, `NOT_ALLOWED`, `BACK_TO_NORMAL`, `RESOLVE_FAILED`, `RESOLVE_RECOVERED`, `WATCH_STARTED`. Расширение списка — ⚠ Q-D4. |
 | Уведомление | `Notification` (`apps.notifications`) | `notification`, `delivery_status` | — | Строка очереди исходящих: `attempt`, `next_attempt_at`, `last_error`. |
@@ -125,7 +125,7 @@
 | Импорт списком | — | модуль `domain_import` | `/domains/import/` | `import` — ключевое слово Python. |
 | Перенос домена в другую группу | — | `move_domain()` | `/domains/<id>/move/` | |
 | График реестра, след | — | `registry_trace`, `trace` | — | Ключ `cache:trace:*`. |
-| Корзина / отметка / масштаб | — | `bucket`, `mark`, `scale` | — | 9.2 |
+| Корзина / отметка / масштаб | `BucketSize.HOUR` / `DAY` | `bucket`, `bucket_size`, `mark`, `scale` | — | 9.2. «Размер корзины» — термин из ключа `cache:trace:*` (11.12), не новое понятие. |
 | Линейка подсети | — | `subnet_ruler` | — | 11.4 |
 | Проба работоспособности | — | `healthcheck` | `/health/` | 11.13 |
 | Авария | — | `outage` | — | 11.13 |
