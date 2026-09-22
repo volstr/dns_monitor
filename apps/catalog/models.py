@@ -9,6 +9,7 @@ from django.contrib.postgres.indexes import GistIndex
 from django.db import models
 
 from core.fields import CidrField
+from core.types.dns import RecordType
 
 DOMAIN_NAME_MAX_LENGTH = 255
 GROUP_NAME_MAX_LENGTH = 120
@@ -26,12 +27,12 @@ class NotificationMode(models.TextChoices):
     NOT_ALLOWED = "not_allowed", "При выходе из разрешённых"
 
 
-class RecordType(models.TextChoices):
-    """Типы запрашиваемых записей — ТЗ 4.3. Про CNAME см. Q-D12."""
-
-    A = "a", "A"
-    AAAA = "aaaa", "AAAA"
-    CNAME = "cname", "CNAME"
+# Перечисление живёт в core: его знают и порт резолвера, и модель, а core про apps не знает.
+RECORD_TYPE_CHOICES = [
+    (RecordType.A.value, "A"),
+    (RecordType.AAAA.value, "AAAA"),
+    (RecordType.CNAME.value, "CNAME"),
+]
 
 
 def default_record_types() -> list[str]:
@@ -149,8 +150,13 @@ class Domain(models.Model):
     )
     comment = models.CharField(max_length=COMMENT_MAX_LENGTH, blank=True, default="")
     record_types = ArrayField(
-        models.CharField(max_length=ENUM_MAX_LENGTH, choices=RecordType.choices),
+        models.CharField(max_length=ENUM_MAX_LENGTH, choices=RECORD_TYPE_CHOICES),
         default=default_record_types,
+    )
+    # Q-D12: цель цепочки CNAME из `canonical_name` ответа. Заполняется, только если у домена
+    # включён флаг CNAME и цель отличается от имени. Событий не порождает, в реестр не идёт.
+    cname_target = models.CharField(
+        max_length=DOMAIN_NAME_MAX_LENGTH, blank=True, default=""
     )
     watch_enabled = models.BooleanField(default=True)
     # Единственное место расписания (ТЗ 11.1, plan.md этап 4). Заполняется при создании домена.

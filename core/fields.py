@@ -21,8 +21,7 @@ from typing import TYPE_CHECKING, Any
 from django.core.exceptions import ValidationError
 from django.db import models
 
-type IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
-type IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+from core.types.dns import IPAddress, IPNetwork
 
 # Django не поддерживает подписку своих полей в рантайме, а mypy --strict требует параметров типа.
 if TYPE_CHECKING:
