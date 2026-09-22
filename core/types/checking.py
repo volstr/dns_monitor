@@ -7,7 +7,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
+
+from core.types.dns import IPAddress
 
 
 class AddressStatus(StrEnum):
@@ -39,3 +43,32 @@ class CheckOutcome(StrEnum):
     RESOLVE_ERROR = "resolve_error"
     #: Q-D5: ни один сервер не ответил. В журнал событий не пишется, в колонке — пустая отметка.
     NOT_PERFORMED = "not_performed"
+
+
+@dataclass(frozen=True, slots=True)
+class AllowlistMatch:
+    """Запись белого списка, с которой совпал адрес — ТЗ 6.3.
+
+    Формулировка причины зависит от вида записи, и решает это длина префикса, а не наличие
+    косой черты в тексте: пользователь мог ввести `10.20.3.7/32`, и «входит в 10.20.3.7/32»
+    было бы враньём (6.3, критерий 46, Q-D1).
+    """
+
+    #: Запись как её ввёл пользователь — показывается в интерфейсе (6.3).
+    entry: str
+    #: Маска уже префикса полной: «входит в …». Иначе «точное совпадение с …».
+    is_network: bool
+
+
+@dataclass(frozen=True, slots=True)
+class AddressStatusView:
+    """Адрес реестра вместе с вычисленным статусом и причиной совпадения.
+
+    Возвращается селектором: статус по 6.4 вычисляется, не хранится, а происхождение причины
+    нужно интерфейсу и тексту уведомления.
+    """
+
+    address: IPAddress
+    status: AddressStatus
+    match: AllowlistMatch | None
+    last_seen_at: datetime
