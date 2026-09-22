@@ -114,6 +114,8 @@
 | Второй фактор / аутентификатор | — | `totp_secret`, `unbind_authenticator()` | — | Включается `AUTH_2FA_ENABLED`. |
 | Блокировка входа / счётчик неудачных попыток | — | `login_lock`, `login_fail` | — | Ключи `auth:lock:*`, `auth:fail:*`. |
 | Отключение участника | — | `is_active`, `deactivate()` | — | |
+| Состояние доступа участника | `MemberAccessState` | `access_state()` (`apps.accounts.selectors`) | — | Q-D21 закрыт: вычисляется, не хранится. Приоритет `DISABLED` → `INVITATION_PENDING` → `PASSWORD_ISSUED` → `ACTIVE` (ТЗ 3, Q-C17). |
+| Действие в журнале без домена | `AuditRecord`, `AuditAction` (`apps.accounts`) | `audit_records` | `/events/` | Q-D4: изменения участников (3.1) и остановка проверок (11.13). Пользователю как отдельный термин не показывается. |
 | Срок сессии | — | `session_lifetime_seconds`, `login_failure_threshold` | — | Q-C5 закрыт: оба поля в `GlobalSettings`, срок скользящий, потолка нет. Срок блокировки 15 минут — не настройка, а TTL ключа `auth:lock:*`. |
 
 ### Экраны, ввод, эксплуатация (9–11)
