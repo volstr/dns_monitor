@@ -12,7 +12,7 @@ from apps.catalog.models import AllowlistEntry, Domain
 from apps.monitoring.models import Check, Event, EventType, Incident
 from apps.monitoring.services.checking import run_check
 from core.adapters.fake_resolver import FakeResolver, answered, no_records, unavailable
-from core.types.checking import CheckOutcome
+from core.types.checking import AddressStatus, CheckOutcome
 from core.types.dns import RecordType
 
 pytestmark = pytest.mark.django_db
@@ -47,6 +47,26 @@ def test_7_4_first_check_is_baseline_and_silent(domain: Domain) -> None:
     assert events(domain, EventType.WATCH_STARTED) == 1
     assert events(domain, EventType.ADDRESS_APPEARED) == 0
     assert events(domain, EventType.ADDRESS_GONE) == 0
+
+
+def test_1_steady_matched_domain_produces_no_events(domain: Domain) -> None:
+    # Критерий 1: три адреса, все входят в подсеть списка → статусы «Совпал», событий нет.
+    # Базовая проверка порождает ровно одно WATCH_STARTED (7.4), дальше — тишина.
+    resolver = FakeResolver({NAME: [answered("10.20.1.14", "10.20.2.60", "10.20.2.61")]})
+    run_check(domain_id=domain.pk, at=START, resolver=resolver)
+    assert Event.objects.filter(domain=domain).count() == 1
+
+    at = START
+    report = None
+    for _ in range(5):
+        at += PERIOD
+        report = run_check(domain_id=domain.pk, at=at, resolver=resolver)
+
+    assert report is not None
+    assert {view.status for view in report.statuses} == {AddressStatus.MATCHED}
+    assert report.outcome is CheckOutcome.NORMAL
+    assert Event.objects.filter(domain=domain).count() == 1
+    assert Incident.objects.filter(domain=domain).count() == 0
 
 
 def test_2_address_outside_the_list_opens_an_incident(domain: Domain) -> None:
