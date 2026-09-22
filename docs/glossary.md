@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | Домен | `Domain` (`apps.catalog`) | `domain`, `domain_id`; имя — `Domain.name` | `/domains/`, `/domains/<id>/` | Имя хранится нормализованным (10.1). |
 | Группа | `Group` (`apps.catalog`) | `group`, `group_id` | `/groups/`, `/groups/<id>/` | Не путать с `django.contrib.auth.models.Group`. Группы Django в проекте не используются, импорт только из `apps.catalog.models`. |
-| Проверка | `Check` (`apps.monitoring`) | `check`, `checked_at`; сервис `run_check()` | — | Ключи Redis `check:cooldown:*` (11.11). У модели Django есть служебный классовый метод `check()`, поле или метод с этим именем на модели не заводить. **«Проверка вхождения» в белый список (6.3) — другое понятие**, см. `AllowlistMatch` и раздел 3. |
+| Проверка | `Check` (`apps.monitoring`) | `check`, `checked_at`; сервис `run_check()` | — | Ключи Redis `check:cooldown:*` (11.11). У модели Django есть служебный классовый метод `check()`, поле или метод с этим именем на модели не заводить. **«Проверка вхождения» в белый список (6.3) — другое понятие**, см. `AllowlistMatch` и раздел 3. Q-D23: на домен хранятся 20 последних успешных и 200 последних неудачных проверок, чистка — в `checker`. |
 | Ответ | — | `answer: frozenset[IPAddress]` | — | ⚠ Q-E3: в `plan.md` это поле называется `ResolveResult.addresses`. |
 | Разрешённые адреса и подсети | — | `allowlist` (`domain.allowlist`) | `/domains/<id>/allowlist/` | **Только `allowlist`**. Слова `allowed`/`resolved` в этом значении не использовать. |
 | Запись списка | `AllowlistEntry` | `entry`, `raw`, `allowlist_entries` | — | Отдельный адрес — запись с полной маской (6.3, 12). Q-13.3 закрыт: `entry cidr` с индексом GiST `(entry inet_ops)`, исходный текст пользователя — `raw varchar(49)`. |
