@@ -14,7 +14,7 @@ from typing import Any
 
 from django.core.management.base import BaseCommand, CommandParser
 
-from apps.monitoring.services.runner import describe, run_one_tick
+from apps.monitoring.services.runner import TickSkipped, describe, run_one_tick
 from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
 
@@ -52,9 +52,15 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, request_stop)
         signal.signal(signal.SIGINT, request_stop)
 
+        # Факт остановки проверок пишется в журнал один раз на аварию, а не каждые пять секунд
+        # (11.13), поэтому состояние инфраструктуры переносится между тиками.
+        healthy = True
         while not stop.is_set():
             at = clock.now()
-            report = run_one_tick(clock=clock, state_store=state_store)
+            report = run_one_tick(
+                clock=clock, state_store=state_store, previously_healthy=healthy
+            )
+            healthy = report.healthy if isinstance(report, TickSkipped) else True
             logger.info(describe(report, at))
             if options["once"]:
                 return

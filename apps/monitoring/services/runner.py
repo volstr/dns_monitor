@@ -17,6 +17,7 @@ from datetime import datetime
 from django.conf import settings
 
 from apps.catalog.models import GlobalSettings
+from apps.monitoring.services.health import check_health, record_checks_stopped
 from apps.monitoring.services.tick import TickReport, tick
 from core.adapters.dns_resolver import DnsResolver
 from core.ports.clock import Clock
@@ -30,10 +31,29 @@ class TickSkipped:
     """Тик не состоялся: проверять нечем или некому. Причина уходит в структурный лог."""
 
     reason: str
+    #: Была ли при этом жива инфраструктура. По нему процесс понимает, писать ли в журнал факт
+    #: остановки при следующем тике (11.13).
+    healthy: bool = True
 
 
-def run_one_tick(*, clock: Clock, state_store: StateStore) -> TickReport | TickSkipped:
-    """Один обход. Возвращает отчёт либо причину, по которой обход не состоялся."""
+def run_one_tick(
+    *, clock: Clock, state_store: StateStore, previously_healthy: bool = True
+) -> TickReport | TickSkipped:
+    """Один обход. Возвращает отчёт либо причину, по которой обход не состоялся.
+
+    ``previously_healthy`` держит процесс-вызыватель: факт остановки проверок пишется в журнал
+    один раз на аварию, а не каждые пять секунд. Перезапуск процесса посреди аварии даст ещё одну
+    запись — это верно по смыслу, старт при неработающем Redis стоит отметить.
+    """
+    health = check_health(state_store=state_store)
+    if not health.healthy:
+        # 11.13: проверки останавливаются, и остановка обязана быть заметной.
+        reason = f"инфраструктура недоступна: {health.failed_component}"
+        logger.error(reason, extra={"component": health.failed_component})
+        if previously_healthy:
+            record_checks_stopped(at=clock.now(), report=health)
+        return TickSkipped(reason=reason, healthy=False)
+
     global_settings = GlobalSettings.objects.get()
     servers = list(global_settings.dns_servers)
     if not servers:
