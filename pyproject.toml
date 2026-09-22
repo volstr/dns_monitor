@@ -37,6 +37,9 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S603"]
+# RUF012: Meta.constraints, Meta.indexes и Meta.ordering — декларации Django, а не разделяемое
+# изменяемое состояние. ClassVar для них не идиоматичен и не ожидается django-stubs.
+"apps/*/models.py" = ["RUF012"]
 
 [tool.mypy]
 python_version = "3.12"

@@ -23,6 +23,7 @@ CSRF_TRUSTED_ORIGINS = [ENV.app_base_url]
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
+    "django.contrib.postgres",
     "django.contrib.staticfiles",
     # django.contrib.auth подключается на этапе 2 вместе с моделью участника: AUTH_USER_MODEL
     # нельзя сменить после первой миграции auth без пересоздания базы.
