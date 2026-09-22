@@ -30,7 +30,7 @@
 | ↳ «Не решён» | `AddressStatus.UNRESOLVED` = `"unresolved"` | — | — | ⚠ Q-13.8 |
 | ↳ «Не актуален» | `AddressStatus.STALE` = `"stale"` | — | — | |
 | Реестр адресов | — | `address_registry` (обратная связь `domain.address_registry`) | `/domains/<id>/registry/` | Просто `registry` не использовать: занято `django.apps.registry`. |
-| Запись реестра адресов (4.4) | `AddressRegistryEntry`, `AddressObservationBucket` | `first_seen_at`, `last_seen_at`; у корзины — `bucket_start`, `bucket_size` | — | Q-E1 закрыт: часовые корзины за 30 суток и суточные бессрочно, свёртка в `checker`. |
+| Запись реестра адресов (4.4) | `AddressRegistryEntry`, `AddressObservationBucket` | `first_seen_at`, `last_seen_at`, `consecutive_misses`; у корзины — `bucket_start`, `bucket_size` | — | Q-E1 закрыт: часовые корзины за 30 суток и суточные бессрочно, свёртка в `checker`. Q-13.2 закрыт: `consecutive_misses` считает подряд идущие `ANSWERED` без этого адреса, инцидент закрывается при K = 3 (константа). |
 | Инцидент | `Incident` (`apps.monitoring`) | `incident`, `opened_at`, `closed_at` | — | |
 | Событие | `Event`, `EventType` (`apps.monitoring`) | `event`, `event_type`, `payload` | `/events/` | Значения `EventType` — ровно имена из 7.1: `ADDRESS_APPEARED`, `ADDRESS_GONE`, `NOT_ALLOWED`, `BACK_TO_NORMAL`, `RESOLVE_FAILED`, `RESOLVE_RECOVERED`, `WATCH_STARTED`. Расширение списка — ⚠ Q-D4. |
 | Уведомление | `Notification` (`apps.notifications`) | `notification`, `delivery_status` | — | Строка очереди исходящих: `attempt`, `next_attempt_at`, `last_error`. |
@@ -60,7 +60,7 @@
 | Интервал напоминаний | — | `reminder_interval_seconds` | — | «Не напоминать» и «по умолчанию» — разные состояния, в схеме их нельзя слить в `NULL`. |
 | Окно слияния / порог слияния | — | `merge_window_seconds`, `merge_threshold` | — | Ключ Redis `notify:merge:*`. |
 | Список DNS-серверов | — | `dns_servers` | — | Упорядоченный. |
-| Количество повторов при ошибке резолва | — | ⚠ Q-C6 | — | |
+| Количество повторов при ошибке резолва | — | `resolve_failure_threshold` | — | Q-C6 закрыт: это N из 7.1, по умолчанию 3, сетевых повторов нет. Подпись в интерфейсе — «Сколько неудачных проверок подряд считать сбоем» (исключение в Q-C14). |
 | Срок хранения журнала / реестра | — | `event_retention_seconds`, `registry_retention_seconds` | — | `NULL` у реестра — бессрочно. |
 | Типы записей | `RecordType.A` / `AAAA` / `CNAME` | `record_types` | — | ⚠ Q-D12 про CNAME. |
 | Наблюдение включено | — | `watch_enabled` | — | Согласовано с `WATCH_STARTED`. |
@@ -99,6 +99,7 @@
 | Идентификатор сообщения в канале доставки | — | `channel_message_id` | — | `varchar(64)` |
 | Напоминание | — | `reminder`, `last_message_at` | — | 8.5 |
 | Сводное сообщение (сводка) | — | `merge_summary` | — | 8.6 |
+| Состав сообщения (8.4) | — | `message_include_full_set`, `message_include_comment`, `message_include_link` | — | Q-C4 закрыт: только общие настройки, наследования нет. Значение «полного набора» — ⚠ Q-D10. |
 
 ### Участники и доступ (3, 3.1)
 
@@ -112,7 +113,7 @@
 | Второй фактор / аутентификатор | — | `totp_secret`, `unbind_authenticator()` | — | Включается `AUTH_2FA_ENABLED`. |
 | Блокировка входа / счётчик неудачных попыток | — | `login_lock`, `login_fail` | — | Ключи `auth:lock:*`, `auth:fail:*`. |
 | Отключение участника | — | `is_active`, `deactivate()` | — | |
-| Срок сессии | — | `session_lifetime_seconds` | — | ⚠ Q-C5 |
+| Срок сессии | — | `session_lifetime_seconds`, `login_failure_threshold` | — | Q-C5 закрыт: оба поля в `GlobalSettings`, срок скользящий, потолка нет. Срок блокировки 15 минут — не настройка, а TTL ключа `auth:lock:*`. |
 
 ### Экраны, ввод, эксплуатация (9–11)
 
