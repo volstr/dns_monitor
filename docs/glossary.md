@@ -25,9 +25,9 @@
 | Актуальный адрес | — | `is_fresh` | — | `actual` не использовать: по-английски это «фактический». `current` не использовать: занят «текущим ответом». |
 | Порог актуальности | — | `freshness_threshold_seconds`; в вычислениях `freshness_threshold: timedelta` | — | В формулах ТЗ обозначен `W`. |
 | Актуальный набор | — | `fresh_set: frozenset[IPAddress]` | — | |
-| Статус адреса | `AddressStatus` | `status` | `?status=` | Вычисляется, не хранится (6.4). **Только `status`**, не путать с `allowlist`. |
-| ↳ «Решён» | `AddressStatus.RESOLVED` = `"resolved"` | — | — | ⚠ Q-13.8. Созвучно `Resolver` и `RESOLVE_FAILED`: ровно та путаница, о которой пишет 13.8. |
-| ↳ «Не решён» | `AddressStatus.UNRESOLVED` = `"unresolved"` | — | — | ⚠ Q-13.8 |
+| Статус адреса | `AddressStatus` | `status` | `?status=` | Вычисляется, не хранится (6.4). **Только `status`**, не путать с `allowlist`. Названия статусов изменены по Q-13.8: раздел 2 ТЗ ещё говорит «Решён». |
+| ↳ «Совпал» | `AddressStatus.MATCHED` = `"matched"` | — | — | Q-13.8 закрыт. Корень `match` уже занят нужным смыслом (`AllowlistMatch`, `matched_entry`) и не сталкивается ни с `resolve*`, ни с `allowlist`. |
+| ↳ «Не совпал» | `AddressStatus.UNMATCHED` = `"unmatched"` | — | — | Q-13.8 |
 | ↳ «Не актуален» | `AddressStatus.STALE` = `"stale"` | — | — | |
 | Реестр адресов | — | `address_registry` (обратная связь `domain.address_registry`) | `/domains/<id>/registry/` | Просто `registry` не использовать: занято `django.apps.registry`. |
 | Запись реестра адресов (4.4) | `AddressRegistryEntry`, `AddressObservationBucket` | `first_seen_at`, `last_seen_at`, `consecutive_misses`; у корзины — `bucket_start`, `bucket_size` | — | Q-E1 закрыт: часовые корзины за 30 суток и суточные бессрочно, свёртка в `checker`. Q-13.2 закрыт: `consecutive_misses` считает подряд идущие `ANSWERED` без этого адреса, инцидент закрывается при K = 3 (константа). |
@@ -62,7 +62,7 @@
 | Список DNS-серверов | — | `dns_servers` | — | Упорядоченный. |
 | Количество повторов при ошибке резолва | — | `resolve_failure_threshold` | — | Q-C6 закрыт: это N из 7.1, по умолчанию 3, сетевых повторов нет. Подпись в интерфейсе — «Сколько неудачных проверок подряд считать сбоем» (исключение в Q-C14). |
 | Срок хранения журнала / реестра | — | `event_retention_seconds`, `registry_retention_seconds` | — | `NULL` у реестра — бессрочно. |
-| Типы записей | `RecordType.A` / `AAAA` / `CNAME` | `record_types` | — | ⚠ Q-D12 про CNAME. |
+| Типы записей | `RecordType.A` / `AAAA` / `CNAME` | `record_types`, `cname_target` | — | Q-D12 закрыт: флаг CNAME означает «показывать цель». Поле `cname_target varchar(255)` перезаписывается значением `canonical_name` из ответа на A-запрос — отдельного запроса не нужно. Событий не порождает. |
 | Наблюдение включено | — | `watch_enabled` | — | Согласовано с `WATCH_STARTED`. |
 | Комментарий | — | `comment` | — | |
 
@@ -78,7 +78,7 @@
 | Совпавшая запись, причина совпадения | `AllowlistMatch` | `matched_entry` | — | «входит в …» / «точное совпадение с …» (6.3). |
 | Нормализованная запись | — | `normalized` | — | 10.2 |
 | Исход проверки (колонка «История») | `CheckOutcome` | `outcome` | — | |
-| ↳ норма / набор изменился / нерешённый / ошибка резолва | `NORMAL` / `ADDRESS_SET_CHANGED` / `UNRESOLVED` / `RESOLVE_ERROR` | — | — | Исход несостоявшейся проверки — ⚠ Q-D5. `UNRESOLVED` здесь — исход проверки, в `AddressStatus` — статус адреса: одно слово в двух перечислениях, оба зависят от ⚠ Q-13.8. |
+| ↳ норма / набор изменился / есть несовпавший / ошибка резолва | `NORMAL` / `ADDRESS_SET_CHANGED` / `HAS_UNMATCHED` / `RESOLVE_ERROR` | — | — | Исход несостоявшейся проверки — ⚠ Q-D5. `HAS_UNMATCHED` вместо прежнего `UNRESOLVED` по Q-13.8: одно слово больше не стоит в двух перечислениях. |
 | Колонка «История» | — | `check_history` | — | 20 отметок, ось — последовательность проверок. |
 | Планировщик | — | `scheduler`; команда `run_checker` | — | Ключ `sched:lock:domain:{id}`. |
 | Время следующей проверки | — | `next_check_at` | — | Единственное место расписания. |
@@ -142,6 +142,7 @@
 |---|---|---|
 | `whitelist`, `allowed_ips`, `allowed` для списка | `allowlist` | Раздел 2 |
 | `resolved` для записи списка | `allowlist_entry` | Раздел 2 |
+| `resolved`, `unresolved` для статуса адреса | `matched`, `unmatched` | Q-13.8. Относится и к локальным переменным: `resolved = effective_settings(...)` — уже нарушение |
 | `actual`, `current` для актуальности | `fresh` | Ложный друг переводчика / занято «текущим ответом» |
 | `check` для вхождения в белый список | `match`, `contains`, `AllowlistMatch` | Раздел 2 называет проверкой цикл резолва (`Check`), а 6.3 тем же словом — вхождение адреса в список. Разные вещи |
 | голые `entry`, `record` | `allowlist_entry`, `registry_entry`, `record_type`, `event` | Слово «запись» в ТЗ означает четыре разных понятия: 4.0, 4.3, 4.4 и 7.1 |
