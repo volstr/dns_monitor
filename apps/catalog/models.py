@@ -161,6 +161,12 @@ class Domain(models.Model):
     watch_enabled = models.BooleanField(default=True)
     # Единственное место расписания (ТЗ 11.1, plan.md этап 4). Заполняется при создании домена.
     next_check_at = models.DateTimeField(null=True, blank=True, default=None)
+    # Q-D6: от него считается, была ли пауза дольше порога актуальности, то есть базовая ли
+    # проверка (7.4). NO_RECORDS успешной проверкой не считается и сюда не пишется.
+    last_successful_check_at = models.DateTimeField(null=True, blank=True, default=None)
+    # Критерии 10-11: сколько проверок подряд домен не резолвится. RESOLVE_FAILED порождается
+    # при достижении порога и не повторяется, пока не было успешного резолва (7.1).
+    consecutive_resolve_failures = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["name"]

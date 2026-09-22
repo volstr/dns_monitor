@@ -5,11 +5,23 @@ from django.db import models
 
 from apps.catalog.models import Domain
 from core.fields import InetField
+from core.types.checking import CheckOutcome
 
 CHANNEL_MESSAGE_ID_MAX_LENGTH = 64
 BUCKET_SIZE_MAX_LENGTH = 8
 ENUM_MAX_LENGTH = 32
 NAME_MAX_LENGTH = 160
+SERVER_MAX_LENGTH = 45
+ERROR_MAX_LENGTH = 500
+
+# Перечисление живёт в core: исход проверки знает и доменный код, и модель.
+CHECK_OUTCOME_CHOICES = [
+    (CheckOutcome.NORMAL.value, "Норма"),
+    (CheckOutcome.ADDRESS_SET_CHANGED.value, "Набор адресов изменился"),
+    (CheckOutcome.HAS_UNMATCHED.value, "Есть несовпавший адрес"),
+    (CheckOutcome.RESOLVE_ERROR.value, "Ошибка резолва"),
+    (CheckOutcome.NOT_PERFORMED.value, "Не состоялась"),
+]
 
 
 class BucketSize(models.TextChoices):
@@ -108,6 +120,37 @@ class Incident(models.Model):
 
     def __str__(self) -> str:
         return f"{self.domain.name} с {self.opened_at:%Y-%m-%d %H:%M}"
+
+
+class Check(models.Model):
+    """Одна проверка одного домена — ТЗ 11.5, Q-D5.
+
+    Ось колонки «История» — последовательность проверок, а не время (11.5), поэтому строки
+    берутся последними двадцатью, а не за период.
+
+    Несостоявшаяся проверка (ни один сервер не ответил) пишется сюда с исходом
+    ``NOT_PERFORMED`` и **не** попадает в журнал событий: по 6.1 реестр и статусы при ней не
+    меняются, а по Q-D5 место такой записи — история проверок и структурный лог.
+
+    Поля ``check`` у модели нет намеренно: у Django есть служебный классовый метод с этим именем.
+    """
+
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="checks")
+    checked_at = models.DateTimeField()
+    outcome = models.CharField(max_length=ENUM_MAX_LENGTH, choices=CHECK_OUTCOME_CHOICES)
+    #: Сервер, который ответил. Пусто у несостоявшейся проверки.
+    answered_by = models.CharField(max_length=SERVER_MAX_LENGTH, blank=True, default="")
+    #: Почему проверка не состоялась (Q-D5). Уходит и в структурный лог.
+    error = models.CharField(max_length=ERROR_MAX_LENGTH, blank=True, default="")
+
+    class Meta:
+        indexes = [
+            # Колонка «История» берёт ровно 20 последних проверок домена (11.5).
+            models.Index(fields=["domain", "-checked_at"], name="check_domain_checked_at"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.domain.name} · {self.checked_at:%Y-%m-%d %H:%M} · {self.outcome}"
 
 
 class EventType(models.TextChoices):
