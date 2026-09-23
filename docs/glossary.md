@@ -29,10 +29,11 @@
 | ↳ «Совпал» | `AddressStatus.MATCHED` = `"matched"` | — | — | Q-13.8 закрыт. Корень `match` уже занят нужным смыслом (`AllowlistMatch`, `matched_entry`) и не сталкивается ни с `resolve*`, ни с `allowlist`. |
 | ↳ «Не совпал» | `AddressStatus.UNMATCHED` = `"unmatched"` | — | — | Q-13.8 |
 | ↳ «Не актуален» | `AddressStatus.STALE` = `"stale"` | — | — | |
+| ↳ «Не проверяется» | `AddressStatus.NOT_CHECKED` = `"not_checked"` | — | — | Q-D25: белый список домена пуст, сравнивать не с чем. Без этого значения пустой список означал бы «не совпал» у каждого адреса, что нарушает 8.2. Идентификатор новый, ⚠ ждёт подтверждения. |
 | Реестр адресов | — | `address_registry` (обратная связь `domain.address_registry`) | `/domains/<id>/registry/` | Просто `registry` не использовать: занято `django.apps.registry`. |
 | Запись реестра адресов (4.4) | `AddressRegistryEntry`, `AddressObservationBucket` | `first_seen_at`, `last_seen_at`, `consecutive_misses`; у корзины — `bucket_start`, `bucket_size` | — | Q-E1 закрыт: часовые корзины за 30 суток и суточные бессрочно, свёртка в `checker`. Q-13.2 закрыт: `consecutive_misses` считает подряд идущие `ANSWERED` без этого адреса, инцидент закрывается при K = 3 (константа). |
 | Инцидент | `Incident` (`apps.monitoring`) | `incident`, `opened_at`, `closed_at` | — | |
-| Событие | `Event`, `EventType` (`apps.monitoring`) | `event`, `event_type`, `payload`, `author`, `author_name` | `/events/` | Значения `EventType` — ровно имена из 7.1: `ADDRESS_APPEARED`, `ADDRESS_GONE`, `NOT_ALLOWED`, `BACK_TO_NORMAL`, `RESOLVE_FAILED`, `RESOLVE_RECOVERED`, `WATCH_STARTED`. Q-D4 закрыт: домен обязателен, автор обнуляемый со снимком имени (Q-D17). Записи без домена — в `AuditRecord`. |
+| Событие | `Event`, `EventType` (`apps.monitoring`) | `event`, `event_type`, `payload`, `author`, `author_name` | `/events/` | Значения `EventType` — ровно имена из 7.1: `ADDRESS_APPEARED`, `ADDRESS_GONE`, `NOT_ALLOWED`, `BACK_TO_NORMAL`, `RESOLVE_FAILED`, `RESOLVE_RECOVERED`, `WATCH_STARTED`. Q-D4 закрыт: домен обязателен, автор обнуляемый со снимком имени (Q-D17). Записи без домена — в `AuditRecord`. Русские названия типов и заголовки сообщений — утверждённая таблица в Q-C11, она обязательна в интерфейсе, сообщениях и фильтрах журнала. |
 | Уведомление | `Notification` (`apps.notifications`) | `notification`, `delivery_status` | — | Строка очереди исходящих: `attempt`, `next_attempt_at`, `last_error`. |
 
 ---
