@@ -68,6 +68,14 @@ class Notification(models.Model):
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="replies"
     )
 
+    #: Окно слияния (8.6): «канал:тип события». Сообщения одного окна ждут в очереди до момента
+    #: `next_attempt_at` и уходят либо порознь, либо одной сводкой — решает порог слияния.
+    #:
+    #: Сами сообщения ждут **в PostgreSQL**, а не в накопителе Redis: срок жизни ключа истёк бы
+    #: раньше, чем окно закроется, и сводку стало бы не из чего собирать. По 11.11 Redis не
+    #: источник истины, поэтому в нём остаётся только счёт (Q-D9).
+    merge_key = models.CharField(max_length=ENUM_MAX_LENGTH * 2, blank=True, default="")
+
     class Meta:
         indexes = [
             # Выборка очереди: что пора отправлять (8.3).
