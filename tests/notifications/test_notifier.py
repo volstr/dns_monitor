@@ -4,14 +4,16 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from apps.catalog.models import Domain, GlobalSettings, NotificationMode
+from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings, NotificationMode
 from apps.monitoring.models import Event, EventType, Incident
+from apps.monitoring.services.tick import tick
 from apps.notifications.models import DeliveryStatus, Notification
 from apps.notifications.services.dispatch import dispatch_event
 from apps.notifications.services.notifier import deliver_due
 from apps.notifications.services.outbox import MAX_ATTEMPTS
 from core.adapters.fake_channel import FakeChannel
 from core.adapters.fake_clock import FakeClock
+from core.adapters.fake_resolver import FakeResolver, answered
 from core.adapters.fake_state_store import FakeStateStore
 from core.ports.notification_channel import NotSent
 
@@ -112,6 +114,35 @@ def test_8_6_summary_lists_up_to_ten_names(store: FakeStateStore) -> None:
     text = channel.messages[0].text
     assert "Затронуто доменов: 12" in text
     assert "и ещё 2" in text
+
+
+def test_38_baseline_violation_is_delivered_inside_a_summary(store: FakeStateStore) -> None:
+    """Критерий 38 через настоящую проверку, а не через собранные руками события.
+
+    7.4: базовая проверка молчит об изменениях адресов, но вхождение в белый список — критерий
+    абсолютный, и он не глушится. При массовом импорте такие сообщения обязаны уйти **сводкой**.
+    """
+    resolver = FakeResolver({})
+    for index in range(6):
+        name = f"domain-{index}.contoso.ru"
+        domain = Domain.objects.create(name=name, next_check_at=MOMENT)
+        AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+        resolver.set(name, [answered("185.44.9.201")])
+
+    # limit задаём явно: по умолчанию тик берёт concurrency × 4 домена, то есть четыре из шести.
+    tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1, limit=6)
+
+    # Каждая проверка — базовая: инцидент открыт и статус виден, хотя событий изменения нет.
+    assert Incident.objects.filter(closed_at__isnull=True).count() == 6
+    assert Event.objects.filter(event_type=EventType.ADDRESS_APPEARED).count() == 0
+
+    channel = FakeChannel()
+    run = deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+
+    # Одно сводное сообщение вместо шести отдельных.
+    assert (run.sent, run.merged) == (1, 6)
+    assert len(channel.messages) == 1
+    assert "Затронуто доменов: 6" in channel.messages[0].text
 
 
 def test_8_3_retryable_failure_stays_in_the_queue(store: FakeStateStore) -> None:

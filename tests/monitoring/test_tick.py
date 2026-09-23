@@ -14,10 +14,13 @@ from apps.catalog.models import (
 from apps.monitoring.models import Check
 from apps.monitoring.services.scheduling import RESERVATION, SUCCESSFUL_HISTORY
 from apps.monitoring.services.tick import tick
-from apps.notifications.models import Notification
+from apps.notifications.models import DeliveryStatus, Notification
+from apps.notifications.services.notifier import deliver_due
+from core.adapters.fake_channel import FakeChannel
 from core.adapters.fake_clock import FakeClock
 from core.adapters.fake_resolver import FakeResolver, answered
 from core.adapters.fake_state_store import FakeStateStore
+from core.ports.notification_channel import NotSent
 from core.ports.state_store import scheduler_lock
 from core.types.checking import CheckOutcome
 
@@ -135,6 +138,32 @@ def test_8_1_check_without_notifications_queues_nothing(
     tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1)
 
     assert Notification.objects.count() == 0
+
+
+def test_8_3_broken_channel_does_not_stop_checks(domain: Domain, store: FakeStateStore) -> None:
+    """Условие сдачи этапа 5: падение канала не мешает проверкам идти.
+
+    Архитектурно это обеспечено разделением процессов — постановка лишь пишет строку в очередь,
+    а канала касается только `run_notifier`. Здесь это закреплено проверкой, а не рассуждением.
+    """
+    GlobalSettings.objects.filter(pk=1).update(
+        telegram_chat_id="-1001234567890", notification_mode=NotificationMode.NOT_ALLOWED
+    )
+    resolver = FakeResolver({NAME: [answered("185.44.9.201")]})
+    tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1)
+
+    # Канал лежит: доставка не проходит, строка остаётся в очереди.
+    channel = FakeChannel(results=[NotSent(error="канал недоступен", retryable=True)] * 5)
+    deliver_due(at=MOMENT + timedelta(minutes=2), channel=channel, state_store=store)
+    assert Notification.objects.filter(status=DeliveryStatus.PENDING).count() == 1
+
+    # Проверки при этом продолжаются как ни в чём не бывало.
+    later = MOMENT + timedelta(minutes=10)
+    Domain.objects.filter(pk=domain.pk).update(next_check_at=later)
+    report = tick(at=later, resolver=resolver, state_store=store, concurrency=1)
+
+    assert (report.claimed, report.checked, report.failed) == (1, 1, 0)
+    assert Check.objects.filter(domain=domain).count() == 2
 
 
 def test_empty_tick_does_nothing(store: FakeStateStore) -> None:
