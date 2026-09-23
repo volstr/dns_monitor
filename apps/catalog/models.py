@@ -17,6 +17,12 @@ COMMENT_MAX_LENGTH = 2000
 ENUM_MAX_LENGTH = 32
 IP_ADDRESS_MAX_LENGTH = 45
 ALLOWLIST_ENTRY_MAX_LENGTH = 49
+#: Идентификатор чата в канале доставки — та же длина, что у идентификатора сообщения (4.0).
+CHANNEL_RECIPIENT_MAX_LENGTH = 64
+#: Почта участника по 4.0 — предел адреса по RFC.
+EMAIL_MAX_LENGTH = 320
+#: Ссылка по 4.0.
+URL_MAX_LENGTH = 2048
 
 
 class NotificationMode(models.TextChoices):
@@ -83,6 +89,19 @@ class GlobalSettings(models.Model):
     # Вход — ТЗ 3, Q-C5. Срок скользящий; срок блокировки задан TTL ключа auth:lock:* (11.11).
     session_lifetime_seconds = models.PositiveIntegerField(default=7 * 24 * 60 * 60)
     login_failure_threshold = models.PositiveIntegerField(default=5)
+
+    # Адресаты каналов доставки — ТЗ 8.3, Q-D11: один адресат на вид канала.
+    # Здесь только «кому отправлять». Всё, что даёт доступ к чужой инфраструктуре — токен бота,
+    # адрес и учётные данные почтового сервера, — живёт в окружении и сюда не попадает: 8.3
+    # прямо запрещает администратору приложения направлять исходящее через свой сервер.
+    # Пустое значение означает «Не настроен» и является нормальным режимом.
+    telegram_chat_id = models.CharField(
+        max_length=CHANNEL_RECIPIENT_MAX_LENGTH, blank=True, default=""
+    )
+    email_recipients = ArrayField(
+        models.EmailField(max_length=EMAIL_MAX_LENGTH), default=list, blank=True
+    )
+    webhook_url = models.CharField(max_length=URL_MAX_LENGTH, blank=True, default="")
 
     class Meta:
         constraints = [
