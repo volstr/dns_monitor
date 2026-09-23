@@ -17,6 +17,7 @@ from datetime import datetime
 from django.conf import settings
 
 from apps.notifications.services.notifier import DeliveryRun, deliver_due
+from apps.notifications.services.reminders import queue_due_reminders
 from core.adapters.telegram import TelegramChannel
 from core.ports.clock import Clock
 from core.ports.state_store import StateStore
@@ -41,7 +42,11 @@ def run_one_delivery(
         logger.warning(reason)
         return DeliverySkipped(reason=reason)
 
-    return deliver_due(at=clock.now(), channel=channel, state_store=state_store)
+    at = clock.now()
+    # Напоминания ставятся в ту же очередь и тем же проходом: по 8.5 это обычные сообщения,
+    # просто повторные, и по Q-D9 они так же проходят через окно слияния.
+    queue_due_reminders(at=at, state_store=state_store)
+    return deliver_due(at=at, channel=channel, state_store=state_store)
 
 
 def describe(result: DeliveryRun | DeliverySkipped, at: datetime) -> str:

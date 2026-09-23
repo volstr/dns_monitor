@@ -125,6 +125,29 @@ def _build(
     return "\n".join(lines)
 
 
+def compose_reminder(
+    *, domain_name: str, age: str, unmatched: tuple[str, ...], domain_url: str
+) -> str:
+    """Напоминание по открытому инциденту — ТЗ 8.5.
+
+    Состав задан там же: возраст инцидента, **текущий** список несовпавших адресов (он мог
+    измениться с момента открытия) и ссылка. Комментарий домена не повторяется — он уже был
+    в первом сообщении.
+    """
+    lines = [
+        "<b>Расхождение держится</b>",
+        f"<code>{escape_html(domain_name)}</code>",
+        f"Возраст: {escape_html(age)}",
+    ]
+    if unmatched:
+        shown = ", ".join(
+            f"<code>{escape_html(address)}</code>" for address in _shorten(unmatched, ADDRESS_LIMIT)
+        )
+        lines.append(f"Вне разрешённых: {shown}")
+    lines.append(f'<a href="{escape_html(domain_url)}">Открыть домен →</a>')
+    return "\n".join(lines)
+
+
 def compose_summary(*, event_type: str, domain_names: tuple[str, ...], journal_url: str) -> str:
     """Сводное сообщение окна слияния — состав из 8.6 дословно.
 

@@ -85,6 +85,10 @@ def dispatch_event(
         merge_key=key.name,
     )
     Event.objects.filter(pk=event_id).update(notification=notification)
+    if event.incident_id:
+        # 8.5: сообщение о новом несовпавшем адресе засчитывается за напоминание — два подряд
+        # не отправляются. Поэтому отсчёт интервала сдвигает любое сообщение по инциденту.
+        Incident.objects.filter(pk=event.incident_id).update(last_message_at=at)
 
     return Queued(
         notification_id=notification.pk,
