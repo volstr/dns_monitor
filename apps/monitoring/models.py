@@ -193,8 +193,17 @@ class Event(models.Model):
     )
     author_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default="")
 
-    # TODO(ТЗ 4.5, 8.3): ссылка на отправленное уведомление появится вместе с apps.notifications
-    # на этапе 5 — это добавление поля, переделки схемы не требует.
+    # 4.5: «Ссылка на связанное уведомление, если оно отправлялось». Связь ведёт событие →
+    # уведомление, потому что при слиянии (8.6) двенадцать событий уходят одним сводным
+    # сообщением. Пусто — уведомление не отправлялось: режим «Не уведомлять», базовая проверка
+    # (7.4) или событие, которое по 8.1 уведомления не порождает.
+    notification = models.ForeignKey(
+        "notifications.Notification",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="events",
+    )
 
     class Meta:
         indexes = [
