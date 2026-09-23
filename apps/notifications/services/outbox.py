@@ -94,12 +94,18 @@ def mark_delivered(*, notification_id: int, at: datetime, channel_message_id: st
     return Delivered(notification_id=notification_id, channel_message_id=channel_message_id)
 
 
-def mark_failed(*, notification_id: int, at: datetime, error: str) -> Retrying | GaveUp:
-    """Неудача: либо назначаем следующую попытку, либо сдаёмся."""
+def mark_failed(
+    *, notification_id: int, at: datetime, error: str, retryable: bool = True
+) -> Retrying | GaveUp:
+    """Неудача: либо назначаем следующую попытку, либо сдаёмся.
+
+    ``retryable=False`` — отказ, который не изменится от повтора: «чат не найден», «бот
+    заблокирован». Пять попыток такого отказа только оттянули бы запись в журнал.
+    """
     notification = Notification.objects.get(pk=notification_id)
     attempt = notification.attempt + 1
 
-    if attempt >= MAX_ATTEMPTS:
+    if not retryable or attempt >= MAX_ATTEMPTS:
         Notification.objects.filter(pk=notification_id).update(
             status=DeliveryStatus.FAILED, attempt=attempt, last_error=error[:ERROR_MAX_LENGTH]
         )

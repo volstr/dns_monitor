@@ -20,6 +20,8 @@ from core.text import escape_html
 MAX_LENGTH = 4096
 #: «первые 8 и „и ещё N"» (8.4).
 ADDRESS_LIMIT = 8
+#: «перечисление до 10 имён» в сводке (8.6).
+SUMMARY_NAME_LIMIT = 10
 
 #: Заголовки из утверждённой таблицы Q-C11.
 HEADERS: dict[str, str] = {
@@ -120,6 +122,24 @@ def _build(
     if include_link:
         lines.append(f'<a href="{escape_html(message.domain_url)}">Открыть домен →</a>')
 
+    return "\n".join(lines)
+
+
+def compose_summary(*, event_type: str, domain_names: tuple[str, ...], journal_url: str) -> str:
+    """Сводное сообщение окна слияния — состав из 8.6 дословно.
+
+    «Тип события, число затронутых доменов, перечисление до 10 имён, „и ещё N", ссылка на журнал
+    с уже применённым фильтром». Общего числа проверенных здесь нет намеренно: формулировка 7.4
+    «12 доменов из 200» — иллюстрация, а не спецификация формата (Q-D9).
+    """
+    header = HEADERS.get(event_type, event_type)
+    shown = _shorten(domain_names, SUMMARY_NAME_LIMIT)
+    lines = [
+        f"<b>{escape_html(header)}</b>",
+        f"Затронуто доменов: {len(domain_names)}",
+        ", ".join(f"<code>{escape_html(name)}</code>" for name in shown),
+        f'<a href="{escape_html(journal_url)}">Открыть журнал →</a>',
+    ]
     return "\n".join(lines)
 
 
