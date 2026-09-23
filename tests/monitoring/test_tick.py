@@ -4,10 +4,17 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from apps.catalog.models import AllowlistEntry, Domain, Group
+from apps.catalog.models import (
+    AllowlistEntry,
+    Domain,
+    GlobalSettings,
+    Group,
+    NotificationMode,
+)
 from apps.monitoring.models import Check
 from apps.monitoring.services.scheduling import RESERVATION, SUCCESSFUL_HISTORY
 from apps.monitoring.services.tick import tick
+from apps.notifications.models import Notification
 from core.adapters.fake_clock import FakeClock
 from core.adapters.fake_resolver import FakeResolver, answered
 from core.adapters.fake_state_store import FakeStateStore
@@ -98,6 +105,36 @@ def test_11_11_lock_is_released_even_when_the_check_fails(store: FakeStateStore)
     tick(at=MOMENT, resolver=FakeResolver(), state_store=store, concurrency=1)
 
     assert store.is_held(scheduler_lock(broken.pk)) is False
+
+
+def test_8_1_check_queues_a_notification_for_its_event(
+    domain: Domain, store: FakeStateStore
+) -> None:
+    """Сквозной путь: проверка → событие → очередь исходящих."""
+    GlobalSettings.objects.filter(pk=1).update(
+        telegram_chat_id="-1001234567890", notification_mode=NotificationMode.NOT_ALLOWED
+    )
+    # Адрес вне списка: список у домена есть (фикстура), значит вхождение вычисляется.
+    resolver = FakeResolver({NAME: [answered("185.44.9.201")]})
+
+    tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1)
+
+    notification = Notification.objects.get()
+    assert notification.recipient == "-1001234567890"
+    assert "Адрес вне разрешённых" in notification.text
+    # Уведомление ждёт закрытия окна слияния, а не уходит немедленно (Q-D9).
+    assert notification.next_attempt_at > MOMENT
+
+
+def test_8_1_check_without_notifications_queues_nothing(
+    domain: Domain, store: FakeStateStore
+) -> None:
+    GlobalSettings.objects.filter(pk=1).update(notification_mode=NotificationMode.NONE)
+    resolver = FakeResolver({NAME: [answered("185.44.9.201")]})
+
+    tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1)
+
+    assert Notification.objects.count() == 0
 
 
 def test_empty_tick_does_nothing(store: FakeStateStore) -> None:

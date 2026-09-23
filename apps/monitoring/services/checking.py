@@ -58,6 +58,9 @@ class CheckReport:
     statuses: tuple[AddressStatusView, ...]
     incident_opened: bool
     incident_closed: bool
+    #: Идентификаторы созданных событий. По ним тик ставит уведомления в очередь — **после**
+    #: фиксации этой транзакции: накопитель окна живёт в Redis и вместе с ней не откатится.
+    event_ids: tuple[int, ...] = ()
 
 
 @transaction.atomic
@@ -111,11 +114,13 @@ def _no_records(
     domain.save(update_fields=["consecutive_resolve_failures", "cname_target"])
 
     events: list[EventType] = []
+    event_ids: list[int] = []
     # Ровно на N-й неудаче: повторно не порождается, пока не было успешного резолва (7.1).
     # До N событий нет вовсе — Q-C10.
     if domain.consecutive_resolve_failures == failure_threshold:
-        _event(domain, at, EventType.RESOLVE_FAILED, {"attempts": failure_threshold})
+        event = _event(domain, at, EventType.RESOLVE_FAILED, {"attempts": failure_threshold})
         events.append(EventType.RESOLVE_FAILED)
+        event_ids.append(event.pk)
 
     Check.objects.create(
         domain=domain,
@@ -130,6 +135,7 @@ def _no_records(
         statuses=(),
         incident_opened=False,
         incident_closed=False,
+        event_ids=tuple(event_ids),
     )
 
 
@@ -142,10 +148,11 @@ def _answered(
     is_baseline: bool,
 ) -> CheckReport:
     events: list[EventType] = []
+    event_ids: list[int] = []
 
     if domain.consecutive_resolve_failures > 0:
-        _event(domain, at, EventType.RESOLVE_RECOVERED, {})
         events.append(EventType.RESOLVE_RECOVERED)
+        event_ids.append(_event(domain, at, EventType.RESOLVE_RECOVERED, {}).pk)
 
     # Набор «до» берётся на момент **предыдущей** проверки, а не на текущий. По 7.1 адрес
     # пропал, если он входил в актуальный набор и в момент этой проверки пересёк границу
@@ -171,25 +178,29 @@ def _answered(
 
     if is_baseline:
         # 7.4: базовая проверка отправную точку ставит молча — событий изменения нет.
-        _event(
+        started = _event(
             domain,
             at,
             EventType.WATCH_STARTED,
             {"address_count": len(after_set), "unmatched_count": len(_unmatched(statuses))},
         )
         events.append(EventType.WATCH_STARTED)
+        event_ids.append(started.pk)
     else:
         for address in sorted(appeared, key=str):
-            _event(domain, at, EventType.ADDRESS_APPEARED, {"addresses": [str(address)]})
+            event = _event(domain, at, EventType.ADDRESS_APPEARED, {"addresses": [str(address)]})
             events.append(EventType.ADDRESS_APPEARED)
+            event_ids.append(event.pk)
         for address in sorted(gone, key=str):
-            _event(domain, at, EventType.ADDRESS_GONE, {"addresses": [str(address)]})
+            event = _event(domain, at, EventType.ADDRESS_GONE, {"addresses": [str(address)]})
             events.append(EventType.ADDRESS_GONE)
+            event_ids.append(event.pk)
 
-    incident_opened, incident_closed, incident_events = _incidents(
+    incident_opened, incident_closed, incident_events, incident_event_ids = _incidents(
         domain, at, statuses, before_unmatched
     )
     events.extend(incident_events)
+    event_ids.extend(incident_event_ids)
 
     domain.consecutive_resolve_failures = 0
     domain.last_successful_check_at = at
@@ -209,6 +220,7 @@ def _answered(
         statuses=statuses,
         incident_opened=incident_opened,
         incident_closed=incident_closed,
+        event_ids=tuple(event_ids),
     )
 
 
@@ -258,9 +270,10 @@ def _incidents(
     at: datetime,
     statuses: tuple[AddressStatusView, ...],
     before_unmatched: frozenset[IPAddress],
-) -> tuple[bool, bool, list[EventType]]:
+) -> tuple[bool, bool, list[EventType], list[int]]:
     """Инциденты и дедупликация — ТЗ 7.3 с быстрым закрытием из Q-13.2."""
     events: list[EventType] = []
+    event_ids: list[int] = []
     unmatched = _unmatched(statuses)
     # Адрес, отсутствующий в K подряд ответах, инцидент больше не держит (Q-13.2).
     holding = {
@@ -272,30 +285,35 @@ def _incidents(
 
     if holding and incident is None:
         incident = Incident.objects.create(domain=domain, opened_at=at)
-        _event(domain, at, EventType.NOT_ALLOWED, {"addresses": _texts(holding)}, incident)
-        return True, False, [EventType.NOT_ALLOWED]
+        opened = _event(
+            domain, at, EventType.NOT_ALLOWED, {"addresses": _texts(holding)}, incident
+        )
+        return True, False, [EventType.NOT_ALLOWED], [opened.pk]
 
     if holding and incident is not None:
         # Инцидент не дублируется, но о новом несовпавшем адресе сообщается (7.3).
         appeared = holding - before_unmatched
         if appeared:
-            _event(domain, at, EventType.NOT_ALLOWED, {"addresses": _texts(appeared)}, incident)
+            event = _event(
+                domain, at, EventType.NOT_ALLOWED, {"addresses": _texts(appeared)}, incident
+            )
             events.append(EventType.NOT_ALLOWED)
-        return False, False, events
+            event_ids.append(event.pk)
+        return False, False, events, event_ids
 
     if incident is not None:
         incident.closed_at = at
         incident.save(update_fields=["closed_at"])
-        _event(
+        closed = _event(
             domain,
             at,
             EventType.BACK_TO_NORMAL,
             {"duration_seconds": int((at - incident.opened_at).total_seconds())},
             incident,
         )
-        return False, True, [EventType.BACK_TO_NORMAL]
+        return False, True, [EventType.BACK_TO_NORMAL], [closed.pk]
 
-    return False, False, events
+    return False, False, events, event_ids
 
 
 def _misses(domain: Domain, address: IPAddress) -> int:
@@ -330,8 +348,8 @@ def _event(
     event_type: EventType,
     payload: dict[str, object],
     incident: Incident | None = None,
-) -> None:
-    Event.objects.create(
+) -> Event:
+    return Event.objects.create(
         domain=domain,
         event_type=event_type,
         occurred_at=at,

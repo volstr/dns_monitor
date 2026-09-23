@@ -29,6 +29,7 @@ from apps.monitoring.services.scheduling import (
     prune_check_history,
     reschedule_after_check,
 )
+from apps.notifications.services.dispatch import dispatch_event
 from core.ports.resolver import Resolver
 from core.ports.state_store import StateStore, scheduler_lock
 
@@ -100,9 +101,14 @@ def _check_one(
         # Домен уже проверяется — например, по кнопке «Проверить сейчас» (11.6).
         return _SKIPPED
     try:
-        run_check(domain_id=item.domain_id, at=at, resolver=resolver)
+        report = run_check(domain_id=item.domain_id, at=at, resolver=resolver)
         reschedule_after_check(domain_id=item.domain_id, at=at)
         prune_check_history(domain_id=item.domain_id)
+        # Постановка в очередь идёт **после** проверки, а не внутри неё: `run_check` выполняется
+        # в транзакции, а накопитель окна слияния живёт в Redis и вместе с ней не откатится.
+        # Откат оставил бы счётчик завышенным, и порог слияния поехал бы (Q-D9).
+        for event_id in report.event_ids:
+            dispatch_event(event_id=event_id, at=at, state_store=state_store)
     except Exception:
         # Один домен не должен ронять обход. Резервирование вернёт его в выборку через полминуты.
         logger.exception("проверка домена упала", extra={"domain": item.name})
