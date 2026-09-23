@@ -97,6 +97,30 @@ def test_5_ipv4_address_does_not_match_an_ipv6_entry(domain: Domain) -> None:
     assert statuses(domain)["10.20.3.7"] is AddressStatus.UNMATCHED
 
 
+def test_8_2_empty_allowlist_means_containment_is_not_evaluated(domain: Domain) -> None:
+    # 8.2: такой домен «не пришлёт уведомление никогда», и логика там названа верной. Значит
+    # пустой список — это не «все адреса не совпали», а «сравнивать не с чем» (Q-D25).
+    seen(domain, "10.20.1.14")
+    seen(domain, "185.44.9.201")
+
+    assert set(statuses(domain).values()) == {AddressStatus.NOT_CHECKED}
+
+
+def test_8_2_stale_still_wins_over_an_empty_allowlist(domain: Domain) -> None:
+    seen(domain, "10.20.1.14", last_seen_at=MOMENT - THRESHOLD - timedelta(minutes=1))
+
+    assert statuses(domain)["10.20.1.14"] is AddressStatus.STALE
+
+
+def test_8_2_first_entry_switches_the_check_on(domain: Domain) -> None:
+    seen(domain, "185.44.9.201")
+    assert statuses(domain)["185.44.9.201"] is AddressStatus.NOT_CHECKED
+
+    allow(domain, "10.20.0.0/22")
+
+    assert statuses(domain)["185.44.9.201"] is AddressStatus.UNMATCHED
+
+
 def test_6_4_stale_takes_priority_over_matching(domain: Domain) -> None:
     # Приоритет 6.4: сначала «Не актуален», вопрос о вхождении для статуса не задаётся.
     allow(domain, "10.20.0.0/22")

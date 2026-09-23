@@ -15,7 +15,7 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import cast
 
-from django.db.models import OuterRef, Subquery
+from django.db.models import Exists, OuterRef, Subquery
 
 from apps.catalog.models import AllowlistEntry
 from apps.monitoring.models import AddressRegistryEntry
@@ -51,8 +51,10 @@ def address_statuses(
         .annotate(
             matched_raw=Subquery(matched.values("raw")[:1]),
             matched_entry=Subquery(matched.values("entry")[:1], output_field=CidrField()),
+            # Есть ли у домена список вообще — тем же запросом, а не отдельным `exists()`.
+            has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef("domain"))),
         )
-        .values("address", "last_seen_at", "matched_raw", "matched_entry")
+        .values("address", "last_seen_at", "matched_raw", "matched_entry", "has_allowlist")
         .order_by("address")
     )
 
@@ -60,7 +62,11 @@ def address_statuses(
     return tuple(
         AddressStatusView(
             address=row["address"],
-            status=_status(row["last_seen_at"] >= border, row["matched_raw"] is not None),
+            status=_status(
+                is_fresh=row["last_seen_at"] >= border,
+                has_match=row["matched_raw"] is not None,
+                has_allowlist=row["has_allowlist"],
+            ),
             match=_match(row["matched_raw"], row["matched_entry"]),
             last_seen_at=row["last_seen_at"],
         )
@@ -68,10 +74,14 @@ def address_statuses(
     )
 
 
-def _status(is_fresh: bool, has_match: bool) -> AddressStatus:
-    """Приоритет сверху вниз — ТЗ 6.4."""
+def _status(*, is_fresh: bool, has_match: bool, has_allowlist: bool) -> AddressStatus:
+    """Приоритет сверху вниз — ТЗ 6.4, плюс пустой список по 8.2 (Q-D25)."""
     if not is_fresh:
         return AddressStatus.STALE
+    if not has_allowlist:
+        # Сравнивать не с чем. Иначе «не совпал» получил бы каждый адрес каждого домена без
+        # списка, и 8.2 («не пришлёт уведомление никогда») было бы нарушено.
+        return AddressStatus.NOT_CHECKED
     return AddressStatus.MATCHED if has_match else AddressStatus.UNMATCHED
 
 

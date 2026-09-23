@@ -80,6 +80,21 @@ def test_2_address_outside_the_list_opens_an_incident(domain: Domain) -> None:
     assert Incident.objects.filter(domain=domain, closed_at__isnull=True).count() == 1
 
 
+def test_16_domain_without_an_allowlist_never_raises_an_incident() -> None:
+    # Критерий 16 и 8.2: при пустом списке уведомлений нет никогда. Значит и инцидента нет —
+    # иначе на обзоре висело бы открытое расхождение на каждом домене без списка (Q-D25).
+    bare = Domain.objects.create(name="cdn.contoso.ru")
+    resolver = FakeResolver({"cdn.contoso.ru": [answered("185.44.9.201", "10.20.1.14")]})
+
+    at = START
+    for _ in range(3):
+        run_check(domain_id=bare.pk, at=at, resolver=resolver)
+        at += PERIOD
+
+    assert Incident.objects.filter(domain=bare).count() == 0
+    assert Event.objects.filter(domain=bare, event_type=EventType.NOT_ALLOWED).count() == 0
+
+
 def test_3_the_same_unmatched_address_does_not_repeat_the_event(domain: Domain) -> None:
     resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
     check(domain, resolver, START)
