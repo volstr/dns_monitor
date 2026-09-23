@@ -20,6 +20,7 @@ import urllib.request
 from typing import Any, Protocol
 
 from core.ports.notification_channel import NotificationChannel, NotSent, SendResult, Sent
+from core.text import escape_html as escape
 
 API_URL = "https://api.telegram.org"
 TIMEOUT_SECONDS = 10
@@ -53,9 +54,8 @@ class UrllibTransport(Transport):
             return int(error.code), body
 
 
-def escape(text: str) -> str:
-    """Экранирование для ограниченного HTML (8.4)."""
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+#: Имя оставлено экспортированным: экранирование — часть контракта разметки этого канала.
+__all__ = ["API_URL", "TelegramChannel", "Transport", "UrllibTransport", "escape"]
 
 
 class TelegramChannel(NotificationChannel):
