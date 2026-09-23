@@ -20,6 +20,7 @@ class FakeStateStore(StateStore):
     def __init__(self, clock: Clock, *, available: bool = True) -> None:
         self._clock = clock
         self._expires_at: dict[str, datetime] = {}
+        self._items: dict[str, list[str]] = {}
         #: Позволяет проверить поведение при недоступном хранилище (11.13).
         self.available = available
 
@@ -33,10 +34,26 @@ class FakeStateStore(StateStore):
     def release(self, key: StateKey) -> None:
         self._guard()
         self._expires_at.pop(key.name, None)
+        self._items.pop(key.name, None)
 
     def is_held(self, key: StateKey) -> bool:
         self._guard()
         return self._alive(key.name)
+
+    def accumulate(self, key: StateKey, item: str) -> int:
+        self._guard()
+        if not self._alive(key.name):
+            # Первое добавление задаёт окно; дальше оно не продлевается (11.11).
+            self._items[key.name] = []
+            self._expires_at[key.name] = self._clock.now() + key.ttl
+        self._items[key.name].append(item)
+        return len(self._items[key.name])
+
+    def collected(self, key: StateKey) -> tuple[str, ...]:
+        self._guard()
+        if not self._alive(key.name):
+            return ()
+        return tuple(self._items.get(key.name, ()))
 
     def ping(self) -> None:
         self._guard()
@@ -51,6 +68,7 @@ class FakeStateStore(StateStore):
             return False
         if expires_at <= self._clock.now():
             del self._expires_at[name]
+            self._items.pop(name, None)
             return False
         return True
 

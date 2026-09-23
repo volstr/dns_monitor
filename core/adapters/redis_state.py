@@ -31,5 +31,17 @@ class RedisStateStore(StateStore):
     def is_held(self, key: StateKey) -> bool:
         return bool(self._client.exists(key.name))
 
+    def accumulate(self, key: StateKey, item: str) -> int:
+        length = int(self._client.rpush(key.name, item))  # type: ignore[arg-type]
+        if length == 1:
+            # Только при первом добавлении: окно фиксированное и потоком событий не продлевается
+            # (11.11). EXPIRE отдельной командой — RPUSH срока жизни не ставит.
+            self._client.expire(key.name, key.ttl)
+        return length
+
+    def collected(self, key: StateKey) -> tuple[str, ...]:
+        items = self._client.lrange(key.name, 0, -1)
+        return tuple(str(item) for item in items)  # type: ignore[union-attr]
+
     def ping(self) -> None:
         self._client.ping()

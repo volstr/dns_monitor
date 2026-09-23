@@ -17,6 +17,7 @@ from core.ports.state_store import (
     StateKey,
     domain_cooldown,
     group_cooldown,
+    merge_window,
     scheduler_lock,
 )
 
@@ -94,6 +95,39 @@ def test_11_13_unavailable_store_raises(clock: FakeClock) -> None:
         store.acquire(scheduler_lock(1))
 
 
+def test_8_6_accumulator_collects_items_and_counts_them(store: FakeStateStore) -> None:
+    key = merge_window("telegram", "not_allowed")
+
+    assert store.accumulate(key, "pay-gw.contoso.ru") == 1
+    assert store.accumulate(key, "api.contoso.ru") == 2
+    assert store.collected(key) == ("pay-gw.contoso.ru", "api.contoso.ru")
+
+
+def test_8_6_window_is_fixed_and_not_extended_by_new_events(
+    store: FakeStateStore, clock: FakeClock
+) -> None:
+    # 11.11: срок ставится при первом добавлении. Иначе поток событий продлевал бы окно
+    # бесконечно и сводка не ушла бы никогда.
+    key = merge_window("telegram", "not_allowed")
+    store.accumulate(key, "первый")
+
+    clock.advance(timedelta(seconds=60))
+    store.accumulate(key, "второй")
+    clock.advance(timedelta(seconds=31))
+
+    assert store.collected(key) == ()
+
+
+def test_8_6_released_accumulator_starts_over(store: FakeStateStore) -> None:
+    key = merge_window("telegram", "not_allowed")
+    store.accumulate(key, "первый")
+
+    store.release(key)
+
+    assert store.collected(key) == ()
+    assert store.accumulate(key, "второй") == 1
+
+
 @pytest.fixture
 def redis_store() -> RedisStateStore:
     store = RedisStateStore.from_url(REDIS_URL, db=STATE_DB)
@@ -132,6 +166,21 @@ def test_real_redis_behaves_like_the_fake(redis_store: RedisStateStore) -> None:
     assert redis_store.acquire(key) is False
     redis_store.release(key)
     assert redis_store.is_held(key) is False
+
+
+def test_8_6_real_redis_accumulates_with_a_lifetime(
+    redis_store: RedisStateStore, redis_inspector: redis.Redis
+) -> None:
+    key = merge_window("telegram", "probe_event")
+    redis_store.release(key)
+
+    assert redis_store.accumulate(key, "pay-gw.contoso.ru") == 1
+    assert redis_store.accumulate(key, "api.contoso.ru") == 2
+
+    assert redis_store.collected(key) == ("pay-gw.contoso.ru", "api.contoso.ru")
+    # Ключ накопителя тоже обязан иметь срок жизни (11.11, критерий 54).
+    assert redis_inspector.ttl(key.name) > 0
+    redis_store.release(key)
 
 
 def test_real_redis_ping_fails_when_unreachable() -> None:
