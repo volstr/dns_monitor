@@ -19,7 +19,9 @@ from django.conf import settings
 from apps.catalog.models import GlobalSettings
 from apps.monitoring.services.health import check_health, record_checks_stopped
 from apps.monitoring.services.tick import TickReport, tick
+from apps.notifications.services.outage import send_outage_alert
 from core.adapters.dns_resolver import DnsResolver
+from core.adapters.telegram import TelegramChannel
 from core.ports.clock import Clock
 from core.ports.state_store import StateStore
 
@@ -52,6 +54,13 @@ def run_one_tick(
         logger.error(reason, extra={"component": health.failed_component})
         if previously_healthy:
             record_checks_stopped(at=clock.now(), report=health)
+            # Критерий 65: сообщение уходит в канал напрямую, минуя очередь и окно слияния —
+            # компонент, сообщающий об отказе, не может зависеть от отказавшего (11.13).
+            send_outage_alert(
+                channel=TelegramChannel(settings.ENV.telegram_bot_token),
+                component=health.failed_component or "неизвестен",
+                detail=health.detail,
+            )
         return TickSkipped(reason=reason, healthy=False)
 
     global_settings = GlobalSettings.objects.get()

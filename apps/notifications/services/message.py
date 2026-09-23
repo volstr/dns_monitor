@@ -125,6 +125,23 @@ def _build(
     return "\n".join(lines)
 
 
+def compose_outage(*, component: str, detail: str | None = None) -> str:
+    """Сообщение об аварии инфраструктуры — ТЗ 11.13.
+
+    Главное требование раздела: остановка проверок обязана быть заметной. «Инструмент
+    мониторинга, который молча перестал мониторить, опаснее отсутствия инструмента: люди
+    продолжают считать, что за доменами следят.»
+    """
+    lines = [
+        "<b>Проверки остановлены</b>",
+        f"Не отвечает компонент инфраструктуры: <code>{escape_html(component)}</code>.",
+        "Пока он не восстановлен, за доменами никто не следит.",
+    ]
+    if detail:
+        lines.append(escape_html(detail))
+    return "\n".join(lines)
+
+
 def compose_reminder(
     *, domain_name: str, age: str, unmatched: tuple[str, ...], domain_url: str
 ) -> str:
