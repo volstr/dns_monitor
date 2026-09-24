@@ -1,13 +1,14 @@
 """Корневые маршруты.
 
-Пока здесь только проба работоспособности (11.13, Q-E4). Экраны продукта — списки доменов,
-карточка, группы, журнал, участники — приходят на этапе 6.
+Экраны появляются по мере готовности: карточка домена, группы, журнал, настройки и участники
+приходят следующими частями этапа 6, в порядке реализации из ТЗ.
 """
 
-from django.urls import URLPattern, URLResolver, path
+from django.urls import URLPattern, URLResolver, include, path
 
 from apps.monitoring.views import healthcheck
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("health/", healthcheck, name="healthcheck"),
+    path("", include("apps.catalog.urls")),
 ]

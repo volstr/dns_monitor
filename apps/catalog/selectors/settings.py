@@ -41,9 +41,16 @@ def effective_settings(domain_id: int) -> EffectiveSettings:
     return settings_of_group(domain.group)
 
 
-def settings_of_group(group: Group | None) -> EffectiveSettings:
-    """Разрешённые настройки группы. ``None`` — случай «без группы»."""
-    global_settings = GlobalSettings.objects.get()
+def settings_of_group(
+    group: Group | None, global_settings: GlobalSettings | None = None
+) -> EffectiveSettings:
+    """Разрешённые настройки группы. ``None`` в ``group`` — случай «без группы».
+
+    ``global_settings`` передаётся списком доменов: строка общих настроек там уже прочитана, и
+    без этого параметра каждая группа на странице добавляла бы ещё один одинаковый запрос.
+    """
+    if global_settings is None:
+        global_settings = GlobalSettings.objects.get()
 
     return EffectiveSettings(
         check_period=_map(

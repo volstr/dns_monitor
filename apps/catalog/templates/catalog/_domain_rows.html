@@ -1,0 +1,57 @@
+{% comment %}
+Строки списка доменов. Отдельным файлом, потому что HTMX обновляет только их (ТЗ 11.5).
+Ни одного вычисления: подписи, классы и отметки пришли готовыми из селектора.
+{% endcomment %}
+{% for row in page.rows %}
+  <tr {% if not row.watch_enabled %}style="opacity:.55"{% endif %}>
+    <td>
+      <div class="dn"><a href="#">{{ row.name }}</a></div>
+      <div class="sub">
+        {% if row.group_name %}{{ row.group_name }}{% else %}Без группы{% endif %}
+        {% if not row.watch_enabled %} · наблюдение выключено{% endif %}
+      </div>
+      {% if row.comment %}<div class="sub" title="{{ row.comment }}">{{ row.comment }}</div>{% endif %}
+    </td>
+
+    <td data-l="Адреса">
+      <div class="ips">
+        {% for chip in row.addresses %}
+          <span class="chip {{ chip.css }}">{% if chip.glyph %}<span class="glyph">{{ chip.glyph }}</span>{% endif %}{{ chip.address }}</span>
+        {% empty %}
+          <span class="sub">Адресов пока нет</span>
+        {% endfor %}
+        {% if row.hidden_addresses %}<span class="sub">и ещё {{ row.hidden_addresses }}</span>{% endif %}
+      </div>
+    </td>
+
+    <td data-l="Проверка адресов">
+      {% if row.matching.tone %}
+        <span class="state {{ row.matching.tone }}">{{ row.matching.label }}</span>
+      {% else %}
+        <span class="sub">{{ row.matching.label }}</span>
+      {% endif %}
+      {% if row.matching.detail %}<div class="sub mono">{{ row.matching.detail }}</div>{% endif %}
+      {% comment %}
+      Ловушка 8.2: пустой список в режиме «При выходе из разрешённых» не пришлёт уведомление
+      никогда. ТЗ требует помечать такие домены прямо в списке.
+      {% endcomment %}
+      {% if row.silent_trap %}
+        <div class="sub"><span class="tag override" title="Белый список пуст, а режим — «При выходе из разрешённых». Уведомлений по этому домену не будет никогда.">Уведомлений не будет</span></div>
+      {% endif %}
+    </td>
+
+    <td data-l="Проверка">
+      <span class="mono">{{ row.check_period }}</span>
+      <div class="sub"><span class="tag inherit">{% if row.check_period_origin == 'group' %}от группы{% else %}общая{% endif %}</span></div>
+    </td>
+
+    <td data-l="Уведомления">
+      <span style="font-size:12px">{{ row.notification_mode }}</span>
+      <div class="sub"><span class="tag inherit">{% if row.notification_origin == 'group' %}от группы{% else %}общая{% endif %}</span></div>
+    </td>
+
+    <td data-l="История">{% include "monitoring/_history_cell.html" with history=row.history %}</td>
+  </tr>
+{% empty %}
+  <tr><td colspan="6"><div class="sub">Ничего не найдено</div></td></tr>
+{% endfor %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% comment %}
+Экран «Домены» — разметка прототипа (строки 836–948), ТЗ 11.5, 8.2.
+
+Чего здесь пока нет и почему: кнопок «Импорт списком» и «Добавить домен» — это раздел 10.3 и
+карточка домена, они приходят следующими частями этапа 6 в порядке реализации из ТЗ, а кнопка
+в никуда хуже её отсутствия. Поле выбора группы пока обычный список: поле с поиском (10.4) —
+один из трёх разрешённых виджетов и относится к этапу 7.
+{% endcomment %}
+
+{% block title %}Домены — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="domains">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Домены</div>
+      <h1>Под наблюдением</h1>
+      <p>Адреса сравниваются с прошлым ответом, а при заданных подсетях — ещё и с ними.</p>
+    </div>
+  </div>
+
+  <div class="body">
+    {% comment %}
+    Обычная форма GET. Атрибуты hx-* включаются сами, когда появится htmx.min.js: тогда
+    обновляются только строки таблицы. Без файла форма работает переходом по странице —
+    своего JS здесь нет ни строки.
+    {% endcomment %}
+    <form class="filters" method="get" action="{% url 'domain-list' %}"
+          hx-get="{% url 'domain-list' %}" hx-target="#domain-rows" hx-trigger="change, submit">
+      <div class="search">
+        <span>⌕</span>
+        <input class="inp mono" type="search" name="search" value="{{ page.search }}"
+               placeholder="домен или IP" aria-label="Поиск по домену или адресу">
+      </div>
+
+      {% comment %}
+      Сегменты — кнопки отправки со своим значением: разметка прототипа сохранена дословно,
+      состояние фильтра уходит в адрес страницы, и на него можно сослаться.
+      {% endcomment %}
+      <div class="seg">
+        <button type="submit" name="chosen" value="all" class="{% if page.chosen == 'all' %}on{% endif %}">Все</button>
+        <button type="submit" name="chosen" value="discrepancies" class="{% if page.chosen == 'discrepancies' %}on{% endif %}">Расхождения</button>
+        <button type="submit" name="chosen" value="no_allowlist" class="{% if page.chosen == 'no_allowlist' %}on{% endif %}">Без разрешённых</button>
+        <button type="submit" name="chosen" value="disabled" class="{% if page.chosen == 'disabled' %}on{% endif %}">Выключенные</button>
+      </div>
+
+      <div style="min-width:210px">
+        <select class="inp" name="group" aria-label="Группа">
+          <option value="">Все группы</option>
+          {% for group in page.groups %}
+            <option value="{{ group.id }}" {% if group.id == page.group_id %}selected{% endif %}>
+              {{ group.name }} · {{ group.domain_count }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn" type="submit">Показать</button>
+    </form>
+
+    <div class="panel">
+      <div class="tw">
+        <table>
+          <thead>
+            <tr>
+              <th>Домен</th>
+              <th>Адреса</th>
+              <th>Проверка адресов</th>
+              <th>Проверка</th>
+              <th>Уведомления</th>
+              <th title="20 последних проверок домена, слева направо. Ось — последовательность проверок, а не время. Пустая отметка означает, что проверки не было.">История</th>
+            </tr>
+          </thead>
+          <tbody id="domain-rows">
+            {% include "catalog/_domain_rows.html" %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% comment %}
+Каркас экранов. Разметка и классы — из прототипа (строки 694–722), истина по вёрстке.
+
+Пункты меню добавляются по мере появления экранов: ссылка на несуществующий маршрут роняет
+страницу, а рисовать ссылку в никуда нечестно. Порядок частей взят из порядка реализации в
+конце ТЗ: домены и карточка, затем группы и настройки, затем импорт, перенос, участники и вход.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}DNS monitoring{% endblock %}</title>
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+{% comment %}
+Файл кладёт разработчик, см. static/README.md. Без него страницы работают обычными переходами:
+HTMX нужен валидации белого списка (10.2) и выбору группы (10.4).
+{% endcomment %}
+<script src="{% static 'js/htmx.min.js' %}" defer></script>
+</head>
+<body>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand">
+      <b>DNS monitoring</b>
+    </div>
+
+    {% comment %}
+    Пункты зависят от роли. «Участники» — только администратору: ТЗ 3, «Наблюдатель вообще не
+    имеет доступа к этому разделу». «Настройки» видны обоим, наблюдателю — без блока адресатов
+    (Q-D19). Подпись «Участники», а не «Пользователи» из ТЗ 3: термин раздела 2 сильнее, он
+    уходит в журнал и в уведомления (Q-C14).
+    {% endcomment %}
+    <nav class="nav">
+      <a href="{% url 'domain-list' %}" {% if screen == 'domains' %}aria-current="page"{% endif %}>Домены</a>
+    </nav>
+
+    <div class="rail-foot">
+      <b>{{ request.user.name }}</b>
+      {{ request.user.get_role_display }}
+      {# «выйти» появится вместе с экраном входа: раздел 3 идёт последним в порядке ТЗ. #}
+    </div>
+  </aside>
+
+  <div class="main">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="banner"><div class="bi">•</div><p>{{ message }}</p></div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+</body>
+</html>

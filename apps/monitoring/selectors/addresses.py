@@ -11,7 +11,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import cast
 
@@ -72,6 +73,70 @@ def address_statuses(
         )
         for row in rows
     )
+
+
+@dataclass(frozen=True, slots=True)
+class RegistryRow:
+    """Строка реестра для списка доменов. От `AddressStatusView` отличается `first_seen_at`.
+
+    Момент первого обнаружения нужен пометке «новый» в списке (Q-C22), а причина совпадения —
+    наоборот, не нужна: в списке она не показывается, там только чипы адресов.
+    """
+
+    address: IPAddress
+    status: AddressStatus
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+def registry_of_domains(
+    domain_ids: Sequence[int], at: datetime, thresholds: Mapping[int, timedelta]
+) -> dict[int, tuple[RegistryRow, ...]]:
+    """Реестры сразу нескольких доменов — один запрос на всю страницу списка.
+
+    Порог актуальности у каждого домена свой: он наследуется от группы (ТЗ 5), поэтому граница
+    `T - W` считается отдельно для каждого и приходит в `thresholds`.
+    """
+    if not domain_ids:
+        return {}
+
+    matched = AllowlistEntry.objects.filter(
+        domain=OuterRef("domain"), entry__net_contains_or_equals=OuterRef("address")
+    )
+    rows = (
+        AddressRegistryEntry.objects.filter(domain_id__in=domain_ids)
+        .annotate(
+            has_match=Exists(matched),
+            has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef("domain"))),
+        )
+        .values(
+            "domain_id",
+            "address",
+            "first_seen_at",
+            "last_seen_at",
+            "has_match",
+            "has_allowlist",
+        )
+        .order_by("domain_id", "address")
+    )
+
+    collected: dict[int, list[RegistryRow]] = {}
+    for row in rows:
+        domain_id = row["domain_id"]
+        border = at - thresholds[domain_id]
+        collected.setdefault(domain_id, []).append(
+            RegistryRow(
+                address=row["address"],
+                status=_status(
+                    is_fresh=row["last_seen_at"] >= border,
+                    has_match=row["has_match"],
+                    has_allowlist=row["has_allowlist"],
+                ),
+                first_seen_at=row["first_seen_at"],
+                last_seen_at=row["last_seen_at"],
+            )
+        )
+    return {domain_id: tuple(rows) for domain_id, rows in collected.items()}
 
 
 def _status(*, is_fresh: bool, has_match: bool, has_allowlist: bool) -> AddressStatus:
