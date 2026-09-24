@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% comment %}
+Журнал — разметка прототипа (строки 1404–1432), ТЗ 11.7, решения Q-D4, Q-C11, Q-C21.
+
+Журнал один, источников два: события домена и действия с участниками. Пользователю про это знать
+незачем, поэтому строки склеены и отсортированы по времени.
+
+Названия типов событий — по утверждённой таблице Q-C11, а не по прототипу, где одно событие
+называлось тремя способами.
+{% endcomment %}
+
+{% block title %}Журнал — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="events">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Журнал</div>
+      <h1>Все события</h1>
+      <p>Отправленные уведомления помечены каналом доставки и результатом.</p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="{% url 'event-export' %}?{{ request.GET.urlencode }}">Выгрузить CSV</a>
+    </div>
+  </div>
+
+  <div class="body">
+    <form class="filters" method="get" action="{% url 'event-list' %}">
+      <div class="search">
+        <span>⌕</span>
+        <input class="inp mono" type="search" name="search" value="{{ page.search }}"
+               placeholder="домен или IP" aria-label="Поиск по домену или адресу">
+      </div>
+
+      <div class="seg">
+        <button type="submit" name="chosen" value="all" class="{% if page.chosen == 'all' %}on{% endif %}">Все</button>
+        <button type="submit" name="chosen" value="not_allowed" class="{% if page.chosen == 'not_allowed' %}on{% endif %}">Вне разрешённых</button>
+        <button type="submit" name="chosen" value="changes" class="{% if page.chosen == 'changes' %}on{% endif %}">Изменения адресов</button>
+        <button type="submit" name="chosen" value="resolve_errors" class="{% if page.chosen == 'resolve_errors' %}on{% endif %}">Ошибки резолва</button>
+      </div>
+
+      <select class="inp" name="period" style="width:auto">
+        <option value="today" {% if page.period == 'today' %}selected{% endif %}>Сегодня</option>
+        <option value="week" {% if page.period == 'week' %}selected{% endif %}>7 дней</option>
+        <option value="month" {% if page.period == 'month' %}selected{% endif %}>30 дней</option>
+        <option value="all" {% if page.period == 'all' %}selected{% endif %}>Всё хранимое</option>
+      </select>
+
+      <button class="btn" type="submit">Показать</button>
+    </form>
+
+    {% if page.truncated %}
+      <div class="banner" style="margin-bottom:14px">
+        <div class="bi">•</div>
+        <p>Показаны только самые свежие записи. Сузьте период или фильтр, чтобы увидеть остальное — выгрузка CSV отдаёт всю выборку.</p>
+      </div>
+    {% endif %}
+
+    <div class="panel">
+      <ul class="feed">
+        {% for row in page.rows %}
+          <li>
+            <time>{{ row.occurred_at|date:"d.m" }}<br>{{ row.occurred_at|date:"H:i" }}</time>
+            <div>
+              <div class="what">
+                {% if row.tone %}<span class="state {{ row.tone }}">{{ row.label }}</span>{% else %}<span class="sub">{{ row.label }}</span>{% endif %}
+                {% if row.domain_id %} — <a class="mono" href="{% url 'domain-detail' row.domain_id %}">{{ row.domain_name }}</a>{% endif %}
+              </div>
+              {% if row.addresses %}
+                <div class="det">
+                  {% for address in row.addresses %}<span class="chip">{{ address }}</span>{% endfor %}
+                </div>
+              {% endif %}
+              {% if row.delivery %}
+                <div class="note">{{ row.channel }}{% if row.channel %} — {% endif %}{{ row.delivery }}.</div>
+              {% endif %}
+              {% if row.author_name %}<div class="note">{{ row.author_name }}</div>{% endif %}
+            </div>
+          </li>
+        {% empty %}
+          <li><div class="sub">Записей за выбранный период нет.</div></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from django import forms
 
 from apps.catalog.models import (
@@ -15,6 +17,7 @@ from apps.catalog.models import (
 )
 from apps.catalog.selectors.domains import DomainFilter
 from apps.catalog.services.settings import SettingsInput
+from apps.monitoring.selectors.journal import JournalFilter, JournalPeriod
 
 SECONDS_IN_MINUTE = 60
 SECONDS_IN_HOUR = 60 * 60
@@ -186,6 +189,32 @@ class GlobalSettingsForm(forms.Form):
             email_recipients=_lines(data.get("email_recipients")),
             webhook_url=str(data.get("webhook_url") or ""),
         )
+
+
+class JournalFilterForm(forms.Form):
+    """Фильтры журнала — ТЗ 11.7, Q-C21. Мусор в параметрах — это «всё», а не ошибка страницы."""
+
+    search = forms.CharField(required=False, max_length=253)
+    chosen = forms.CharField(required=False)
+    period = forms.CharField(required=False)
+
+    def selected_filter(self) -> JournalFilter:
+        return self._enum(JournalFilter, "chosen", JournalFilter.ALL)
+
+    def selected_period(self) -> JournalPeriod:
+        return self._enum(JournalPeriod, "period", JournalPeriod.ALL)
+
+    def search_text(self) -> str:
+        return str(self.cleaned_data.get("search") or "") if self.is_valid() else ""
+
+    def _enum[T: StrEnum](self, kind: type[T], field: str, default: T) -> T:
+        if not self.is_valid():
+            return default
+        raw = str(self.cleaned_data.get(field) or "")
+        try:
+            return kind(raw)
+        except ValueError:
+            return default
 
 
 def _lines(text: object) -> tuple[str, ...]:

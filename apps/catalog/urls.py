@@ -17,6 +17,8 @@ from apps.catalog.views import (
     group_edit,
     group_list,
     group_save,
+    journal,
+    journal_csv,
     overview_screen,
 )
 
@@ -36,6 +38,8 @@ urlpatterns: list[URLPattern] = [
     path("groups/<int:group_id>/save/", group_save, name="group-save"),
     path("groups/<int:group_id>/domains/", group_domains, name="group-domains"),
     path("groups/<int:group_id>/check/", group_check_now, name="group-check"),
+    path("events/", journal, name="event-list"),
+    path("events/export.csv", journal_csv, name="event-export"),
     path("settings/", global_settings, name="settings"),
     path("settings/save/", global_settings_save, name="settings-save"),
 ]

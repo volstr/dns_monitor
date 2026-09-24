@@ -56,6 +56,11 @@ def dispatch_event(
     resolved = effective_settings(event.domain_id)
     global_settings = GlobalSettings.objects.get()
 
+    # Требование 11.7: выгрузка журнала содержит режим уведомлений **на момент события**.
+    # Восстановить его потом нельзя — настройку могли поменять, — поэтому он записывается здесь,
+    # где уже разрешён по цепочке наследования, и до любых ранних выходов ниже.
+    _remember_mode(event, resolved.notification_mode.value)
+
     recipient = global_settings.telegram_chat_id
     if not recipient:
         # Канал «Не настроен» — нормальный режим (8.3), а не ошибка.
@@ -126,6 +131,16 @@ def _reply_to_id(decision: Send) -> int | None:
         .first()
     )
     return opening.pk if opening else None
+
+
+def _remember_mode(event: Event, mode: str) -> None:
+    """Дописать режим в полезную нагрузку события, не трогая остальное."""
+    payload = dict(event.payload or {})
+    if payload.get("notification_mode") == mode:
+        return
+    payload["notification_mode"] = mode
+    event.payload = payload
+    Event.objects.filter(pk=event.pk).update(payload=payload)
 
 
 def _text(

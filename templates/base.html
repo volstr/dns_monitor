@@ -37,6 +37,7 @@ HTMX нужен валидации белого списка (10.2) и выбо�
       <a href="{% url 'overview' %}" {% if screen == 'overview' %}aria-current="page"{% endif %}>Обзор</a>
       <a href="{% url 'domain-list' %}" {% if screen == 'domains' %}aria-current="page"{% endif %}>Домены</a>
       <a href="{% url 'group-list' %}" {% if screen == 'groups' %}aria-current="page"{% endif %}>Группы</a>
+      <a href="{% url 'event-list' %}" {% if screen == 'events' %}aria-current="page"{% endif %}>Журнал</a>
       <a href="{% url 'settings' %}" {% if screen == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
     </nav>
 

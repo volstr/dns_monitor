@@ -22,6 +22,7 @@ from apps.catalog.forms import (
     DomainFilterForm,
     GlobalSettingsForm,
     GroupForm,
+    JournalFilterForm,
 )
 from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import DomainFilter, domain_list_page
@@ -31,6 +32,7 @@ from apps.catalog.services.allowlist import parse_allowlist
 from apps.catalog.services.domains import DomainNotSaved, save_domain
 from apps.catalog.services.groups import GroupNotSaved, save_group
 from apps.catalog.services.settings import SettingsNotSaved, save_global_settings
+from apps.monitoring.selectors.journal import ExportRefused, journal_export, journal_page
 from apps.monitoring.selectors.overview import overview
 from apps.monitoring.services.manual_check import (
     CheckRejected,
@@ -138,6 +140,39 @@ def overview_screen(request: HttpRequest) -> HttpResponse:
         "monitoring/overview.html",
         {"page": overview(at=SystemClock().now()), "screen": "overview"},
     )
+
+
+@member_required
+def journal(request: HttpRequest) -> HttpResponse:
+    """Журнал — ТЗ 11.7, Q-D4. Наблюдателю доступен: раздел 3 включает журнал в его чтение."""
+    form = JournalFilterForm(request.GET)
+    page = journal_page(
+        at=SystemClock().now(),
+        search=form.search_text(),
+        chosen=form.selected_filter(),
+        period=form.selected_period(),
+    )
+    return render(request, "monitoring/journal.html", {"page": page, "screen": "events"})
+
+
+@member_required
+def journal_csv(request: HttpRequest) -> HttpResponse:
+    """Выгрузка журнала — ТЗ 11.7, критерий 49. Выгружается текущая выборка с фильтрами."""
+    form = JournalFilterForm(request.GET)
+    result = journal_export(
+        at=SystemClock().now(),
+        search=form.search_text(),
+        chosen=form.selected_filter(),
+        period=form.selected_period(),
+    )
+
+    if isinstance(result, ExportRefused):
+        messages.error(request, result.reason)
+        return redirect("event-list")
+
+    response = HttpResponse(result.content, content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="dns-monitoring-events.csv"'
+    return response
 
 
 @member_required
