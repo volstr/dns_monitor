@@ -1,0 +1,29 @@
+{% comment %}
+Построчные замечания по белому списку — ТЗ 10.2, критерии 44, 45.
+
+Фрагмент отдаётся и обычным ответом на сохранение, и запросом HTMX во время ввода. Разбор один
+и тот же: дублировать его в JS запрещено прямо (`CLAUDE.md`).
+
+Ошибка блокирует сохранение, предупреждение — нет. Нормализация (Q-13.3) показывается до
+сохранения, как требует 10.2.
+{% endcomment %}
+{% for line in parsed.errors %}
+  <div class="line-err"><span class="ln">стр. {{ line.number }}</span><span>{{ line.error }}</span></div>
+{% endfor %}
+
+{% for line in parsed.lines %}
+  {% if line.normalized_from %}
+    <div class="line-warn">
+      <span class="ln">стр. {{ line.number }}</span>
+      <span>{{ line.normalized_from }} будет сохранено как {{ line.raw }} — у подсети хостовая часть нулевая</span>
+    </div>
+  {% endif %}
+{% endfor %}
+
+{% for line in parsed.warnings %}
+  <div class="line-warn"><span class="ln">стр. {{ line.number }}</span><span>{{ line.warning }}</span></div>
+{% endfor %}
+
+{% if parsed.errors %}
+  <div class="hint" style="margin:9px 0 0;color:var(--breach)">Пока есть ошибочная строка, сохранить нельзя.</div>
+{% endif %}

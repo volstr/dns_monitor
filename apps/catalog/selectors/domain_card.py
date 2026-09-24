@@ -21,7 +21,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import cast
 
-from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings, NotificationMode
+from apps.catalog.models import (
+    RECORD_TYPE_CHOICES,
+    AllowlistEntry,
+    Domain,
+    GlobalSettings,
+    NotificationMode,
+)
 from apps.catalog.selectors.settings import EffectiveSettings, settings_of_group
 from apps.monitoring.models import Event, EventType
 from apps.monitoring.selectors.addresses import address_statuses
@@ -117,6 +123,12 @@ class DomainCard:
     group_id: int | None
     comment: str
     watch_enabled: bool
+    record_types: tuple[str, ...]
+    #: Все типы записей с подписями — для переключателей формы (4.3). Экран получает всё, что ему
+    #: нужно, одним вызовом, и шаблону не приходится знать про модель.
+    record_type_choices: tuple[tuple[str, str], ...]
+    #: Белый список текстом для поля ввода — по записи в строке, в порядке записей (10.2).
+    allowlist_text: str
     #: «Группа «Платёжный контур» · проверка раз в 5 минут · последний ответ в 14:38».
     headline: str
     summary_label: str
@@ -147,6 +159,9 @@ def domain_card(*, domain_id: int, at: datetime) -> DomainCard | None:
         group_id=domain.group_id,
         comment=domain.comment,
         watch_enabled=domain.watch_enabled,
+        record_types=tuple(domain.record_types),
+        record_type_choices=tuple((value, str(label)) for value, label in RECORD_TYPE_CHOICES),
+        allowlist_text="\n".join(entry.raw for entry in entries),
         headline=_headline(domain, effective),
         summary_label=_summary_label(statuses),
         summary_tone=_summary_tone(statuses),

@@ -6,9 +6,10 @@
 — линейка подсети (11.4) и график следа реестра (9.2) — виджеты этапа 7, это два из трёх мест,
   где вообще разрешён клиентский код. Вместо них те же данные текстом: какие адреса попадают в
   запись и когда каждый отдавался;
-— правка домена (белый список с построчной валидацией 10.2, типы записей, комментарий,
-  сохранение, удаление) и кнопки «Проверить сейчас» и «Приостановить» — следующая часть.
-  Кнопка, которая ничего не делает, хуже её отсутствия.
+— удаления домена: оно необратимо и уносит с собой реестр и журнал, поэтому делается вместе с
+  окном подтверждения, а не кнопкой без него.
+
+Правка видна только администратору: ТЗ 3 — «Наблюдатель… не меняет ничего».
 {% endcomment %}
 
 {% block title %}{{ card.name }} — DNS monitoring{% endblock %}
@@ -22,6 +23,14 @@
       <p>{{ card.headline }}</p>
       {% if card.comment %}<p class="note-line">{{ card.comment }}</p>{% endif %}
     </div>
+    {% if is_admin %}
+      <div class="actions">
+        <form method="post" action="{% url 'domain-check' card.id %}">
+          {% csrf_token %}
+          <button class="btn" type="submit">Проверить сейчас</button>
+        </form>
+      </div>
+    {% endif %}
   </div>
 
   <div class="body">
@@ -164,16 +173,84 @@
             {% endfor %}
           </div>
 
-          <div class="field" style="margin-top:20px;margin-bottom:0">
-            <label>Наблюдение</label>
-            <div class="hint" style="margin:6px 0 0">
-              {% if card.watch_enabled %}
-                Включено: домен проверяется по расписанию.
-              {% else %}
-                Выключено: домен не проверяется и не шлёт уведомлений, но реестр адресов сохраняется.
-              {% endif %}
+          {% if is_admin %}
+            <form method="post" action="{% url 'domain-save' card.id %}">
+              {% csrf_token %}
+
+              {% for reason in save_reasons %}
+                <div class="line-err"><span>{{ reason }}</span></div>
+              {% endfor %}
+
+              <div class="field" style="margin-top:20px">
+                <label for="d-sub">Разрешённые адреса и подсети</label>
+                <div class="hint">
+                  По одной записи в строке. Отдельный адрес — <code style="font-size:11.5px">10.20.3.7</code>,
+                  диапазон — <code style="font-size:11.5px">10.20.0.0/22</code>.
+                  Пустой список означает, что проверять вхождение не с чем.
+                </div>
+                {% comment %}
+                Проверка идёт на сервере с задержкой около 250 мс: разбор CIDR существует в одном
+                месте, дублировать его в JS запрещено (`CLAUDE.md`, 10.2). Без htmx.min.js
+                замечания приходят при сохранении — оно всё равно блокируется ошибочной строкой.
+                {% endcomment %}
+                <textarea class="inp" id="d-sub" name="allowlist" rows="5"
+                          hx-post="{% url 'allowlist-check' card.id %}"
+                          hx-trigger="keyup changed delay:250ms"
+                          hx-target="#allowlist-issues"
+                          hx-include="closest form">{% if draft %}{{ draft.allowlist }}{% else %}{{ card.allowlist_text }}{% endif %}</textarea>
+                <div id="allowlist-issues">
+                  {% if parsed %}{% include "catalog/_allowlist_issues.html" %}{% endif %}
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="d-note">Комментарий</label>
+                <div class="hint">
+                  Что это за домен и что делать, если адрес изменился. Уходит в текст уведомления —
+                  дежурный увидит его ночью раньше, чем откроет интерфейс.
+                </div>
+                <textarea class="inp" id="d-note" name="comment" rows="3"
+                          style="font-family:inherit;font-size:13px">{% if draft %}{{ draft.comment }}{% else %}{{ card.comment }}{% endif %}</textarea>
+              </div>
+
+              <div class="field">
+                <label>Типы записей</label>
+                <div style="display:flex;gap:16px;margin-top:6px">
+                  {% for value, label in card.record_type_choices %}
+                    <label class="tgl">
+                      <input type="checkbox" name="record_types" value="{{ value }}"
+                             {% if value in card.record_types %}checked{% endif %}> {{ label }}
+                    </label>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="field" style="margin-bottom:0">
+                <label class="tgl">
+                  <input type="checkbox" name="watch_enabled" {% if card.watch_enabled %}checked{% endif %}>
+                  Наблюдение включено
+                </label>
+                <div class="hint" style="margin:6px 0 0">
+                  Выключенный домен не проверяется и не шлёт уведомлений, но реестр адресов сохраняется.
+                </div>
+              </div>
+
+              <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft);display:flex;gap:8px">
+                <button class="btn btn-solid" type="submit">Сохранить</button>
+              </div>
+            </form>
+          {% else %}
+            <div class="field" style="margin-top:20px;margin-bottom:0">
+              <label>Наблюдение</label>
+              <div class="hint" style="margin:6px 0 0">
+                {% if card.watch_enabled %}
+                  Включено: домен проверяется по расписанию.
+                {% else %}
+                  Выключено: домен не проверяется и не шлёт уведомлений, но реестр адресов сохраняется.
+                {% endif %}
+              </div>
             </div>
-          </div>
+          {% endif %}
         </div>
       </div>
     </div>
