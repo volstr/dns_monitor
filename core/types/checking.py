@@ -76,4 +76,6 @@ class AddressStatusView:
     address: IPAddress
     status: AddressStatus
     match: AllowlistMatch | None
+    #: Нужен карточке домена: реестр показывает «Первый раз» и «Последний» (9.1).
+    first_seen_at: datetime
     last_seen_at: datetime

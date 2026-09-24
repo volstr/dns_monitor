@@ -7,11 +7,12 @@
 
 from __future__ import annotations
 
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 
 from apps.accounts.access import member_required
 from apps.catalog.forms import DomainFilterForm
+from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import domain_list_page
 from core.adapters.system_clock import SystemClock
 
@@ -33,3 +34,13 @@ def domain_list(request: HttpRequest) -> HttpResponse:
         else "catalog/domain_list.html"
     )
     return render(request, template, {"page": page, "screen": "domains"})
+
+
+@member_required
+def domain_detail(request: HttpRequest, domain_id: int) -> HttpResponse:
+    """Карточка домена — ТЗ 9.1, 11.8. Только чтение: правка приходит следующей частью."""
+    card = domain_card(domain_id=domain_id, at=SystemClock().now())
+    if card is None:
+        raise Http404
+
+    return render(request, "catalog/domain_card.html", {"card": card, "screen": "domains"})

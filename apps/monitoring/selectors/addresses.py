@@ -55,7 +55,14 @@ def address_statuses(
             # Есть ли у домена список вообще — тем же запросом, а не отдельным `exists()`.
             has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef("domain"))),
         )
-        .values("address", "last_seen_at", "matched_raw", "matched_entry", "has_allowlist")
+        .values(
+            "address",
+            "first_seen_at",
+            "last_seen_at",
+            "matched_raw",
+            "matched_entry",
+            "has_allowlist",
+        )
         .order_by("address")
     )
 
@@ -69,6 +76,7 @@ def address_statuses(
                 has_allowlist=row["has_allowlist"],
             ),
             match=_match(row["matched_raw"], row["matched_entry"]),
+            first_seen_at=row["first_seen_at"],
             last_seen_at=row["last_seen_at"],
         )
         for row in rows

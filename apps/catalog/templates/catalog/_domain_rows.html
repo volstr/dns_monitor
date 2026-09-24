@@ -5,11 +5,7 @@
 {% for row in page.rows %}
   <tr {% if not row.watch_enabled %}style="opacity:.55"{% endif %}>
     <td>
-      {% comment %}
-      Имя станет ссылкой на карточку домена, когда она появится следующей частью этапа 6.
-      Ссылка в никуда хуже её отсутствия — по той же причине здесь нет кнопок «Открыть».
-      {% endcomment %}
-      <div class="dn">{{ row.name }}</div>
+      <div class="dn"><a href="{% url 'domain-detail' row.id %}">{{ row.name }}</a></div>
       <div class="sub">
         {% if row.group_name %}{{ row.group_name }}{% else %}Без группы{% endif %}
         {% if not row.watch_enabled %} · наблюдение выключено{% endif %}

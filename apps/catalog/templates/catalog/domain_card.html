@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% comment %}
+Карточка домена — разметка прототипа (строки 949–1235), ТЗ 9.1, 6.3, 6.4, 11.8.
+
+Чего здесь пока нет и почему:
+— линейка подсети (11.4) и график следа реестра (9.2) — виджеты этапа 7, это два из трёх мест,
+  где вообще разрешён клиентский код. Вместо них те же данные текстом: какие адреса попадают в
+  запись и когда каждый отдавался;
+— правка домена (белый список с построчной валидацией 10.2, типы записей, комментарий,
+  сохранение, удаление) и кнопки «Проверить сейчас» и «Приостановить» — следующая часть.
+  Кнопка, которая ничего не делает, хуже её отсутствия.
+{% endcomment %}
+
+{% block title %}{{ card.name }} — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="domain">
+  <div class="head">
+    <div>
+      <a class="back" href="{% url 'domain-list' %}">← Домены</a>
+      <h1 class="mono" style="font-size:22px">{{ card.name }}</h1>
+      <p>{{ card.headline }}</p>
+      {% if card.comment %}<p class="note-line">{{ card.comment }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-h">
+        <h2>Разрешённые адреса и подсети</h2>
+        <div class="right">
+          {% if card.summary_tone %}
+            <span class="state {{ card.summary_tone }}">{{ card.summary_label }}</span>
+          {% else %}
+            <span class="sub">{{ card.summary_label }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="padding:18px 16px 16px">
+        {% for entry in card.allowlist %}
+          <div class="ruler">
+            <div class="ruler-h" style="margin-bottom:12px">
+              <code>{{ entry.raw }}</code>
+              {% if entry.range_text %}<span class="cap">{{ entry.range_text }}</span>{% endif %}
+              <span class="st">
+                {% if entry.stale_days %}
+                  <span class="state stale" title="Под эту запись давно не приходило ни одного адреса. Возможно, она уже не нужна.">не отдаётся {{ entry.stale_days }} дней</span>
+                {% elif entry.inside %}
+                  <span class="state ok">{{ entry.inside|length }} внутри</span>
+                {% else %}
+                  <span class="sub">пусто</span>
+                {% endif %}
+              </span>
+            </div>
+            <div class="ruler-list">
+              {% for address in entry.inside %}
+                <span class="chip">{{ address }}</span>
+              {% empty %}
+                <span class="sub">Ни один адрес не попадает в эту запись</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% empty %}
+          <p class="sub">Разрешённые адреса не заданы — вхождение не с чем сравнивать, проверяется только изменение набора.</p>
+        {% endfor %}
+
+        {% for line in card.unmatched %}
+          <div class="outside">
+            <div class="lbl">Не<br>решён</div>
+            <div style="flex:1">
+              <span class="chip out" style="font-size:13px;padding:4px 8px"><span class="glyph">✕</span>{{ line.address }}</span>
+              <div class="txt">{{ line.age_text|capfirst }}. Не совпадает ни с одним разрешённым адресом и не входит ни в одну подсеть.</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-h"><h2>Реестр адресов</h2></div>
+      <div style="padding:13px 0 0">
+        <div style="padding:0 16px 13px;font-size:12.5px;color:var(--ink-soft);max-width:88ch">
+          Каждый адрес, который домен когда-либо отдавал.
+        </div>
+        <div class="tw">
+          <div class="reg" style="min-width:860px">
+            <div class="reg-scale">
+              <div class="th">Адрес</div>
+              <div class="th">Первый раз</div>
+              <div class="th">Последний</div>
+              <div class="th">Статус</div>
+            </div>
+            {% for line in card.registry %}
+              <div class="reg-row">
+                <div class="addr">
+                  <span class="chip {{ line.chip_css }}">{{ line.address }}</span>
+                  <span class="match">{{ line.match_text }}</span>
+                </div>
+                <div class="when" data-l="Первый раз">{{ line.first_seen_at|date:"d.m H:i" }}</div>
+                <div class="when" data-l="Последний">{{ line.last_seen_at|date:"d.m H:i" }}</div>
+                <div class="act">
+                  {% if line.status_tone %}
+                    <span class="state {{ line.status_tone }}">{{ line.status_label }}</span>
+                  {% else %}
+                    <span class="sub">{{ line.status_label }}</span>
+                  {% endif %}
+                  <span class="age" style="display:block;margin-top:4px">{{ line.age_text }}</span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="reg-row"><div class="addr"><span class="sub">Домен пока не отдавал ни одного адреса</span></div></div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-h"><h2>История</h2></div>
+        <ul class="hist">
+          {% for event in card.events %}
+            <li>
+              <time>{{ event.occurred_at|date:"d.m"}}<br>{{ event.occurred_at|date:"H:i" }}</time>
+              <div>
+                <span class="state {{ event.tone }}">{{ event.label }}</span>
+                {% if event.addresses %}
+                  <div class="det" style="margin-top:6px">
+                    {% for address in event.addresses %}<span class="chip">{{ address }}</span>{% endfor %}
+                  </div>
+                {% endif %}
+                {% if event.author_name %}<div class="sub">{{ event.author_name }}</div>{% endif %}
+              </div>
+            </li>
+          {% empty %}
+            <li><div class="sub">Событий пока нет</div></li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><h2>Настройки домена</h2></div>
+        <div style="padding:16px">
+          <div style="border:1px solid var(--line);border-radius:3px;background:var(--panel-2);padding:13px 14px">
+            <div class="eyebrow" style="margin-bottom:9px">
+              {% if card.group_name %}Взято из группы{% else %}Взято из общих настроек{% endif %}
+            </div>
+            {% if card.group_name %}
+              <div class="kv"><span class="k">Группа</span><span><b style="font-weight:500">{{ card.group_name }}</b></span></div>
+            {% endif %}
+            {% comment %}
+            ТЗ 5 и 11.8: у каждого значения видно, откуда оно взялось. Происхождение пришло
+            готовым из селектора — в шаблоне оно не вычисляется (Q-C13).
+            {% endcomment %}
+            {% for line in card.settings %}
+              <div class="kv">
+                <span class="k">{{ line.label }}</span>
+                <span>
+                  {{ line.value }}
+                  <span class="tag inherit">{% if line.origin == 'group' %}от группы{% else %}общая{% endif %}</span>
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="field" style="margin-top:20px;margin-bottom:0">
+            <label>Наблюдение</label>
+            <div class="hint" style="margin:6px 0 0">
+              {% if card.watch_enabled %}
+                Включено: домен проверяется по расписанию.
+              {% else %}
+                Выключено: домен не проверяется и не шлёт уведомлений, но реестр адресов сохраняется.
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
