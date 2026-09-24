@@ -14,8 +14,11 @@ from apps.catalog.models import (
     RECORD_TYPE_CHOICES,
 )
 from apps.catalog.selectors.domains import DomainFilter
+from apps.catalog.services.settings import SettingsInput
 
 SECONDS_IN_MINUTE = 60
+SECONDS_IN_HOUR = 60 * 60
+SECONDS_IN_DAY = 24 * 60 * 60
 
 
 class DomainFilterForm(forms.Form):
@@ -123,3 +126,68 @@ class GroupForm(forms.Form):
     def _chosen_seconds(self, field: str) -> int | None:
         raw = str(self.cleaned_data.get(field) or "")
         return int(raw) if raw.isdigit() else None
+
+
+class GlobalSettingsForm(forms.Form):
+    """Общие настройки — ТЗ 4.1.
+
+    Единицы ввода человеческие: период в минутах, пороги в часах, хранение в днях. Пересчёт в
+    секунды — здесь, чтобы ни шаблон, ни сервис его не повторяли.
+
+    Подключения каналов сюда не входят: токен бота и учётные данные почты живут в окружении
+    (8.3, Q-A2). Здесь только адресаты.
+    """
+
+    check_period_minutes = forms.IntegerField(min_value=1)
+    freshness_threshold_hours = forms.IntegerField(min_value=1)
+    notification_mode = forms.CharField()
+    notify_back_to_normal = forms.BooleanField(required=False)
+    reminder_interval_hours = forms.IntegerField(min_value=0)
+    merge_window_seconds = forms.IntegerField(min_value=1)
+    merge_threshold = forms.IntegerField(min_value=1)
+    dns_servers = forms.CharField(required=False, widget=forms.Textarea)
+    resolve_failure_threshold = forms.IntegerField(min_value=1)
+    event_retention_days = forms.IntegerField(min_value=1)
+    registry_retention_days = forms.IntegerField(required=False, min_value=1)
+    message_include_full_set = forms.BooleanField(required=False)
+    message_include_comment = forms.BooleanField(required=False)
+    message_include_link = forms.BooleanField(required=False)
+    session_lifetime_hours = forms.IntegerField(min_value=1)
+    login_failure_threshold = forms.IntegerField(min_value=1)
+    telegram_chat_id = forms.CharField(required=False, max_length=64)
+    email_recipients = forms.CharField(required=False, widget=forms.Textarea)
+    webhook_url = forms.CharField(required=False, max_length=2048)
+
+    def values(self) -> SettingsInput:
+        """Значения формы в секундах и списках — в том виде, в каком их ждёт сервис."""
+        data = self.cleaned_data
+        registry_days = data.get("registry_retention_days")
+
+        return SettingsInput(
+            check_period_seconds=data["check_period_minutes"] * SECONDS_IN_MINUTE,
+            freshness_threshold_seconds=data["freshness_threshold_hours"] * SECONDS_IN_HOUR,
+            notification_mode=str(data["notification_mode"]),
+            notify_back_to_normal=bool(data.get("notify_back_to_normal")),
+            reminder_interval_seconds=data["reminder_interval_hours"] * SECONDS_IN_HOUR,
+            merge_window_seconds=data["merge_window_seconds"],
+            merge_threshold=data["merge_threshold"],
+            dns_servers=_lines(data.get("dns_servers")),
+            resolve_failure_threshold=data["resolve_failure_threshold"],
+            event_retention_seconds=data["event_retention_days"] * SECONDS_IN_DAY,
+            registry_retention_seconds=(
+                registry_days * SECONDS_IN_DAY if registry_days else None
+            ),
+            message_include_full_set=bool(data.get("message_include_full_set")),
+            message_include_comment=bool(data.get("message_include_comment")),
+            message_include_link=bool(data.get("message_include_link")),
+            session_lifetime_seconds=data["session_lifetime_hours"] * SECONDS_IN_HOUR,
+            login_failure_threshold=data["login_failure_threshold"],
+            telegram_chat_id=str(data.get("telegram_chat_id") or ""),
+            email_recipients=_lines(data.get("email_recipients")),
+            webhook_url=str(data.get("webhook_url") or ""),
+        )
+
+
+def _lines(text: object) -> tuple[str, ...]:
+    """Список по строке в строке: так его вводят и в DNS-серверах, и в адресах почты."""
+    return tuple(line.strip() for line in str(text or "").splitlines() if line.strip())

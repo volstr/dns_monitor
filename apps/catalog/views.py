@@ -17,13 +17,21 @@ from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
 from apps.accounts.access import admin_required, member_required
-from apps.catalog.forms import DomainEditForm, DomainFilterForm, GroupForm
+from apps.catalog.forms import (
+    DomainEditForm,
+    DomainFilterForm,
+    GlobalSettingsForm,
+    GroupForm,
+)
 from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import DomainFilter, domain_list_page
+from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
 from apps.catalog.services.allowlist import parse_allowlist
 from apps.catalog.services.domains import DomainNotSaved, save_domain
 from apps.catalog.services.groups import GroupNotSaved, save_group
+from apps.catalog.services.settings import SettingsNotSaved, save_global_settings
+from apps.monitoring.selectors.overview import overview
 from apps.monitoring.services.manual_check import (
     CheckRejected,
     RejectionReason,
@@ -120,6 +128,48 @@ def domain_check_now(request: HttpRequest, domain_id: int) -> HttpResponse:
             request, "Домен поставлен в очередь: проверка пройдёт в ближайшие секунды."
         )
     return redirect("domain-detail", domain_id=domain_id)
+
+
+@member_required
+def overview_screen(request: HttpRequest) -> HttpResponse:
+    """Обзор — ТЗ 11.9, Q-E5, Q-C12."""
+    return render(
+        request,
+        "monitoring/overview.html",
+        {"page": overview(at=SystemClock().now()), "screen": "overview"},
+    )
+
+
+@member_required
+def global_settings(request: HttpRequest) -> HttpResponse:
+    """Общие настройки — ТЗ 4.1. Наблюдателю на чтение и без адресатов (Q-D19)."""
+    return render(
+        request,
+        "catalog/settings.html",
+        {"page": settings_page(), "screen": "settings"},
+    )
+
+
+@admin_required
+def global_settings_save(request: HttpRequest) -> HttpResponse:
+    """Сохранение общих настроек. Наблюдателю сюда нельзя — критерий 29."""
+    form = GlobalSettingsForm(request.POST)
+    if not form.is_valid():
+        for field, errors in form.errors.items():
+            messages.error(request, f"{field}: {'; '.join(errors)}")
+        return redirect("settings")
+
+    result = save_global_settings(form.values())
+
+    if isinstance(result, SettingsNotSaved):
+        for reason in result.reasons:
+            messages.error(request, reason)
+        return redirect("settings")
+
+    for warning in result.warnings:
+        messages.warning(request, warning)
+    messages.success(request, "Сохранено.")
+    return redirect("settings")
 
 
 @member_required

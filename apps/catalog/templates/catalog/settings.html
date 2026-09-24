@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% comment %}
+Общие настройки — разметка прототипа (строки 1434–1616), ТЗ 4.1, 8.3, 8.4.
+
+Подключения каналов здесь отсутствуют намеренно: токен бота и учётные данные почтового сервера
+живут в окружении (8.3, 11.10, Q-A2), и поля для них в интерфейсе быть не должно — иначе
+администратор приложения смог бы направить исходящее через свой сервер. Здесь только адресаты.
+
+Наблюдателю экран доступен на чтение, а блок адресатов ему не показывается (Q-D19).
+{% endcomment %}
+
+{% block title %}Настройки — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="settings">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Настройки</div>
+      <h1>Общие настройки</h1>
+      <p>Значения по умолчанию для всех групп и доменов. Группа может переопределить период, порог, режим уведомлений и напоминания.</p>
+    </div>
+  </div>
+
+  <div class="body" style="max-width:840px">
+    {% if not is_admin %}
+      <div class="banner" style="margin-bottom:20px">
+        <div class="bi">•</div>
+        <p>У вас доступ только на чтение. Менять настройки может администратор.</p>
+      </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'settings-save' %}">
+      {% csrf_token %}
+      <fieldset style="border:0;padding:0;margin:0" {% if not is_admin %}disabled{% endif %}>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Проверка</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Период проверки<div class="d">Как часто резолвить домены. Минимум — минута.</div></div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="check_period_minutes" value="{{ page.check_period_minutes }}"> <span class="sub">минут</span></div>
+            </div>
+            <div class="row">
+              <div class="k">Порог актуальности<div class="d">Сколько адрес должен не отдаваться, чтобы стать неактуальным. Должен быть заметно больше периода проверки.</div></div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="freshness_threshold_hours" value="{{ page.freshness_threshold_hours }}"> <span class="sub">часов</span></div>
+            </div>
+            <div class="row">
+              <div class="k">DNS-серверы<div class="d">По одному в строке, в порядке обхода. Первый ответивший определяет результат.</div></div>
+              <div><textarea class="inp mono" name="dns_servers" rows="3">{{ page.dns_servers_text }}</textarea></div>
+            </div>
+            <div class="row">
+              <div class="k">Сколько неудачных проверок подряд считать сбоем</div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="resolve_failure_threshold" value="{{ page.resolve_failure_threshold }}"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Уведомления</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Когда уведомлять</div>
+              <div>
+                <select class="inp" name="notification_mode" style="max-width:320px">
+                  {% for mode in page.modes %}
+                    <option value="{{ mode.value }}" {% if mode.selected %}selected{% endif %}>{{ mode.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="k">Сообщать о возврате в норму</div>
+              <div><label class="tgl"><input type="checkbox" name="notify_back_to_normal" {% if page.notify_back_to_normal %}checked{% endif %}> Сообщать</label></div>
+            </div>
+            <div class="row">
+              <div class="k">Напоминать по открытому инциденту<div class="d">Ноль означает «не напоминать».</div></div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="0" name="reminder_interval_hours" value="{{ page.reminder_interval_hours }}"> <span class="sub">часов</span></div>
+            </div>
+            <div class="row">
+              <div class="k">Слияние массовых событий<div class="d">Окно накопления и порог, начиная с которого события уходят одной сводкой.</div></div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <input class="inp mono" style="max-width:110px" type="number" min="1" name="merge_window_seconds" value="{{ page.merge_window_seconds }}"> <span class="sub">секунд</span>
+                <input class="inp mono" style="max-width:110px" type="number" min="1" name="merge_threshold" value="{{ page.merge_threshold }}"> <span class="sub">событий</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Что уходит в сообщении</h2></div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:10px">
+            <label class="tgl"><input type="checkbox" name="message_include_full_set" {% if page.message_include_full_set %}checked{% endif %}> Полный текущий набор адресов</label>
+            <label class="tgl"><input type="checkbox" name="message_include_comment" {% if page.message_include_comment %}checked{% endif %}> Комментарий домена или группы</label>
+            <label class="tgl"><input type="checkbox" name="message_include_link" {% if page.message_include_link %}checked{% endif %}> Ссылку на карточку домена</label>
+          </div>
+        </div>
+
+        {% if is_admin %}
+          <div class="panel" style="margin-bottom:20px">
+            <div class="panel-h"><h2>Каналы доставки</h2></div>
+            <div class="rows">
+              {% comment %}
+              Только адресаты. Токен бота и учётные данные почты приходят из окружения и в
+              интерфейсе не меняются (8.3, 11.10, Q-A2).
+              {% endcomment %}
+              <div class="row">
+                <div class="k">Telegram<div class="d">Идентификатор чата. Токен бота задаётся в окружении.</div></div>
+                <div><input class="inp mono" style="max-width:280px" name="telegram_chat_id" value="{{ page.telegram_chat_id }}"></div>
+              </div>
+              <div class="row">
+                <div class="k">Почта<div class="d">По адресу в строке. Сервер и учётные данные задаются в окружении.</div></div>
+                <div><textarea class="inp mono" name="email_recipients" rows="3">{{ page.email_recipients_text }}</textarea></div>
+              </div>
+              <div class="row">
+                <div class="k">Вебхук<div class="d">Адрес, на который уходит POST. Канал пока не реализован.</div></div>
+                <div><input class="inp mono" name="webhook_url" value="{{ page.webhook_url }}"></div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="panel" style="margin-bottom:20px">
+          <div class="panel-h"><h2>Хранение и доступ</h2></div>
+          <div class="rows">
+            <div class="row">
+              <div class="k">Хранить журнал событий</div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="event_retention_days" value="{{ page.event_retention_days }}"> <span class="sub">дней</span></div>
+            </div>
+            <div class="row">
+              <div class="k">Хранить реестр адресов<div class="d">Пусто — хранить бессрочно.</div></div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="registry_retention_days" value="{{ page.registry_retention_days|default_if_none:'' }}"> <span class="sub">дней</span></div>
+            </div>
+            <div class="row">
+              <div class="k">Срок сессии<div class="d">Через сколько бездействия потребуется войти заново.</div></div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="session_lifetime_hours" value="{{ page.session_lifetime_hours }}"> <span class="sub">часов</span></div>
+            </div>
+            <div class="row">
+              <div class="k">Блокировать вход после<div class="d">Неудачных попыток подряд. Блокировка на 15 минут.</div></div>
+              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="login_failure_threshold" value="{{ page.login_failure_threshold }}"></div>
+            </div>
+          </div>
+        </div>
+
+        {% if is_admin %}
+          <button class="btn btn-solid" type="submit">Сохранить</button>
+        {% endif %}
+      </fieldset>
+    </form>
+  </div>
+</section>
+{% endblock %}

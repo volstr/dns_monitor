@@ -34,8 +34,10 @@ HTMX нужен валидации белого списка (10.2) и выбо�
     уходит в журнал и в уведомления (Q-C14).
     {% endcomment %}
     <nav class="nav">
+      <a href="{% url 'overview' %}" {% if screen == 'overview' %}aria-current="page"{% endif %}>Обзор</a>
       <a href="{% url 'domain-list' %}" {% if screen == 'domains' %}aria-current="page"{% endif %}>Домены</a>
       <a href="{% url 'group-list' %}" {% if screen == 'groups' %}aria-current="page"{% endif %}>Группы</a>
+      <a href="{% url 'settings' %}" {% if screen == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
     </nav>
 
     <div class="rail-foot">

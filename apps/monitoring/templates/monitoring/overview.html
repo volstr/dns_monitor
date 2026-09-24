@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% comment %}
+Обзор — разметка прототипа (строки 726–835), ТЗ 11.9, решения Q-C12, Q-E5.
+
+«Круга проверок» здесь нет: у каждого домена свой next_check_at со случайным смещением, общего
+круга в модели не существует, и обещать его значило бы врать. Вместо него последняя и ближайшая
+проверки — минимум и максимум по одному столбцу.
+
+11.9 требует именно списка: счётчик не говорит ни какой домен, ни как давно. И требует явной
+строки, когда расхождений нет, — с датой последнего закрытого, а не пустого места.
+{% endcomment %}
+
+{% block title %}Обзор — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="overview">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Обзор</div>
+      <h1>
+        {% if page.open_items %}
+          Открытых расхождений: {{ page.open_items|length }}
+        {% else %}
+          Открытых расхождений нет
+        {% endif %}
+      </h1>
+      <p>
+        {% if page.last_check_at %}
+          Последняя проверка в {{ page.last_check_at|date:"H:i" }}.
+        {% else %}
+          Проверок ещё не было.
+        {% endif %}
+        {% if page.next_check_at %}Ближайшая — в {{ page.next_check_at|date:"H:i" }}.{% endif %}
+      </p>
+    </div>
+    <div class="actions"><a class="btn" href="{% url 'domain-list' %}">Все домены</a></div>
+  </div>
+
+  <div class="body">
+    <div class="stats" style="margin-bottom:20px">
+      <div class="stat"><span class="k">Доменов</span><b class="mono">{{ page.domains_total }}</b></div>
+      <div class="stat"><span class="k">Под наблюдением</span><b class="mono">{{ page.domains_watched }}</b></div>
+      <div class="stat"><span class="k">Групп</span><b class="mono">{{ page.groups_total }}</b></div>
+      <div class="stat"><span class="k">Базовый период</span><b class="mono">{{ page.base_period }}</b></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h"><h2>Открытые расхождения</h2></div>
+      <ul class="hist">
+        {% for item in page.open_items %}
+          <li>
+            <time>{{ item.opened_at|date:"d.m" }}<br>{{ item.opened_at|date:"H:i" }}</time>
+            <div>
+              <a class="dn" href="{% url 'domain-detail' item.domain_id %}">{{ item.domain_name }}</a>
+              <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+                {% for address in item.addresses %}
+                  <span class="chip out"><span class="glyph">✕</span>{{ address }}</span>
+                {% endfor %}
+              </div>
+              <div class="sub">
+                {{ item.age_text }}{% if item.last_message_at %} · последнее сообщение в {{ item.last_message_at|date:"H:i" }}{% else %} · сообщений не отправлялось{% endif %}
+              </div>
+            </div>
+          </li>
+        {% empty %}
+          <li>
+            <div class="sub">
+              Открытых расхождений нет{% if page.last_closed_at %} — последнее закрыто {{ page.last_closed_at|date:"d.m.Y в H:i" }}{% endif %}.
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -10,14 +10,18 @@ from apps.catalog.views import (
     domain_detail,
     domain_list,
     domain_save,
+    global_settings,
+    global_settings_save,
     group_check_now,
     group_domains,
     group_edit,
     group_list,
     group_save,
+    overview_screen,
 )
 
 urlpatterns: list[URLPattern] = [
+    path("", overview_screen, name="overview"),
     path("domains/", domain_list, name="domain-list"),
     # Адрес из 8.4: ссылка в уведомлении ведёт сюда же.
     path("domains/<int:domain_id>/", domain_detail, name="domain-detail"),
@@ -32,4 +36,6 @@ urlpatterns: list[URLPattern] = [
     path("groups/<int:group_id>/save/", group_save, name="group-save"),
     path("groups/<int:group_id>/domains/", group_domains, name="group-domains"),
     path("groups/<int:group_id>/check/", group_check_now, name="group-check"),
+    path("settings/", global_settings, name="settings"),
+    path("settings/save/", global_settings_save, name="settings-save"),
 ]
