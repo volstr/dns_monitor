@@ -1,0 +1,59 @@
+{% comment %}
+Открытие ссылки-приглашения — ТЗ 3, критерии 30, 31.
+
+Открывший задаёт себе пароль сам. Ссылка одноразовая: повторное открытие и просроченная ссылка
+получают отказ с причиной, а не форму — иначе человек будет набирать пароль впустую.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Приглашение — DNS monitoring</title>
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+
+<div class="auth on">
+  <div class="auth-art">
+    <div>
+      <div class="eyebrow">DNS monitoring</div>
+      <h2 style="margin-top:14px">Вас пригласили в рабочее пространство</h2>
+      <p>Задайте пароль — он понадобится при каждом входе. Ссылка одноразовая и после этого перестанет работать.</p>
+    </div>
+  </div>
+
+  <div class="auth-form">
+    <div class="auth-card">
+      <div class="eyebrow">Приглашение</div>
+      <h1>Задайте пароль</h1>
+
+      {% if error %}
+        <div class="err">{{ error }}</div>
+      {% else %}
+        {% if form.errors %}
+          <div class="err">{% for field, errors in form.errors.items %}{{ errors|join:" " }} {% endfor %}</div>
+        {% endif %}
+        <form method="post" action="{% url 'join' token %}">
+          {% csrf_token %}
+          <div class="field">
+            <label for="join-pw">Пароль</label>
+            <div class="hint">Не короче двенадцати символов.</div>
+            <input class="inp" id="join-pw" name="password" type="password" autocomplete="new-password" required>
+          </div>
+          <div class="field" style="margin-bottom:22px">
+            <label for="join-repeat">Ещё раз</label>
+            <input class="inp" id="join-repeat" name="repeat" type="password" autocomplete="new-password" required>
+          </div>
+          <button class="btn btn-solid" style="width:100%;justify-content:center" type="submit">Сохранить и войти</button>
+        </form>
+      {% endif %}
+
+      <div class="auth-note"><a href="{% url 'login' %}">Уже есть доступ — войти</a></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

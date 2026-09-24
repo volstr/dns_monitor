@@ -30,6 +30,7 @@ from apps.accounts.services.authentication import (
     new_totp_secret,
     provisioning_uri,
 )
+from apps.accounts.services.members import Refused, accept_invitation
 from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
 
@@ -165,6 +166,34 @@ def _totp_screen(
             "error": error,
         },
     )
+
+
+def accept_invitation_view(request: HttpRequest, token: str) -> HttpResponse:
+    """Открытие ссылки-приглашения — ТЗ 3, критерии 30, 31.
+
+    Открывший задаёт себе пароль сам. Ссылка одноразовая: повторное открытие и просроченная
+    ссылка получают отказ с причиной, а не форму.
+    """
+    if request.method != "POST":
+        return render(request, "accounts/join.html", {"form": PasswordChangeForm(), "token": token})
+
+    form = PasswordChangeForm(request.POST)
+    if not form.is_valid():
+        return render(request, "accounts/join.html", {"form": form, "token": token})
+
+    result = accept_invitation(
+        token=token,
+        password=form.new_password(),
+        at=SystemClock().now(),
+        state_store=_store(),
+    )
+    if isinstance(result, Refused):
+        return render(request, "accounts/join.html", {"error": result.reason, "token": token})
+
+    member = Member.objects.get(pk=result.member_id)
+    start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
+    messages.success(request, "Пароль задан. Добро пожаловать.")
+    return redirect("overview")
 
 
 def password_change_view(request: HttpRequest) -> HttpResponse:

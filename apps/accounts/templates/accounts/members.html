@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% comment %}
+Участники — разметка прототипа (строки 1617+), ТЗ 3, 3.1; критерии 75, 76, 82, 83, 84.
+
+Вкладка называется «Участники», а не «Пользователи»: термин раздела 2 сильнее, он уходит в
+журнал и в уведомления (Q-C14).
+
+Состояние второго фактора показывается только для чтения, с пометкой о том, что оно задано в
+окружении: переключателя здесь быть не должно (ТЗ 3).
+
+Кнопки скрываются там, где действие запрещено, но полагаться на это нельзя — предохранители
+проверяются в сервисе (3.1: «и на стороне API, а не только в интерфейсе»).
+{% endcomment %}
+
+{% block title %}Участники — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="users">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Участники</div>
+      <h1>Кто имеет доступ</h1>
+      <p>Администратор меняет всё, наблюдатель только читает домены, реестр, журнал и группы.</p>
+    </div>
+  </div>
+
+  <div class="body">
+    {% if not page.email_invites_available %}
+      {% comment %}Критерий 75: баннер с именами переменных, кнопки подключения почты нет.{% endcomment %}
+      <div class="banner" style="margin-bottom:20px">
+        <div class="bi">•</div>
+        <div>
+          <b>Письма с приглашениями отправить не получится</b>
+          <p>
+            Почтовый сервер не настроен. Выдайте ссылку для входа или задайте пароль — оба способа
+            доступны ниже. Настроить почту из интерфейса нельзя: переменные
+            {% for name in page.smtp_variables %}<code>{{ name }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+            задаются в окружении, попросите администратора установки.
+          </p>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="panel" style="margin-bottom:20px">
+      <div class="panel-h"><h2>Пригласить участника</h2></div>
+      <form method="post" action="{% url 'member-invite' %}" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        {% csrf_token %}
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <input class="inp" name="name" placeholder="Имя" required style="max-width:220px">
+          <input class="inp mono" name="email" type="email" placeholder="почта" required style="max-width:280px">
+          <select class="inp" name="role" style="max-width:190px">
+            {% for value, label in page.roles %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+          <select class="inp" name="lifetime" style="max-width:190px" aria-label="Срок действия ссылки">
+            <option value="24h">Ссылка на 24 часа</option>
+            <option value="7d" selected>Ссылка на 7 дней</option>
+            <option value="30d">Ссылка на 30 дней</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-solid" type="submit" name="way" value="link">Выдать ссылку</button>
+          <button class="btn" type="submit" name="way" value="password">Задать пароль</button>
+          <button class="btn" type="button" disabled title="{% if page.email_invites_available %}Канал почты пока не реализован{% else %}SMTP_HOST не задан{% endif %}">Отправить письмом</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Участник</th><th>Роль</th><th>Состояние</th><th>Второй фактор</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for row in page.rows %}
+              <tr>
+                <td>
+                  <form method="post" action="{% url 'member-update' row.id %}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                    {% csrf_token %}
+                    <input class="inp" name="name" value="{{ row.name }}" style="max-width:190px">
+                    <input class="inp mono" name="email" value="{{ row.email }}" style="max-width:240px">
+                    <select class="inp" name="role" style="max-width:170px">
+                      {% for value, label in page.roles %}
+                        <option value="{{ value }}" {% if value == row.role %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                    <button class="btn btn-sm" type="submit">Сохранить</button>
+                  </form>
+                  {% if row.invite_token %}
+                    <div class="sub" style="margin-top:6px">
+                      Ссылка действует до {{ row.invite_expires_at|date:"d.m.Y H:i" }}:
+                      <code style="font-size:11px">{{ request.scheme }}://{{ request.get_host }}{% url 'join' row.invite_token %}</code>
+                    </div>
+                  {% endif %}
+                </td>
+                <td data-l="Роль">{{ row.role_label }}</td>
+                <td data-l="Состояние">
+                  {% if row.state_tone %}
+                    <span class="state {{ row.state_tone }}">{{ row.state_label }}</span>
+                  {% else %}
+                    <span class="sub">{{ row.state_label }}</span>
+                  {% endif %}
+                  {% if row.last_login %}<div class="sub">входил {{ row.last_login|date:"d.m.Y" }}</div>{% endif %}
+                </td>
+                <td data-l="Второй фактор">
+                  {% if page.two_factor_enabled %}
+                    <span class="sub">{% if row.authenticator_bound %}привязан{% else %}не привязан{% endif %}</span>
+                    <div class="sub">задано в окружении</div>
+                  {% else %}
+                    <span class="sub">выключен в окружении</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    {% if not row.is_self %}
+                      <form method="post" action="{% url 'member-action' row.id 'password' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Сбросить пароль</button></form>
+                      <form method="post" action="{% url 'member-action' row.id 'sessions' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Завершить сессии</button></form>
+                      {% if page.two_factor_enabled and row.authenticator_bound %}
+                        <form method="post" action="{% url 'member-action' row.id 'authenticator' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Отвязать аутентификатор</button></form>
+                      {% endif %}
+                      <form method="post" action="{% url 'member-action' row.id 'deactivate' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Отключить</button></form>
+                      {% if not row.last_login %}
+                        <form method="post" action="{% url 'member-action' row.id 'delete' %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit">Удалить</button></form>
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

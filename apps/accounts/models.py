@@ -11,6 +11,7 @@
 from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.db import models
+from django.utils.crypto import salted_hmac
 
 EMAIL_MAX_LENGTH = 320
 NAME_MAX_LENGTH = 160
@@ -74,6 +75,12 @@ class Member(AbstractBaseUser):
     # AbstractBaseUser, где оно короче.
     password = models.CharField(max_length=PASSWORD_MAX_LENGTH)
 
+    # Поколение сессий. Меняется, когда все сессии участника нужно завершить: смена почты (3.1,
+    # критерий 80), сброс пароля (81), кнопка «Завершить все сессии». Участвует в подписи
+    # сессии, поэтому смена поколения делает недействительными сразу все выданные сессии,
+    # включая чужие устройства. Ждать истечения ключа в Redis при этом не нужно.
+    session_epoch = models.PositiveIntegerField(default=0)
+
     objects = MemberManager()
 
     USERNAME_FIELD = "email"
@@ -84,6 +91,19 @@ class Member(AbstractBaseUser):
 
     def __str__(self) -> str:
         return self.name
+
+    def get_session_auth_hash(self) -> str:
+        """Подпись сессии, зависящая и от пароля, и от поколения.
+
+        Штатная реализация считает подпись только от хеша пароля, поэтому смена почты сессии бы
+        не завершила — а 3.1 требует именно этого. Поколение добавлено сюда, чтобы завершение
+        сессий работало и без смены пароля.
+        """
+        return salted_hmac(
+            "apps.accounts.models.Member.get_session_auth_hash",
+            f"{self.password}{self.session_epoch}",
+            algorithm="sha256",
+        ).hexdigest()
 
 
 class Invitation(models.Model):
