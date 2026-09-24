@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% comment %}
+Настройка группы — разметка прототипа (строки 1303–1403), ТЗ 5, 7.2, 11.6.
+
+Переключатели прототипа заменены списками: «Своё» в них раскрывается по клику, а клиентский код
+разрешён ровно в трёх местах, и это не одно из них. Своё значение вводится соседним полем в
+минутах и перекрывает выбор из списка.
+
+«По умолчанию» — это NULL в столбце, а не ноль. У интервала напоминаний ноль означает
+«не напоминать» (8.5), и сливать эти состояния нельзя.
+{% endcomment %}
+
+{% block title %}{% if page.id %}{{ page.name }}{% else %}Новая группа{% endif %} — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="group">
+  <div class="head">
+    <div>
+      <a class="back" href="{% url 'group-list' %}">← Группы</a>
+      <h1>{% if page.id %}{{ page.name }}{% else %}Новая группа{% endif %}</h1>
+      {% if page.id %}
+        <p>{{ page.domain_count }} домен(ов) · период и уведомления берутся отсюда. Разрешённые адреса каждый домен задаёт сам.</p>
+      {% else %}
+        <p>Домены с одним расписанием и одним режимом уведомлений — настроите один раз.</p>
+      {% endif %}
+    </div>
+    {% if page.id %}
+      <div class="actions">
+        <form method="post" action="{% url 'group-check' page.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="confirmed" value="yes">
+          <button class="btn" type="submit">Проверить домены группы</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="body" style="max-width:840px">
+    <form method="post" action="{% if page.id %}{% url 'group-save' page.id %}{% else %}{% url 'group-create' %}{% endif %}">
+      {% csrf_token %}
+
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-h"><h2>Группа</h2></div>
+        <div class="rows">
+          <div class="row">
+            <div class="k">Название</div>
+            <div><input class="inp" style="max-width:340px" name="name" value="{{ page.name }}" required></div>
+          </div>
+          <div class="row">
+            <div class="k">Комментарий<div class="d">Зачем эта группа и кто за неё отвечает. Подставляется в уведомление, если у домена нет своего комментария.</div></div>
+            <div><textarea class="inp" name="comment" rows="3" style="font-family:inherit;font-size:13px">{{ page.comment }}</textarea></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-h"><h2>Проверка</h2></div>
+        <div class="rows">
+          <div class="row">
+            <div class="k">Период проверки<div class="d">Как часто резолвить домены группы.</div></div>
+            <div>
+              <select class="inp" name="check_period" style="max-width:220px">
+                {% for choice in page.periods %}
+                  <option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>
+                {% endfor %}
+              </select>
+              <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--ink-soft)">или своё, минут:</span>
+                <input class="inp mono" type="number" name="check_period_minutes" min="1" style="max-width:110px">
+                <span style="font-size:12px;color:var(--ink-soft)">по умолчанию — {{ page.default_period }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">Порог актуальности<div class="d">Сколько адрес должен не отдаваться, чтобы стать неактуальным.</div></div>
+            <div>
+              <select class="inp" name="freshness_threshold" style="max-width:220px">
+                {% for choice in page.thresholds %}
+                  <option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>
+                {% endfor %}
+              </select>
+              <div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--ink-soft)">или своё, минут:</span>
+                <input class="inp mono" type="number" name="freshness_threshold_minutes" min="1" style="max-width:110px">
+                <span style="font-size:12px;color:var(--ink-soft)">по умолчанию — {{ page.default_threshold }}</span>
+              </div>
+              <div style="margin-top:11px;padding:11px 13px;border:1px solid var(--line);border-radius:3px;background:var(--panel-2);font-size:12.5px;color:var(--ink-soft);max-width:62ch">
+                Если DNS перебирает адреса по кругу, каждый из них регулярно выпадает из ответа и возвращается.
+                Такие пропуски событием не считаются: адрес объявляется пропавшим, только когда молчит дольше
+                указанного срока. Тогда же он получает статус «Не актуален». Порог должен быть заметно больше
+                периода проверки — иначе за него не успевает пройти круг адресов.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-h"><h2>Уведомления</h2></div>
+        <div class="rows">
+          <div class="row">
+            <div class="k">Когда уведомлять</div>
+            <div>
+              <select class="inp" name="notification_mode" style="max-width:320px">
+                {% for choice in page.modes %}
+                  <option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>
+                {% endfor %}
+              </select>
+              <div style="margin-top:6px;font-size:12px;color:var(--ink-soft)">по умолчанию — {{ page.default_mode }}</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">Сообщать о возврате в норму<div class="d">Второе сообщение, когда адрес снова стал решённым. Оно ссылается на первое и несёт длительность проблемы.</div></div>
+            <div>
+              <select class="inp" name="notify_back_to_normal" style="max-width:220px">
+                <option value="" {% if page.notify_back_to_normal is None %}selected{% endif %}>По умолчанию</option>
+                <option value="yes" {% if page.notify_back_to_normal is True %}selected{% endif %}>Сообщать</option>
+                <option value="no" {% if page.notify_back_to_normal is False %}selected{% endif %}>Не сообщать</option>
+              </select>
+              <div style="margin-top:6px;font-size:12px;color:var(--ink-soft)">
+                по умолчанию — {% if page.default_notify_back %}сообщать{% else %}не сообщать{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="k">Напоминать по открытому инциденту</div>
+            <div>
+              <select class="inp" name="reminder_interval" style="max-width:220px">
+                {% for choice in page.reminders %}
+                  <option value="{{ choice.value }}" {% if choice.selected %}selected{% endif %}>{{ choice.label }}</option>
+                {% endfor %}
+              </select>
+              <div style="margin-top:6px;font-size:12px;color:var(--ink-soft)">по умолчанию — {{ page.default_reminder }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-solid" type="submit">Сохранить</button>
+        <a class="btn" href="{% url 'group-list' %}">Отмена</a>
+      </div>
+    </form>
+
+    {% if page.id %}
+      <div class="panel" style="margin-top:20px">
+        <div class="panel-h">
+          <h2>Домены группы</h2>
+          <div class="right"><a class="btn btn-sm" href="{% url 'group-domains' page.id %}">Открыть списком</a></div>
+        </div>
+        <div style="padding:14px 16px;font-size:12.5px;color:var(--ink-soft)">
+          Доменов в группе: {{ page.domain_count }}.
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

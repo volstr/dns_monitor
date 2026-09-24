@@ -10,6 +10,11 @@ from apps.catalog.views import (
     domain_detail,
     domain_list,
     domain_save,
+    group_check_now,
+    group_domains,
+    group_edit,
+    group_list,
+    group_save,
 )
 
 urlpatterns: list[URLPattern] = [
@@ -20,4 +25,11 @@ urlpatterns: list[URLPattern] = [
     path("domains/<int:domain_id>/check/", domain_check_now, name="domain-check"),
     # Построчная проверка списка через HTMX (10.2).
     path("domains/<int:domain_id>/allowlist/", allowlist_check, name="allowlist-check"),
+    path("groups/", group_list, name="group-list"),
+    path("groups/new/", group_edit, name="group-new"),
+    path("groups/new/save/", group_save, name="group-create"),
+    path("groups/<int:group_id>/", group_edit, name="group-edit"),
+    path("groups/<int:group_id>/save/", group_save, name="group-save"),
+    path("groups/<int:group_id>/domains/", group_domains, name="group-domains"),
+    path("groups/<int:group_id>/check/", group_check_now, name="group-check"),
 ]

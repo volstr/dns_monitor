@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% comment %}
+Экран «Группы» — разметка прототипа (строки 1236–1302), ТЗ 5, 11.3.
+
+Подзаголовок прототипа обещает, что разрешённые адреса складываются из общего, группового и
+доменного списков. Это расхождение с ТЗ 5 («только домен, наследования нет»), записанное в Q-C1:
+здесь текст взят с экрана настройки группы — «Разрешённые адреса каждый домен задаёт сам».
+{% endcomment %}
+
+{% block title %}Группы — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="groups">
+  <div class="head">
+    <div>
+      <div class="eyebrow">Группы</div>
+      <h1>Здесь задаются период и уведомления</h1>
+      <p>Домен берёт расписание и режим уведомлений у своей группы. Разрешённые адреса каждый домен задаёт сам.</p>
+    </div>
+    {% if is_admin %}
+      <div class="actions"><a class="btn btn-mark" href="{% url 'group-new' %}">Создать группу</a></div>
+    {% endif %}
+  </div>
+
+  <div class="body">
+    <div class="gcards">
+      {% for card in page.cards %}
+        <div class="panel gcard">
+          <h3>
+            {{ card.name }}
+            {% if card.unresolved %}<span class="state breach" style="font-size:11px">{{ card.unresolved }}</span>{% endif %}
+          </h3>
+          {% if card.comment %}<p class="note-line">{{ card.comment }}</p>{% endif %}
+          <div class="meta">
+            <div><span class="k">Доменов</span><span>{{ card.domain_count }}</span></div>
+            <div>
+              <span class="k">Проверка</span>
+              <span class="mono">{{ card.period }}</span>
+              <span class="tag {% if card.period_is_own %}override{% else %}inherit{% endif %}">{% if card.period_is_own %}своё{% else %}по умолчанию{% endif %}</span>
+            </div>
+            <div>
+              <span class="k">Уведомлять</span>
+              <span>{{ card.mode }}</span>
+              <span class="tag {% if card.mode_is_own %}override{% else %}inherit{% endif %}">{% if card.mode_is_own %}своё{% else %}по умолчанию{% endif %}</span>
+            </div>
+          </div>
+          <div class="foot">
+            {% if is_admin %}<a class="btn btn-sm" href="{% url 'group-edit' card.id %}">Настроить</a>{% endif %}
+            <a class="btn btn-sm" href="{% url 'group-domains' card.id %}">Домены группы</a>
+          </div>
+        </div>
+      {% endfor %}
+
+      {% comment %}
+      «Без группы» — не запись в таблице, а домены с пустой группой. Раздел 5: они берут все
+      наследуемые параметры прямо из общих настроек.
+      {% endcomment %}
+      <div class="panel gcard">
+        <h3>Без группы</h3>
+        <p class="note-line">Домены, которые ещё не разложили по группам.</p>
+        <div class="meta">
+          <div><span class="k">Доменов</span><span>{{ page.ungrouped.domain_count }}</span></div>
+          <div><span class="k">Проверка</span><span class="mono">{{ page.ungrouped.period }}</span> <span class="tag inherit">общая</span></div>
+          <div><span class="k">Уведомлять</span><span>{{ page.ungrouped.mode }}</span> <span class="tag inherit">общая</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
