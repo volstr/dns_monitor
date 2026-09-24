@@ -28,6 +28,7 @@ from apps.notifications.models import ChannelKind, DeliveryStatus, Notification
 from apps.notifications.services.message import MessageInput, compose
 from apps.notifications.services.policy import Send, SkipReason, decide
 from core.ports.state_store import StateStore, merge_window
+from core.text import humanize_duration
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,10 +158,7 @@ def _duration(event: Event) -> str | None:
     """Длительность инцидента для «Снова в норме» — критерий 17."""
     if event.event_type != EventType.BACK_TO_NORMAL.value or event.incident is None:
         return None
-    seconds = int((event.occurred_at - event.incident.opened_at).total_seconds())
-    if seconds < 60 * 60:
-        return f"{seconds // 60} мин"
-    return f"{seconds // 3600} ч {seconds % 3600 // 60} мин"
+    return humanize_duration(event.occurred_at - event.incident.opened_at)
 
 
 def pending_incident(event: Event) -> Incident | None:

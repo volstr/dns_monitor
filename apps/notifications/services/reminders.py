@@ -30,6 +30,7 @@ from apps.notifications.models import ChannelKind, Notification
 from apps.notifications.services.message import compose_reminder
 from apps.notifications.services.outbox import enqueue
 from core.ports.state_store import StateStore, merge_window
+from core.text import humanize_duration
 from core.types.checking import AddressStatus
 
 #: Тип «события» для окна слияния: напоминания сливаются так же, как события (Q-D9).
@@ -128,7 +129,4 @@ def _thread_id(incident: Incident) -> int | None:
 
 def _age(age: timedelta) -> str:
     """Возраст инцидента в читаемом виде — как в блоке 11.9 «держится 3 ч 12 мин»."""
-    minutes = int(age.total_seconds()) // 60
-    if minutes < 60:
-        return f"{minutes} мин"
-    return f"{minutes // 60} ч {minutes % 60} мин"
+    return humanize_duration(age)
