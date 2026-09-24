@@ -40,9 +40,16 @@ class AnonymousUser:
     is_authenticated = False
 
 
-def test_3_anonymous_visitor_is_refused() -> None:
-    with pytest.raises(PermissionDenied):
-        member_required(open_screen)(request_from(None))
+def test_3_anonymous_visitor_is_sent_to_the_login_screen() -> None:
+    """Не отказ, а вход: человек не вошёл, и ему есть куда идти.
+
+    Адрес запоминается — ссылка из уведомления (8.4) после входа откроется сама.
+    """
+    response = member_required(open_screen)(request_from(None))
+
+    assert response.status_code == 302
+    assert response["Location"].startswith("/login/")
+    assert "next=" in response["Location"]
 
 
 def test_3_observer_reads_domains() -> None:
@@ -54,7 +61,11 @@ def test_3_observer_reads_domains() -> None:
 
 
 def test_3_observer_has_no_access_to_the_members_screen() -> None:
-    """ТЗ 3: «Наблюдатель вообще не имеет доступа к этому разделу» (критерии 29, 87)."""
+    """ТЗ 3: «Наблюдатель вообще не имеет доступа к этому разделу» (критерии 29, 87).
+
+    Здесь именно отказ, а не вход: наблюдатель уже вошёл, и предлагать ему войти снова значило
+    бы соврать о причине.
+    """
     observer = make_member("watch@contoso.ru")
 
     with pytest.raises(PermissionDenied):

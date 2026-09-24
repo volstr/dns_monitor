@@ -1,0 +1,61 @@
+{% comment %}
+Обязательная привязка аутентификатора — ТЗ 3, критерий 51.
+
+Пароль уже проверен, но участник ещё не вошёл: до подтверждения кодом доступа к остальным
+экранам нет. QR-код не рисуется — это была бы картинка, которую нечем генерировать без новой
+зависимости; строка подключения показывается текстом, её принимает любое приложение.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Привязка аутентификатора — DNS monitoring</title>
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+
+<div class="auth on">
+  <div class="auth-art">
+    <div>
+      <div class="eyebrow">DNS monitoring</div>
+      <h2 style="margin-top:14px">Второй фактор обязателен</h2>
+      <p>Он включён администратором установки в переменной окружения и не отключается из интерфейса.</p>
+    </div>
+  </div>
+
+  <div class="auth-form">
+    <div class="auth-card">
+      <div class="eyebrow">Шаг второй</div>
+      <h1>Привяжите приложение</h1>
+      <p>Добавьте строку ниже в приложение-аутентификатор и введите код, который оно покажет.</p>
+
+      {% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+      <div class="field">
+        <label>Строка подключения</label>
+        <div class="hint">Её можно вставить в приложение вручную.</div>
+        <textarea class="inp mono" rows="3" readonly style="font-size:11px">{{ uri }}</textarea>
+      </div>
+
+      <div class="field">
+        <label>Ключ</label>
+        <div class="mono" style="font-size:13px;letter-spacing:.08em">{{ secret }}</div>
+      </div>
+
+      <form method="post" action="{% url 'totp-setup' %}">
+        {% csrf_token %}
+        <div class="field" style="margin-bottom:22px">
+          <label for="bind-otp">Код из приложения</label>
+          <input class="inp mono" id="bind-otp" name="code" inputmode="numeric" maxlength="6"
+                 placeholder="000000" style="letter-spacing:.4em" required>
+        </div>
+        <button class="btn btn-solid" style="width:100%;justify-content:center" type="submit">Подтвердить</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -32,8 +32,11 @@ def domain() -> Domain:
     return domain
 
 
-def test_3_anonymous_visitor_does_not_get_the_card(client: Client, domain: Domain) -> None:
-    assert client.get(reverse("domain-detail", args=[domain.pk])).status_code == 403
+def test_3_anonymous_visitor_is_sent_to_the_login_screen(client: Client, domain: Domain) -> None:
+    response = client.get(reverse("domain-detail", args=[domain.pk]))
+
+    assert response.status_code == 302
+    assert reverse("login") in response["Location"]
 
 
 def test_unknown_domain_answers_404(client: Client, observer: Member) -> None:

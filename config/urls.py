@@ -10,5 +10,6 @@ from apps.monitoring.views import healthcheck
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("health/", healthcheck, name="healthcheck"),
+    path("", include("apps.accounts.urls")),
     path("", include("apps.catalog.urls")),
 ]

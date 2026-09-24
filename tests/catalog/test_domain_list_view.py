@@ -30,8 +30,11 @@ def observer() -> Member:
     )
 
 
-def test_3_anonymous_visitor_does_not_get_the_screen(client: Client) -> None:
-    assert client.get(reverse("domain-list")).status_code == 403
+def test_3_anonymous_visitor_is_sent_to_the_login_screen(client: Client) -> None:
+    response = client.get(reverse("domain-list"))
+
+    assert response.status_code == 302
+    assert reverse("login") in response["Location"]
 
 
 def test_11_5_screen_renders_domains_on_real_data(client: Client, observer: Member) -> None:
@@ -75,7 +78,10 @@ def test_61_disabled_member_loses_access_at_once(client: Client, observer: Membe
 
     Member.objects.filter(pk=observer.pk).update(is_active=False)
 
-    assert client.get(reverse("domain-list")).status_code == 403
+    # Отключённый перестаёт быть участником, поэтому попадает на вход — но не на экран.
+    response = client.get(reverse("domain-list"))
+    assert response.status_code == 302
+    assert reverse("login") in response["Location"]
 
 
 def test_11_5_filter_reaches_the_selector(client: Client, observer: Member) -> None:

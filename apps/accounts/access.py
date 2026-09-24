@@ -15,8 +15,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from functools import wraps
 
+from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
+from django.urls import reverse
 
 from apps.accounts.models import Role
 
@@ -26,15 +28,14 @@ type View = Callable[..., HttpResponse]
 def member_required(view: View) -> View:
     """Экран доступен только участнику рабочего пространства.
 
-    TODO(ТЗ 3): анонимный запрос пока получает 403. Перенаправление на экран входа появится
-    вместе с самим экраном — раздел 3 стоит последним в порядке реализации из ТЗ, и ссылка на
-    несуществующий маршрут была бы хуже честного отказа.
+    Анонимный запрос ведёт на вход с запомненным адресом: человек, открывший ссылку из
+    уведомления (8.4), после входа попадает именно на неё, а не на обзор.
     """
 
     @wraps(view)
     def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
         if not request.user.is_authenticated:
-            raise PermissionDenied
+            return redirect_to_login(request.get_full_path(), reverse("login"))
         return view(request, *args, **kwargs)
 
     return wrapper
@@ -45,12 +46,15 @@ def admin_required(view: View) -> View:
 
     ТЗ 3: «Наблюдатель вообще не имеет доступа к этому разделу». Проверка живёт здесь, а не в
     шаблоне: спрятанный пункт меню не является ограничением доступа (критерии 29, 87).
+
+    Наблюдатель получает именно отказ, а не вход: он уже вошёл, и предлагать ему войти снова
+    значило бы врать о причине.
     """
 
     @wraps(view)
     def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
         if not request.user.is_authenticated:
-            raise PermissionDenied
+            return redirect_to_login(request.get_full_path(), reverse("login"))
         if request.user.role != Role.ADMIN:
             raise PermissionDenied
         return view(request, *args, **kwargs)

@@ -44,7 +44,10 @@ HTMX нужен валидации белого списка (10.2) и выбо�
     <div class="rail-foot">
       <b>{{ request.user.name }}</b>
       {{ request.user.get_role_display }}
-      {# «выйти» появится вместе с экраном входа: раздел 3 идёт последним в порядке ТЗ. #}
+      <form method="post" action="{% url 'logout' %}" style="margin-top:6px">
+        {% csrf_token %}
+        <button type="submit" style="font-size:12px;text-decoration:underline">выйти</button>
+      </form>
     </div>
   </aside>
 

@@ -1,0 +1,73 @@
+{% comment %}
+Вход — разметка прототипа (строки 649–694), ТЗ 3, критерии 33, 50, 56.
+
+Каркас `base.html` здесь не используется: у экрана входа нет ни меню, ни участника в шапке.
+
+Поля кода при выключенном втором факторе нет в разметке вовсе — не скрытого и не заблокированного,
+а отсутствующего (ТЗ 3, критерий 50). Обеспечивается формой, которая удаляет поле, а не стилями.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход — DNS monitoring</title>
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+
+<div class="auth on">
+  <div class="auth-art">
+    <div>
+      <div class="eyebrow">DNS monitoring</div>
+      <h2 style="margin-top:14px">Домен указывает не туда — вы узнаёте первым</h2>
+      <p>Сервис резолвит A- и AAAA-записи по расписанию, сравнивает с предыдущим ответом и со списком разрешённых адресов и подсетей. Расхождение уходит в Telegram.</p>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:3px;background:var(--paper);padding:16px">
+      <div class="eyebrow" style="margin-bottom:12px">Пример проверки</div>
+      <div class="mono" style="font-size:12px;line-height:2">
+        <div style="color:var(--ink-soft)">pay-gw.contoso.ru → 3 адреса</div>
+        <div><span style="color:var(--ok)">✓</span> 10.20.1.14 &nbsp;<span style="color:var(--ink-faint)">10.20.0.0/22</span></div>
+        <div><span style="color:var(--ok)">✓</span> 10.20.2.61 &nbsp;<span style="color:var(--ink-faint)">10.20.0.0/22</span></div>
+        <div><span style="color:var(--breach)">✕</span> <b style="color:var(--breach)">185.44.9.201</b> &nbsp;<span style="color:var(--breach)">не решён</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-form">
+    <div class="auth-card">
+      <div class="eyebrow">DNS monitoring</div>
+      <h1>Вход</h1>
+      <p>Доступ только для участников рабочего пространства.</p>
+
+      {% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+      <form method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+        <div class="field">
+          <label for="lg-mail">Рабочая почта</label>
+          <input class="inp mono" id="lg-mail" name="email" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="lg-pass">Пароль</label>
+          <input class="inp" id="lg-pass" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        {% if two_factor %}
+          <div class="field" style="margin-bottom:22px">
+            <label for="lg-otp">Код из приложения</label>
+            <div class="hint">Шесть цифр, обновляются каждые 30 секунд.</div>
+            <input class="inp mono" id="lg-otp" name="code" inputmode="numeric" maxlength="6"
+                   placeholder="000000" style="letter-spacing:.4em" required>
+          </div>
+        {% endif %}
+        <button class="btn btn-solid" style="width:100%;justify-content:center" type="submit">Войти</button>
+      </form>
+
+      <div class="auth-note">Забыли пароль — напишите администратору рабочего пространства.</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
