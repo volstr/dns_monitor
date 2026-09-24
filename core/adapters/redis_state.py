@@ -43,5 +43,14 @@ class RedisStateStore(StateStore):
         items = self._client.lrange(key.name, 0, -1)
         return tuple(str(item) for item in items)  # type: ignore[union-attr]
 
+    def remember(self, key: StateKey, value: str) -> None:
+        # SET EX — значение и срок жизни одной командой, как в acquire: ключа без срока не
+        # возникает даже на мгновение.
+        self._client.set(key.name, value, ex=key.ttl)
+
+    def recall(self, key: StateKey) -> str | None:
+        value = self._client.get(key.name)
+        return None if value is None else str(value)
+
     def ping(self) -> None:
         self._client.ping()

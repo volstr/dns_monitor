@@ -21,6 +21,7 @@ class FakeStateStore(StateStore):
         self._clock = clock
         self._expires_at: dict[str, datetime] = {}
         self._items: dict[str, list[str]] = {}
+        self._values: dict[str, str] = {}
         #: Позволяет проверить поведение при недоступном хранилище (11.13).
         self.available = available
 
@@ -35,6 +36,7 @@ class FakeStateStore(StateStore):
         self._guard()
         self._expires_at.pop(key.name, None)
         self._items.pop(key.name, None)
+        self._values.pop(key.name, None)
 
     def is_held(self, key: StateKey) -> bool:
         self._guard()
@@ -55,6 +57,18 @@ class FakeStateStore(StateStore):
             return ()
         return tuple(self._items.get(key.name, ()))
 
+    def remember(self, key: StateKey, value: str) -> None:
+        self._guard()
+        self._values[key.name] = value
+        # Срок обновляется при каждой записи: у сессии окно скользящее (ТЗ 3).
+        self._expires_at[key.name] = self._clock.now() + key.ttl
+
+    def recall(self, key: StateKey) -> str | None:
+        self._guard()
+        if not self._alive(key.name):
+            return None
+        return self._values.get(key.name)
+
     def ping(self) -> None:
         self._guard()
 
@@ -69,6 +83,7 @@ class FakeStateStore(StateStore):
         if expires_at <= self._clock.now():
             del self._expires_at[name]
             self._items.pop(name, None)
+            self._values.pop(name, None)
             return False
         return True
 

@@ -24,8 +24,12 @@ CSRF_TRUSTED_ORIGINS = [ENV.app_base_url]
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.messages",
     "django.contrib.postgres",
     "django.contrib.staticfiles",
+    # `django.contrib.sessions` намеренно не подключён: его модель создала бы таблицу сессий,
+    # которой неоткуда наполняться — сессии живут в Redis (Q-D20). Промежуточный слой и базовый
+    # класс хранилища из этого пакета работают и без регистрации приложения.
     "apps.accounts",
     "apps.catalog",
     "apps.monitoring",
@@ -36,8 +40,11 @@ MIDDLEWARE = [
     # Первым: при аварии инфраструктуры ответ 503 отдаётся раньше любой другой работы (11.13).
     "config.middleware.InfrastructureHealthMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -52,6 +59,10 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "django.contrib.messages.context_processors.messages",
+                # Видимость пунктов меню по роли (ТЗ 3, Q-D19). Доступ ограничивают декораторы
+                # в том же модуле, а не этот процессор.
+                "apps.accounts.access.navigation",
             ],
         },
     },
@@ -70,8 +81,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ТЗ 3: почта служит логином. Сменить после первой миграции auth нельзя.
 AUTH_USER_MODEL = "accounts.Member"
 
-# TODO(ТЗ 3, Q-D20): SESSION_ENGINE на Redis в базе состояния и скользящий срок сессии —
-# вместе с обёрткой над Redis на этапе 4. Штатная таблица сессий не используется.
+# ТЗ 3, Q-D20: сессии в Redis, в базе состояния. Штатная таблица сессий не используется.
+SESSION_ENGINE = "apps.accounts.sessions"
+# Срок сессии отсчитывается от бездействия (ТЗ 3), поэтому окно скользящее: каждая запись
+# продлевает ключ. Сам срок — настройка продукта, а не константа настроек Django.
+SESSION_SAVE_EVERY_REQUEST = True
 
 LANGUAGE_CODE = "ru"
 # ТЗ 4.0: хранение в UTC. Часовой пояс отображения установки — Q-A3, этап 6.
