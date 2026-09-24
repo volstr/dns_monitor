@@ -83,6 +83,31 @@ def test_3_duplicate_email_is_refused() -> None:
     assert "уже есть" in result.reason
 
 
+def test_3_createsuperuser_creates_an_administrator() -> None:
+    """`manage.py createsuperuser` — рефлекс любого, кто знает Django.
+
+    «Суперпользователя» в продукте нет: роли ровно две. Команда заводит обычного администратора
+    по тем же правилам, что и `create_admin`.
+    """
+    member = Member.objects.create_superuser(
+        email="a.kirilova@contoso.ru", name="Анна Кирилова", password=PASSWORD
+    )
+
+    assert member.role == Role.ADMIN
+    assert member.check_password(PASSWORD)
+
+
+def test_3_createsuperuser_refuses_a_second_administrator() -> None:
+    Member.objects.create_superuser(
+        email="a.kirilova@contoso.ru", name="Анна Кирилова", password=PASSWORD
+    )
+
+    with pytest.raises(ValueError, match="уже есть администратор"):
+        Member.objects.create_superuser(
+            email="second@contoso.ru", name="Второй", password=PASSWORD
+        )
+
+
 def test_email_is_normalised() -> None:
     result = create(email="  A.Kirilova@Contoso.ru  ")
 

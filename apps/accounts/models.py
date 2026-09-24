@@ -35,6 +35,27 @@ class MemberManager(BaseUserManager["Member"]):
     живут в сервисах, а не здесь. TODO(ТЗ 3): `apps.accounts.services` на этапе участников.
     """
 
+    def create_superuser(self, email: str, name: str, password: str) -> "Member":
+        """Поддержка `manage.py createsuperuser` — ТЗ 3.
+
+        «Суперпользователя» в этом продукте нет: роли ровно две, «Администратор» и
+        «Наблюдатель» (раздел 3). Метод существует потому, что `createsuperuser` — рефлекс любого,
+        кто работал с Django, и падение с `AttributeError` вместо объяснения никому не помогает.
+        Создаётся обычный администратор, теми же правилами, что и у `manage.py create_admin`:
+        второго администратора так завести нельзя, для этого есть вкладка «Участники».
+        """
+        # Импорт внутри метода: сервис знает про модель, и на уровне модуля вышел бы цикл.
+        from datetime import UTC, datetime
+
+        from apps.accounts.services.bootstrap import AdminNotCreated, create_first_admin
+
+        result = create_first_admin(
+            email=email, name=name, password=password, at=datetime.now(UTC)
+        )
+        if isinstance(result, AdminNotCreated):
+            raise ValueError(result.reason)
+        return self.get(pk=result.member_id)
+
     def create_member(
         self,
         *,
