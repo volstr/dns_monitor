@@ -54,6 +54,19 @@ def test_11_5_screen_renders_domains_on_real_data(client: Client, observer: Memb
     assert "Пункты зависят от роли" not in body
 
 
+def test_11_4_layout_container_is_visible(client: Client, observer: Member) -> None:
+    """В CSS прототипа `.app{display:none}`, показывает блок только `.app.on`.
+
+    Без модификатора страница приходит целиком и не отображается — пустой экран при полностью
+    исправном ответе. Ни один тест на содержимое такого не ловит, поэтому проверка отдельная.
+    """
+    client.force_login(observer)
+
+    body = client.get(reverse("domain-list")).content.decode()
+
+    assert 'class="app on"' in body
+
+
 def test_11_5_htmx_request_gets_only_the_rows(client: Client, observer: Member) -> None:
     """Обновление фильтра не перерисовывает страницу: приходят только строки таблицы."""
     Domain.objects.create(name="pay-gw.contoso.ru")

@@ -1,13 +1,19 @@
 /* Стили прототипа `guide/dns-monitoring-prototype.html` (строки 11–644), перенесённые целиком.
-   Прототип — истина по вёрстке и CSS (CLAUDE.md), поэтому правок ровно две:
+   Прототип — истина по вёрстке и CSS (CLAUDE.md). Цвета, размеры, отступы и переменные не
+   тронуты; правки только там, где перенос из одностраничного макета в настоящее приложение
+   иначе ломает поведение. Каждая помечена в тексте комментарием «Правка переноса».
 
    1. Блок @font-face ниже. В прототипе шрифты грузились с Google Fonts; по Q-C20 они лежат
       файлами в static/fonts/ — установки бывают в закрытом контуре, внешняя зависимость
       недопустима. Файлы кладёт разработчик, см. static/README.md.
    2. Удлинены цепочки запасных шрифтов: "JetBrains Mono" → ui-monospace → monospace,
       "IBM Plex Sans Condensed" → system-ui → sans-serif. Пока файлов нет, интерфейс работает и
-      выглядит разумно; когда появятся — выглядит как прототип. Цвета, размеры, отступы и
-      переменные не тронуты. */
+      выглядит разумно; когда появятся — выглядит как прототип.
+   3. Селекторы меню покрывают и `button`, и `a`. В прототипе пункты — кнопки, потому что он
+      переключал экраны скриптом; здесь это разные адреса, и навигация обязана быть ссылками.
+   4. На телефоне в меню шесть колонок вместо пяти, и «Настройки» с «Участниками» не прячутся.
+      Прототип убирал их за кнопку «Ещё», открывавшуюся скриптом, — клиентский код разрешён в
+      трёх местах, и это не одно из них. */
 
 @font-face{font-family:"IBM Plex Sans";font-weight:400;font-style:normal;font-display:swap;
   src:local("IBM Plex Sans"),url("../fonts/ibm-plex-sans-400.woff2") format("woff2")}
@@ -87,13 +93,18 @@ a{color:inherit}
 .brand b{display:block;font-size:16px;font-weight:600;letter-spacing:-.01em}
 .brand .eyebrow{margin-top:3px}
 .nav{padding:10px 8px;flex:1}
-.nav button{
+/* Правка переноса: в прототипе пункты меню — кнопки, потому что он одностраничный и переключал
+   экраны скриптом. Здесь это разные адреса, и навигация обязана быть ссылками: их открывают в
+   новой вкладке, копируют и они работают без JS. Поэтому селекторы покрывают и то, и другое —
+   оформление при этом ровно прототипа. */
+.nav button,.nav a{
   display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:var(--r);
   color:var(--ink-soft);font-weight:500;text-align:left;
 }
-.nav button:hover{background:var(--panel-2);color:var(--ink)}
-.nav button[aria-current="page"]{background:var(--ink);color:var(--panel)}
-.nav button[aria-current="page"] .count{background:rgba(250,251,252,.2);color:var(--panel)}
+.nav button:hover,.nav a:hover{background:var(--panel-2);color:var(--ink)}
+.nav button[aria-current="page"],.nav a[aria-current="page"]{background:var(--ink);color:var(--panel)}
+.nav button[aria-current="page"] .count,
+.nav a[aria-current="page"] .count{background:rgba(250,251,252,.2);color:var(--panel)}
 .nav .count{
   margin-left:auto;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;font-weight:500;
   background:var(--panel-2);border:1px solid var(--line-soft);border-radius:2px;padding:1px 5px;color:var(--ink-soft);
@@ -533,7 +544,7 @@ input.mono,select.inp{font-family:"JetBrains Mono",ui-monospace,monospace}
   .app.on{grid-template-columns:1fr}
   .rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}
   .nav{display:flex;gap:6px;overflow-x:auto;padding:8px}
-  .nav button{width:auto;white-space:nowrap}
+  .nav button,.nav a{width:auto;white-space:nowrap}
   .rail-foot{display:none}
   .head,.body{padding-left:20px;padding-right:20px}
   .stats{grid-template-columns:1fr 1fr}
@@ -556,8 +567,12 @@ input.mono,select.inp{font-family:"JetBrains Mono",ui-monospace,monospace}
     box-shadow:0 -6px 20px -14px rgba(22,32,43,.5);
   }
   .brand{display:none}
-  .nav{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;overflow:visible;padding:5px 5px calc(5px + env(safe-area-inset-bottom))}
-  .nav button{
+  /* Правка переноса: шесть колонок вместо пяти. Прототип прятал «Настройки» и
+     «Участники» за кнопкой «Ещё», а она открывалась скриптом — клиентский код разрешён
+     в трёх местах, и это не одно из них. Пункты остаются на виду: недостижимый на
+     телефоне раздел хуже, чем на одну колонку теснее. */
+  .nav{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;overflow:visible;padding:5px 5px calc(5px + env(safe-area-inset-bottom))}
+  .nav button,.nav a{
     flex-direction:column;gap:2px;justify-content:center;text-align:center;
     padding:7px 2px;font-size:10.5px;line-height:1.25;border-radius:4px;
   }

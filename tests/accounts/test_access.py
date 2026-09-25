@@ -82,10 +82,26 @@ def test_3_1_navigation_hides_the_members_item_from_an_observer() -> None:
     observer = make_member("watch@contoso.ru")
     admin = make_member("boss@contoso.ru", role=Role.ADMIN)
 
-    assert navigation(request_from(observer)) == {"is_admin": False}
-    assert navigation(request_from(admin)) == {"is_admin": True}
+    assert navigation(request_from(observer))["is_admin"] is False
+    assert navigation(request_from(admin))["is_admin"] is True
+
+
+def test_nav_counts_are_prepared_for_a_member() -> None:
+    """Числа у пунктов меню — часть макета (Q-E5), считаются здесь же."""
+    admin = make_member("boss@contoso.ru", role=Role.ADMIN)
+
+    counts = navigation(request_from(admin))["counts"]
+
+    assert counts is not None
+    assert counts.members == 1  # type: ignore[union-attr]
 
 
 def test_navigation_survives_a_request_without_a_user() -> None:
-    """Контекстный процессор зовут и на странице ошибки, где участника в запросе может не быть."""
-    assert navigation(RequestFactory().get("/domains/")) == {"is_admin": False}
+    """Контекстный процессор зовут и на странице ошибки, где участника в запросе может не быть.
+
+    Счётчики там не считаются: меню на экране входа нет, и лишние запросы ни к чему.
+    """
+    context = navigation(RequestFactory().get("/domains/"))
+
+    assert context["is_admin"] is False
+    assert context["counts"] is None

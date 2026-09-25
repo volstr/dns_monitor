@@ -21,7 +21,12 @@ HTMX нужен валидации белого списка (10.2) и выбо�
 </head>
 <body>
 
-<div class="app">
+{% comment %}
+Модификатор `on` обязателен: в CSS прототипа `.app{display:none}`, и показывает блок только
+`.app.on`. В прототипе класс навешивал скрипт, переключавший экран входа и приложение; здесь
+переключения нет — это разные страницы, — поэтому класс стоит сразу.
+{% endcomment %}
+<div class="app on">
   <aside class="rail">
     <div class="brand">
       <b>DNS monitoring</b>
@@ -34,22 +39,34 @@ HTMX нужен валидации белого списка (10.2) и выбо�
     уходит в журнал и в уведомления (Q-C14).
     {% endcomment %}
     <nav class="nav">
-      <a href="{% url 'overview' %}" {% if screen == 'overview' %}aria-current="page"{% endif %}>Обзор</a>
-      <a href="{% url 'domain-list' %}" {% if screen == 'domains' %}aria-current="page"{% endif %}>Домены</a>
-      <a href="{% url 'group-list' %}" {% if screen == 'groups' %}aria-current="page"{% endif %}>Группы</a>
-      <a href="{% url 'event-list' %}" {% if screen == 'events' %}aria-current="page"{% endif %}>Журнал</a>
-      <a href="{% url 'settings' %}" {% if screen == 'settings' %}aria-current="page"{% endif %}>Настройки</a>
+      <a data-go="overview" href="{% url 'overview' %}" {% if screen == 'overview' %}aria-current="page"{% endif %}>
+        Обзор{% if counts.discrepancies %}<span class="count hot">{{ counts.discrepancies }}</span>{% endif %}
+      </a>
+      <a data-go="domains" href="{% url 'domain-list' %}" {% if screen == 'domains' %}aria-current="page"{% endif %}>
+        Домены{% if counts.domains %}<span class="count">{{ counts.domains }}</span>{% endif %}
+      </a>
+      <a data-go="groups" href="{% url 'group-list' %}" {% if screen == 'groups' %}aria-current="page"{% endif %}>
+        Группы{% if counts.groups %}<span class="count">{{ counts.groups }}</span>{% endif %}
+      </a>
+      <a data-go="events" href="{% url 'event-list' %}" {% if screen == 'events' %}aria-current="page"{% endif %}>
+        Журнал
+      </a>
+      <a data-go="settings" href="{% url 'settings' %}" {% if screen == 'settings' %}aria-current="page"{% endif %}>
+        Настройки
+      </a>
       {% if is_admin %}
-        <a href="{% url 'member-list' %}" {% if screen == 'members' %}aria-current="page"{% endif %}>Участники</a>
+        <a data-go="users" href="{% url 'member-list' %}" {% if screen == 'members' %}aria-current="page"{% endif %}>
+          Участники{% if counts.members %}<span class="count">{{ counts.members }}</span>{% endif %}
+        </a>
       {% endif %}
     </nav>
 
     <div class="rail-foot">
       <b>{{ request.user.name }}</b>
-      {{ request.user.get_role_display }}
-      <form method="post" action="{% url 'logout' %}" style="margin-top:6px">
+      {{ request.user.get_role_display }} ·
+      <form method="post" action="{% url 'logout' %}" style="display:inline">
         {% csrf_token %}
-        <button type="submit" style="font-size:12px;text-decoration:underline">выйти</button>
+        <button type="submit" style="font-size:12px;color:inherit;text-decoration:underline">выйти</button>
       </form>
     </div>
   </aside>

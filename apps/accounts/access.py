@@ -62,12 +62,21 @@ def admin_required(view: View) -> View:
     return wrapper
 
 
-def navigation(request: HttpRequest) -> dict[str, bool]:
-    """Контекст шаблонов: какие пункты меню показывать.
+def navigation(request: HttpRequest) -> dict[str, object]:
+    """Контекст шаблонов: какие пункты меню показывать и какие числа у них стоят.
 
     Отдельно от проверок выше намеренно. Здесь решается только видимость, а доступ ограничивают
     декораторы: если однажды эти два места разойдутся, спрятанный пункт всё равно не откроется.
+
+    Счётчики считаются только для вошедшего: на экране входа меню нет вовсе, и лишние запросы
+    там ни к чему.
     """
     user = getattr(request, "user", None)
-    is_admin = bool(user and user.is_authenticated and user.role == Role.ADMIN)
-    return {"is_admin": is_admin}
+    if not (user and user.is_authenticated):
+        return {"is_admin": False, "counts": None}
+
+    # Импорт внутри функции: `access` зовут из настроек шаблонов, и на уровне модуля он потянул
+    # бы приложения до того, как реестр Django их загрузит.
+    from apps.catalog.selectors.navigation import navigation_counts
+
+    return {"is_admin": user.role == Role.ADMIN, "counts": navigation_counts()}
