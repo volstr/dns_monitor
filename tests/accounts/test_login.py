@@ -1,9 +1,11 @@
 """Вход — ТЗ 3, 11.11; критерии 32, 33, 50, 51, 52, 56, 57."""
 
+import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import pyotp
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
 
@@ -233,6 +235,33 @@ def test_50_code_field_is_absent_from_the_markup(client: Client) -> None:
     assert 'name="password"' in body
     assert 'name="code"' not in body
     assert "Код из приложения" not in body
+
+
+def test_3_missing_code_says_so_instead_of_blaming_the_password(
+    client: Client, member: Member, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Человек вводит верные почту и пароль — текст отказа обязан назвать настоящую причину."""
+    monkeypatch.setattr(
+        settings, "ENV", dataclasses.replace(settings.ENV, auth_2fa_enabled=True)
+    )
+
+    response = client.post(reverse("login"), {"email": EMAIL, "password": PASSWORD})
+
+    body = response.content.decode()
+    assert "AUTH_2FA_ENABLED" in body
+    assert "Проверьте почту и пароль" not in body
+
+
+def test_50_code_field_appears_when_the_second_factor_is_on(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        settings, "ENV", dataclasses.replace(settings.ENV, auth_2fa_enabled=True)
+    )
+
+    body = client.get(reverse("login")).content.decode()
+
+    assert 'name="code"' in body
 
 
 def test_3_login_screen_signs_a_member_in(client: Client, member: Member) -> None:

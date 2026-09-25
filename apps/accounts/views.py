@@ -65,7 +65,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
         return render(
             request,
             "accounts/login.html",
-            {"form": form, "two_factor": two_factor, "error": "Проверьте почту и пароль."},
+            {"form": form, "two_factor": two_factor, "error": _form_error(form, two_factor)},
         )
 
     result = authenticate(
@@ -78,6 +78,21 @@ def login_view(request: HttpRequest) -> HttpResponse:
         two_factor_enabled=two_factor,
     )
     return _after_authenticate(request, result, two_factor)
+
+
+def _form_error(form: LoginForm, two_factor: bool) -> str:
+    """Причина отказа формы называется прямо.
+
+    Пустой код при включённом втором факторе — не «проверьте почту и пароль»: человек вводит
+    верные почту и пароль, получает этот текст и ищет ошибку не там. Про существование учётной
+    записи здесь по-прежнему ничего не сообщается (Q-C19) — речь только о заполнении полей.
+    """
+    if two_factor and "code" in form.errors:
+        return (
+            "Нужен код из приложения-аутентификатора: второй фактор включён в окружении "
+            "переменной AUTH_2FA_ENABLED."
+        )
+    return "Проверьте почту и пароль."
 
 
 def _after_authenticate(
