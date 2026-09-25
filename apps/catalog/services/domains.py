@@ -14,11 +14,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from django.db import transaction
 
-from apps.catalog.models import AllowlistEntry, Domain
+from apps.catalog.models import DOMAIN_NAME_MAX_LENGTH, AllowlistEntry, Domain
 from apps.catalog.services.allowlist import ParsedAllowlist, parse_allowlist
+
+
+@dataclass(frozen=True, slots=True)
+class DomainCreated:
+    domain_id: int
+    name: str
+    #: Имя после приведения к punycode, если ввод был не-ASCII (10.1). Показывается человеку.
+    converted_from: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DomainNotCreated:
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +54,69 @@ class DomainNotSaved:
 
     parsed: ParsedAllowlist
     reasons: tuple[str, ...] = ()
+
+
+def create_domain(
+    *, name: str, group_id: int | None, comment: str, at: datetime
+) -> DomainCreated | DomainNotCreated:
+    """Добавить домен — ТЗ 10.1, решение Q-E2.
+
+    Имя приводится к нижнему регистру, конечная точка отбрасывается, не-ASCII переводится в
+    punycode. Невозможность перевода — ошибка ввода с внятным текстом, а не исключение.
+
+    **Расписание назначается сразу.** Домен с пустым `next_check_at` планировщик не заберёт
+    никогда, и добавленный домен молча не проверялся бы. По Q-E2 один добавленный домен идёт в
+    ближайший тик, а не ждёт случайного смещения: пик разбирается ограничением параллелизма, а
+    со второй проверки домены расходятся сами — период отсчитывается от факта проверки.
+    """
+    normalized, reason = _normalized_name(name)
+    if normalized is None:
+        return DomainNotCreated(reason=reason or "Имя домена не подходит.")
+
+    if Domain.objects.filter(name=normalized).exists():
+        # 10.1: дубликаты внутри установки не допускаются.
+        return DomainNotCreated(reason=f"Домен {normalized} уже есть в списке.")
+
+    domain = Domain.objects.create(
+        name=normalized,
+        group_id=group_id,
+        comment=comment.strip(),
+        next_check_at=at,
+    )
+    stripped = name.strip().rstrip(".")
+    return DomainCreated(
+        domain_id=domain.pk,
+        name=normalized,
+        converted_from=stripped if stripped.lower() != normalized else None,
+    )
+
+
+def _normalized_name(name: str) -> tuple[str | None, str | None]:
+    """Приведение имени по 10.1. Второе значение — причина отказа."""
+    stripped = name.strip().rstrip(".")
+    if not stripped:
+        return None, "Имя домена обязательно."
+    if " " in stripped:
+        return None, "В имени домена не бывает пробелов."
+    if "." not in stripped:
+        return None, "Имя домена состоит хотя бы из двух частей, разделённых точкой."
+
+    # Нижний регистр — явно, а не кодеком: `str.encode("idna")` пропускает нормализацию для
+    # меток, которые уже ASCII, и «PAY-GW.contoso.ru» осталось бы с заглавными. Тогда 10.1
+    # нарушалось бы дважды: имя не приведено и дубликат не распознан.
+    lowered = stripped.lower()
+    try:
+        converted = lowered.encode("idna").decode("ascii")
+    except UnicodeError:
+        return None, (
+            f"«{stripped}» не удаётся перевести в punycode. Проверьте, нет ли в имени "
+            f"недопустимых символов и не длиннее ли часть имени 63 знаков."
+        )
+
+
+    if len(converted) > DOMAIN_NAME_MAX_LENGTH:
+        return None, f"Имя домена длиннее {DOMAIN_NAME_MAX_LENGTH} символов."
+    return converted, None
 
 
 def save_domain(

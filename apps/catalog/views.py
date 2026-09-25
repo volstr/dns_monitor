@@ -18,6 +18,7 @@ from django.shortcuts import redirect, render
 
 from apps.accounts.access import admin_required, member_required
 from apps.catalog.forms import (
+    DomainCreateForm,
     DomainEditForm,
     DomainFilterForm,
     GlobalSettingsForm,
@@ -29,7 +30,12 @@ from apps.catalog.selectors.domains import DomainFilter, domain_list_page
 from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
 from apps.catalog.services.allowlist import parse_allowlist
-from apps.catalog.services.domains import DomainNotSaved, save_domain
+from apps.catalog.services.domains import (
+    DomainNotCreated,
+    DomainNotSaved,
+    create_domain,
+    save_domain,
+)
 from apps.catalog.services.groups import GroupNotSaved, save_group
 from apps.catalog.services.settings import SettingsNotSaved, save_global_settings
 from apps.monitoring.selectors.journal import ExportRefused, journal_export, journal_page
@@ -61,6 +67,39 @@ def domain_list(request: HttpRequest) -> HttpResponse:
         else "catalog/domain_list.html"
     )
     return render(request, template, {"page": page, "screen": "domains"})
+
+
+@admin_required
+def domain_create(request: HttpRequest) -> HttpResponse:
+    """Добавление домена — ТЗ 10.1. Наблюдателю сюда нельзя (ТЗ 3)."""
+    if request.method != "POST":
+        return render(
+            request,
+            "catalog/domain_new.html",
+            {"groups": group_list_page().cards, "screen": "domains"},
+        )
+
+    form = DomainCreateForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Проверьте имя домена.")
+        return redirect("domain-new")
+
+    result = create_domain(
+        name=form.domain_name(),
+        group_id=form.group_id(),
+        comment=form.comment_text(),
+        at=SystemClock().now(),
+    )
+
+    if isinstance(result, DomainNotCreated):
+        messages.error(request, result.reason)
+        return redirect("domain-new")
+
+    if result.converted_from:
+        # 10.1: перевод в punycode показывается, а не происходит молча.
+        messages.info(request, f"«{result.converted_from}» записан как {result.name}.")
+    messages.success(request, "Домен добавлен. Первая проверка пройдёт в ближайшие секунды.")
+    return redirect("domain-detail", domain_id=result.domain_id)
 
 
 @member_required

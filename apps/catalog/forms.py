@@ -12,6 +12,7 @@ from django import forms
 
 from apps.catalog.models import (
     COMMENT_MAX_LENGTH,
+    DOMAIN_NAME_MAX_LENGTH,
     GROUP_NAME_MAX_LENGTH,
     RECORD_TYPE_CHOICES,
 )
@@ -46,6 +47,27 @@ class DomainFilterForm(forms.Form):
 
     def group_id(self) -> int | None:
         return self.cleaned_data.get("group") if self.is_valid() else None
+
+
+class DomainCreateForm(forms.Form):
+    """Добавление домена — ТЗ 10.1.
+
+    Имя здесь не нормализуется: приведение к нижнему регистру, отбрасывание конечной точки и
+    перевод в punycode — доменные правила, и живут они в сервисе. Форма проверяет только длину.
+    """
+
+    name = forms.CharField(max_length=DOMAIN_NAME_MAX_LENGTH)
+    group = forms.IntegerField(required=False, min_value=1)
+    comment = forms.CharField(required=False, max_length=COMMENT_MAX_LENGTH)
+
+    def domain_name(self) -> str:
+        return str(self.cleaned_data.get("name") or "")
+
+    def group_id(self) -> int | None:
+        return self.cleaned_data.get("group")
+
+    def comment_text(self) -> str:
+        return str(self.cleaned_data.get("comment") or "")
 
 
 class DomainEditForm(forms.Form):

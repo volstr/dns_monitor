@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% comment %}
+Добавление домена — ТЗ 10.1, решение Q-E2.
+
+В прототипе это модальное окно, открываемое скриптом. Здесь отдельная страница: клиентский код
+разрешён в трёх местах, и это не одно из них, а на адрес страницы можно сослаться.
+
+Разрешённые адреса тут не задаются — их правят на карточке домена, куда и ведёт сохранение.
+{% endcomment %}
+
+{% block title %}Новый домен — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="domains">
+  <div class="head">
+    <div>
+      <a class="back" href="{% url 'domain-list' %}">← Домены</a>
+      <h1>Добавить домен</h1>
+      <p>Первая проверка пройдёт сразу после добавления. Разрешённые адреса зададите на карточке.</p>
+    </div>
+  </div>
+
+  <div class="body" style="max-width:640px">
+    <div class="panel">
+      <form method="post" action="{% url 'domain-new' %}" style="padding:16px;display:flex;flex-direction:column;gap:14px">
+        {% csrf_token %}
+
+        <div class="field">
+          <label for="d-name">Имя домена</label>
+          <div class="hint">
+            Регистр и конечная точка неважны. Имя не на латинице будет записано в punycode —
+            например, <code>пример.рф</code> станет <code>xn--e1afmkfd.xn--p1ai</code>.
+          </div>
+          <input class="inp mono" id="d-name" name="name" placeholder="pay-gw.contoso.ru" required autofocus>
+        </div>
+
+        <div class="field">
+          <label for="d-group">Группа</label>
+          <div class="hint">От неё домен берёт период проверки и режим уведомлений (раздел 5).</div>
+          <select class="inp" id="d-group" name="group" style="max-width:320px">
+            <option value="">Без группы — всё из общих настроек</option>
+            {% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <div class="field" style="margin-bottom:0">
+          <label for="d-comment">Комментарий</label>
+          <div class="hint">Уходит в текст уведомления — дежурный увидит его раньше, чем откроет интерфейс.</div>
+          <textarea class="inp" id="d-comment" name="comment" rows="3" style="font-family:inherit;font-size:13px"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-solid" type="submit">Добавить</button>
+          <a class="btn" href="{% url 'domain-list' %}">Отмена</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

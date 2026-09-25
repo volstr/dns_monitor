@@ -7,6 +7,7 @@ from django.urls import URLPattern, path
 from apps.catalog.views import (
     allowlist_check,
     domain_check_now,
+    domain_create,
     domain_detail,
     domain_list,
     domain_save,
@@ -25,6 +26,7 @@ from apps.catalog.views import (
 urlpatterns: list[URLPattern] = [
     path("", overview_screen, name="overview"),
     path("domains/", domain_list, name="domain-list"),
+    path("domains/new/", domain_create, name="domain-new"),
     # Адрес из 8.4: ссылка в уведомлении ведёт сюда же.
     path("domains/<int:domain_id>/", domain_detail, name="domain-detail"),
     path("domains/<int:domain_id>/save/", domain_save, name="domain-save"),
