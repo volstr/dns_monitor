@@ -18,6 +18,14 @@
 HTMX нужен валидации белого списка (10.2) и выбору группы (10.4).
 {% endcomment %}
 <script src="{% static 'js/htmx.min.js' %}" defer></script>
+{% comment %}
+Три места клиентского кода и только они (CLAUDE.md): линейка подсети (11.4), график следа
+реестра (9.2) и поле выбора группы с поиском (10.4). Каждый файл — надстройка: без него
+страница остаётся читаемой и рабочей.
+{% endcomment %}
+<script src="{% static 'js/ruler.js' %}" defer></script>
+<script src="{% static 'js/trace.js' %}" defer></script>
+<script src="{% static 'js/combo.js' %}" defer></script>
 </head>
 <body>
 

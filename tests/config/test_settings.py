@@ -78,11 +78,11 @@ def test_dev_adds_localhost_to_allowed_hosts() -> None:
 
 
 @pytest.mark.parametrize(
-    ("base_url", "secure"),
+    ("app_base_url", "secure"),
     [("https://dns-monitoring.example.com", True), ("http://dns-monitoring.example.com", False)],
 )
-def test_prod_secure_cookies_follow_scheme(base_url: str, secure: bool) -> None:
-    env = PROD_ENV | {"APP_BASE_URL": base_url}
+def test_prod_secure_cookies_follow_scheme(app_base_url: str, secure: bool) -> None:
+    env = PROD_ENV | {"APP_BASE_URL": app_base_url}
 
     values = settings_of(
         "config.settings.prod", env, "SESSION_COOKIE_SECURE", "CSRF_COOKIE_SECURE"

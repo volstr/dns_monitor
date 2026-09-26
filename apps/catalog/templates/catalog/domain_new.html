@@ -41,7 +41,7 @@
         <div class="field">
           <label for="d-group">Группа</label>
           <div class="hint">От неё домен берёт период проверки и режим уведомлений (раздел 5).</div>
-          <select class="inp" id="d-group" name="group" style="max-width:320px">
+          <select class="inp" id="d-group" name="group" style="max-width:320px" data-combo>
             <option value="">Без группы — всё из общих настроек</option>
             {% for group in groups %}<option value="{{ group.id }}">{{ group.name }}</option>{% endfor %}
           </select>

@@ -58,7 +58,20 @@
       </div>
       <div style="padding:18px 16px 16px">
         {% for entry in card.allowlist %}
-          <div class="ruler">
+          {% comment %}
+          Номер приводится к строке до сложения: фильтр `add` пробует сложить числа, на
+          «ruler-» спотыкается и при неудаче возвращает пустую строку. Пустой id — виджет
+          молча не находит данные.
+          {% endcomment %}
+          {% with counter=forloop.counter|stringformat:"s" %}
+          {% with ruler_id="ruler-"|add:counter %}
+          <div class="ruler" {% if entry.ruler %}data-ruler="{{ ruler_id }}"{% endif %}>
+            {% comment %}
+            Данные линейки уходят рядом с элементом в JSON — так того требует CLAUDE.md.
+            Позиции уже посчитаны сервером: адрес IPv6 в число JavaScript не помещается.
+            Без ruler.js остаётся список адресов ниже, и он остаётся правдой.
+            {% endcomment %}
+            {% if entry.ruler %}{{ entry.ruler|json_script:ruler_id }}{% endif %}
             <div class="ruler-h" style="margin-bottom:12px">
               <code>{{ entry.raw }}</code>
               {% if entry.range_text %}<span class="cap">{{ entry.range_text }}</span>{% endif %}
@@ -72,6 +85,14 @@
                 {% endif %}
               </span>
             </div>
+            {% if entry.ruler %}<div class="track"></div>{% endif %}
+            {% if entry.ruler %}
+              <div class="scale">
+                <span>{{ entry.ruler.first }}</span>
+                <span>{{ entry.ruler.middle }}</span>
+                <span>{{ entry.ruler.last }}</span>
+              </div>
+            {% endif %}
             <div class="ruler-list">
               {% for address in entry.inside %}
                 <span class="chip">{{ address }}</span>
@@ -80,6 +101,8 @@
               {% endfor %}
             </div>
           </div>
+          {% endwith %}
+          {% endwith %}
         {% empty %}
           <p class="sub">Разрешённые адреса не заданы — вхождение не с чем сравнивать, проверяется только изменение набора.</p>
         {% endfor %}
@@ -118,10 +141,24 @@
           вместе с виджетами: по 9.2 число корзин считается от ширины элемента, и это
           клиентский код.
         </div>
-        <div class="tw">
+        {% comment %}
+        Данные графика уходят рядом с элементом в JSON (CLAUDE.md). Сколько отметок поместится
+        и сколько суток приходится на одну, решает сам виджет: по 9.2 число корзин определяется
+        шириной элемента. Без trace.js колонка следа остаётся пустой, а всё остальное в реестре
+        читается по-прежнему.
+        {% endcomment %}
+        {{ card.trace|json_script:"trace-data" }}
+        <div data-trace="trace-data" data-trace-scale="all">
+          <div style="padding:0 16px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="eyebrow" style="margin-right:2px">Масштаб</span>
+            <div class="seg" data-trace-scales></div>
+            <span data-trace-caption style="font-size:12px;color:var(--ink-faint)"></span>
+          </div>
+          <div class="tw">
           <div class="reg" style="min-width:860px">
             <div class="reg-scale">
               <div class="th">Адрес</div>
+              <div class="axis" data-trace-axis><span class="l"></span><span class="c"></span><span class="r"></span></div>
               <div class="th">Первый раз</div>
               <div class="th">Последний</div>
               <div class="th">Статус</div>
@@ -132,6 +169,7 @@
                   <span class="chip {{ line.chip_css }}">{{ line.address }}</span>
                   <span class="match">{{ line.match_text }}</span>
                 </div>
+                <div class="trace" data-trace-row="{{ line.address }}"></div>
                 <div class="when" data-l="Первый раз">{{ line.first_seen_at|date:"d.m H:i" }}</div>
                 <div class="when" data-l="Последний">{{ line.last_seen_at|date:"d.m H:i" }}</div>
                 <div class="act">
@@ -146,6 +184,13 @@
             {% empty %}
               <div class="reg-row"><div class="addr"><span class="sub">Домен пока не отдавал ни одного адреса</span></div></div>
             {% endfor %}
+          </div>
+          </div>
+          <div class="reg-legend">
+            <span><i class="a"></i> отдавался в этот день, адрес решён</span>
+            <span><i class="d"></i> отдавался, но не решён</span>
+            <span><i class="s"></i> отдавался, сейчас уже не отдаётся</span>
+            <span><i class="o"></i> в этот день не отдавался</span>
           </div>
         </div>
       </div>

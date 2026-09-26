@@ -33,10 +33,12 @@ from apps.catalog.selectors.settings import EffectiveSettings, settings_of_group
 from apps.monitoring.models import Event, EventType
 from apps.monitoring.selectors.addresses import address_statuses
 from apps.monitoring.selectors.journal import CHANGE_TYPES, FAILURE_TYPES
+from apps.monitoring.selectors.trace import trace_of_domain
 from core.text import humanize_duration, plural
 from core.types.checking import AddressStatus, AddressStatusView
 from core.types.dns import IPNetwork
 from core.types.settings import SettingOrigin
+from core.types.widgets import RulerData, RulerMark, TraceData
 
 #: Q-13.5: запись, под которую столько не приходило ни одного адреса, подсвечивается. Константа,
 #: а не настройка: в 4.1 такого параметра нет, а в общих настройках уже шестнадцать полей.
@@ -135,6 +137,9 @@ class AllowlistLine:
     #: Q-13.5: сколько дней под запись не приходило ни одного адреса. `None` — приходило недавно
     #: либо не приходило никогда, и тогда говорить о «устаревании» нечего.
     stale_days: int | None
+    #: Данные линейки подсети (11.4) для виджета. `None` у записи без маски: шкалу рисовать не
+    #: из чего, совпадение там проверяется точным сравнением.
+    ruler: RulerData | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +180,8 @@ class DomainCard:
     events: tuple[EventLine, ...]
     registry_filter: RegistryFilter
     history_filter: HistoryFilter
+    #: Данные графика следа (9.2) для виджета. Уходят в шаблон одним JSON рядом с элементом.
+    trace: TraceData
 
 
 def domain_card(
@@ -224,6 +231,11 @@ def domain_card(
         events=_events(domain, history),
         registry_filter=registry,
         history_filter=history,
+        trace=trace_of_domain(
+            domain_id=domain.pk,
+            at=at,
+            statuses={str(view.address): str(view.status) for view in statuses},
+        ),
     )
 
 
@@ -340,6 +352,34 @@ def _allowlist_line(
         range_text=_range_text(entry) if is_network else "",
         inside=tuple(str(view.address) for view in inside),
         stale_days=_stale_days(last_seen, at),
+        ruler=_ruler(entry, inside) if is_network else None,
+    )
+
+
+def _ruler(entry: AllowlistEntry, inside: tuple[AddressStatusView, ...]) -> RulerData:
+    """Данные линейки подсети — ТЗ 11.4.
+
+    Позиции считаются здесь, а не в браузере: адрес IPv6 — это 128 бит, и в числе JavaScript он
+    не помещается. Доля диапазона вычисляется целочисленно и уходит готовой.
+    """
+    network = _network_of(entry)
+    start = int(network.network_address)
+    span = network.num_addresses - 1
+
+    return RulerData(
+        entry=entry.raw,
+        first=str(network[0]),
+        middle=str(network[span // 2]),
+        last=str(network[-1]),
+        size=network.num_addresses,
+        marks=[
+            RulerMark(
+                address=str(view.address),
+                position=(int(view.address) - start) / span if span else 0.0,
+                status=str(view.status),
+            )
+            for view in inside
+        ],
     )
 
 

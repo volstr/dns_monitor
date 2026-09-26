@@ -20,6 +20,9 @@ dev = [
     "pytest-django>=4.9,<5",
     "django-stubs[compatible-mypy]>=5.2,<5.3",
     "ruff>=0.8,<1",
+    # Этап 7: проверка отрисованной страницы. Ставится из PyPI и браузеры тянет сам — Node для
+    # этого не нужен, и запрет на него не нарушается.
+    "pytest-playwright>=0.5,<1",
 ]
 
 [tool.uv]
@@ -59,3 +62,8 @@ django_settings_module = "config.settings.test"
 # --ds, а не DJANGO_SETTINGS_MODULE: переменная из .env иначе перебила бы тестовые настройки.
 addopts = "--ds=config.settings.test --strict-markers"
 testpaths = ["tests"]
+markers = [
+    # Этап 7: проверки отрисованной страницы. Требуют браузера, поэтому помечены отдельно —
+    # их можно исключить командой `-m "not e2e"`, когда браузера нет.
+    "e2e: проверка отрисованной страницы через браузер",
+]

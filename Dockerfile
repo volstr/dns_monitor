@@ -18,7 +18,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/app/venv \
     UV_PYTHON_DOWNLOADS=never \
     UV_NO_CACHE=1 \
-    PATH=/opt/app/venv/bin:$PATH
+    PATH=/opt/app/venv/bin:$PATH \
+    # Браузер для проверок отрисованной страницы (этап 7) кладётся в общий каталог, а не в
+    # домашний: качает его root на сборке, пользуется им app в рантайме.
+    PLAYWRIGHT_BROWSERS_PATH=/opt/app/browsers
 
 COPY --from=uv /uv /usr/local/bin/uv
 
@@ -35,6 +38,18 @@ WORKDIR /app
 
 COPY --chown=app:app pyproject.toml uv.lock ./
 RUN if [ "${DEPS}" = "dev" ]; then uv sync --frozen; else uv sync --frozen --no-dev; fi
+
+# Браузер для Playwright — только в образе разработчика. Ставится на сборке под root: системные
+# библиотеки Chromium иначе не положить, а требование «entrypoint не требует root» относится к
+# рантайму, и оно не нарушается. В рабочем образе ни браузера, ни его зависимостей нет.
+USER root
+RUN if [ "${DEPS}" = "dev" ]; then \
+      install -d -o app -g app "${PLAYWRIGHT_BROWSERS_PATH}" \
+   && /opt/app/venv/bin/python -m playwright install --with-deps chromium \
+   && chown -R app:app "${PLAYWRIGHT_BROWSERS_PATH}" \
+   && rm -rf /var/lib/apt/lists/*; \
+    fi
+USER app
 
 COPY --chown=app:app . .
 

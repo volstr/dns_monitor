@@ -50,7 +50,8 @@
       </div>
 
       <div style="min-width:210px">
-        <select class="inp" name="group" aria-label="Группа">
+        {# data-combo включает поле с поиском (10.4). Без combo.js остаётся обычный список. #}
+        <select class="inp" name="group" aria-label="Группа" data-combo>
           <option value="">Все группы</option>
           {% for group in page.groups %}
             <option value="{{ group.id }}" {% if group.id == page.group_id %}selected{% endif %}>
