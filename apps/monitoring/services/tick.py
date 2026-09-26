@@ -34,6 +34,7 @@ from apps.monitoring.services.scheduling import (
     reschedule_after_check,
 )
 from apps.notifications.services.dispatch import dispatch_event
+from core.observability.logs import current_run, new_run
 from core.observability.report import Failure, report
 from core.ports.resolver import Resolver
 from core.ports.state_store import StateStore, scheduler_lock
@@ -63,6 +64,10 @@ def tick(
     concurrency: int,
     limit: int | None = None,
 ) -> TickReport:
+    # Обход получает идентификатор до первой записи в журнал: по нему потом собираются все
+    # строки и все ошибки одного цикла проверок (11.14, «контекст события»).
+    new_run()
+
     claimed = claim_due_domains(at=at, limit=limit or concurrency * CLAIM_FACTOR)
     if not claimed:
         return TickReport(claimed=0, checked=0, skipped=0, failed=0)
@@ -104,6 +109,7 @@ def report_failures(failures: list[BaseException]) -> None:
                 cause=f"check:{cause}",
                 message=f"проверка домена упала: {cause}",
                 affected=len(errors),
+                tags={"run": current_run()},
                 error=errors[0],
             )
         )

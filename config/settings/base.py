@@ -98,15 +98,28 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Структурные логи — этап 8.
+# Структурные логи. `json` — боевой формат: три процесса пишут в общий поток, и разбирать их
+# приходится по полям. `plain` остаётся для режима разработчика, где журнал читают глазами.
+LOG_FORMAT = "json"
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        # Идентификатор обхода — контекст события по 11.14: «чтобы все ошибки одного цикла
+        # проверок нашлись вместе».
+        "run": {"()": "core.observability.logs.RunIdFilter"},
+    },
     "formatters": {
         "plain": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+        "json": {"()": "core.observability.logs.JsonFormatter"},
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": LOG_FORMAT,
+            "filters": ["run"],
+        },
     },
     "root": {"handlers": ["console"], "level": "INFO"},
 }

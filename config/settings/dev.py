@@ -1,7 +1,10 @@
 """Режим разработчика: ``docker-compose-dev.yml``."""
 
 from .base import *  # noqa: F403
-from .base import APP_HOST
+from .base import APP_HOST, LOGGING
 
 DEBUG = True
 ALLOWED_HOSTS = [APP_HOST, "localhost", "127.0.0.1"]
+
+# Журнал разработчик читает глазами в терминале, а не собирает по полям.
+LOGGING["handlers"]["console"]["formatter"] = "plain"
