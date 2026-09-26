@@ -6,11 +6,13 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 
 from apps.catalog.models import Domain, Group
+from apps.monitoring.models import AddressObservationBucket, AddressRegistryEntry, BucketSize
 from tests.e2e.conftest import EMAIL, PASSWORD
 
 pytestmark = pytest.mark.e2e
@@ -157,6 +159,39 @@ def test_10_4_combo_writes_into_the_select_that_is_submitted(
     page.locator(".combo-opt", has_text="Платёжный контур").first.click()
 
     assert page.locator("select[name=group]").input_value() == str(group.pk)
+
+
+def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> None:
+    """Q-D25: адрес без белого списка не красится цветом решённого.
+
+    Проверяется вычисленный цвет, а не класс: подмена класса на зелёный прошла бы мимо обычных
+    тестов — ровно так эта ошибка и возникла.
+    """
+    domain = Domain.objects.create(
+        name="github.com",
+        last_successful_check_at=datetime(2026, 9, 26, 14, 38, tzinfo=UTC),
+        next_check_at=None,
+    )
+    AddressRegistryEntry.objects.create(
+        domain=domain,
+        address="140.82.121.3",
+        first_seen_at=datetime(2026, 9, 26, 14, 38, tzinfo=UTC),
+        last_seen_at=datetime(2026, 9, 26, 14, 38, tzinfo=UTC),
+    )
+    AddressObservationBucket.objects.create(
+        domain=domain,
+        address="140.82.121.3",
+        bucket_size=BucketSize.DAY.value,
+        bucket_start=datetime(2026, 9, 26, tzinfo=UTC),
+    )
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{domain.pk}/")
+
+    mark = page.locator("[data-trace-row] i.n").first
+    assert mark.count() > 0
+    # Зелёный из палитры прототипа — --ok, то есть #2E7D5B.
+    assert mark.evaluate("node => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
+    assert page.locator("[data-trace-row] i.a").count() == 0
 
 
 def test_page_works_with_javascript_disabled(

@@ -88,10 +88,11 @@ class HistoryFilter(StrEnum):
     RESOLVE_ERRORS = "resolve_errors"
 
 
-#: Какие статусы показывает сегмент. `NOT_CHECKED` идёт вместе с решёнными: у домена без списка
-#: вхождение не вычисляется, и «нерешённым» такой адрес не является (Q-D25).
+#: Какие статусы показывает сегмент. `NOT_CHECKED` не попадает ни в один: он не «решён» и не
+#: «не решён», потому что вхождение не вычислялось вовсе (Q-D25). Класть его к решённым значило
+#: бы утверждать, что адрес прошёл проверку, которой не было. Такие адреса видны в «Все».
 REGISTRY_STATUSES = {
-    RegistryFilter.MATCHED: (AddressStatus.MATCHED, AddressStatus.NOT_CHECKED),
+    RegistryFilter.MATCHED: (AddressStatus.MATCHED,),
     RegistryFilter.UNMATCHED: (AddressStatus.UNMATCHED,),
     RegistryFilter.STALE: (AddressStatus.STALE,),
 }

@@ -16,7 +16,9 @@
       трёх местах, и это не одно из них.
    5. Селекторы сегментов покрывают и `button`, и `a`: кнопка отправляет форму (фильтры списка
       доменов), ссылка задаёт состояние экрана, на которое можно сослаться (фильтры реестра и
-      истории на карточке). */
+      истории на карточке).
+   6. Добавлена отметка следа `.trace i.n` — «не проверяется» (Q-D25). В прототипе такого
+      состояния не было. */
 
 @font-face{font-family:"IBM Plex Sans";font-weight:400;font-style:normal;font-display:swap;
   src:local("IBM Plex Sans"),url("../fonts/ibm-plex-sans-400.woff2") format("woff2")}
@@ -194,6 +196,11 @@ a{color:inherit}
 .trace i.a{background:var(--ok)}
 .trace i.d{background:var(--breach)}
 .trace i.s{background:#AEB9C4}
+/* Правка переноса: отметка «не проверяется» (Q-D25). В прототипе такого состояния не
+   было — оно появилось вместе с решением про пустой белый список. Контур вместо заливки:
+   адрес отдавался, но сравнивать его было не с чем, и красить его цветом решённого
+   значило бы врать. */
+.trace i.n{background:transparent;box-shadow:inset 0 0 0 1px var(--ink-faint)}
 .state.stale{color:var(--ink-faint)}
 .age{font-size:11.5px;color:var(--ink-faint)}
 .age.hot{color:var(--breach)}
