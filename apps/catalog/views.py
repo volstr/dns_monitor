@@ -31,7 +31,12 @@ from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import DomainFilter, domain_list_page
 from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
-from apps.catalog.services.allowlist import ParsedAllowlist, parse_allowlist
+from apps.catalog.services.allowlist import (
+    ParsedAllowlist,
+    parse_allowlist,
+    suggested_line,
+    with_suggestion,
+)
 from apps.catalog.services.domains import (
     DomainNotCreated,
     DomainNotSaved,
@@ -148,7 +153,29 @@ def domain_detail(request: HttpRequest, domain_id: int) -> HttpResponse:
     if card is None:
         raise Http404
 
-    return render(request, "catalog/domain_card.html", {"card": card, "screen": "domains"})
+    return render(
+        request,
+        "catalog/domain_card.html",
+        {"card": card, "screen": "domains", "draft": _suggested_draft(form, card)},
+    )
+
+
+def _suggested_draft(form: DomainCardForm, card: object) -> dict[str, str] | None:
+    """Q-C15: кнопка дописывает строку в поле и **не сохраняет**.
+
+    Дальше идёт обычный путь: построчная проверка и «Сохранить». Так человек видит, что именно
+    добавится, и может поправить — особенно длину префикса у подсети, которую ТЗ не задаёт.
+    """
+    suggestion = form.suggestion_for()
+    if suggestion is None:
+        return None
+
+    address, as_network = suggestion
+    line = suggested_line(address, as_network=as_network)
+    return {
+        "allowlist": with_suggestion(card.allowlist_text, line),  # type: ignore[attr-defined]
+        "comment": card.comment,  # type: ignore[attr-defined]
+    }
 
 
 @admin_required

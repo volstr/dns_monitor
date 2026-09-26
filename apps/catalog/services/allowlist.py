@@ -23,6 +23,7 @@ from core.types.dns import IPNetwork, RecordType
 #: Длина колонки `raw` (Q-13.3). Самая длинная осмысленная запись — IPv6 с маской.
 MAX_ENTRY_LENGTH = 49
 
+IPV4_VERSION = 4
 IPV4_OCTETS = 4
 IPV4_MAX_OCTET = 255
 IPV4_MAX_PREFIX = 32
@@ -92,6 +93,36 @@ def parse_allowlist(text: str, record_types: tuple[str, ...] = ()) -> ParsedAllo
         parsed.append(_parse_line(number, stripped))
 
     return ParsedAllowlist(lines=tuple(_warned(parsed, record_types)))
+
+
+#: Что предлагает кнопка «Добавить подсеть» (Q-C15). ТЗ длину префикса не называет; эти —
+#: обычная граница выдачи у провайдера и стандартный размер сети IPv6. Значение подставляется
+#: в поле, а не сохраняется: человек правит его до нажатия «Сохранить».
+SUGGESTED_IPV4_PREFIX = 24
+SUGGESTED_IPV6_PREFIX = 64
+
+
+def suggested_line(address: str, *, as_network: bool) -> str:
+    """Строка, которую кнопка дописывает в поле белого списка — Q-C15.
+
+    «Разрешить адрес» даёт сам адрес: по 6.3 запись без маски сравнивается точно, и это ровно
+    то, о чём просят. «Добавить подсеть» даёт **содержащую** его сеть, а не адрес с пустым
+    префиксом: подставить `185.44.9.201/24` было бы ошибкой ввода, которую тут же пришлось бы
+    исправлять нормализацией.
+    """
+    parsed = ipaddress.ip_address(address)
+    if not as_network:
+        return str(parsed)
+    prefix = SUGGESTED_IPV4_PREFIX if parsed.version == IPV4_VERSION else SUGGESTED_IPV6_PREFIX
+    return str(ipaddress.ip_network(f"{parsed}/{prefix}", strict=False))
+
+
+def with_suggestion(current: str, suggestion: str) -> str:
+    """Дописать строку, если её там ещё нет. Повторное нажатие не должно плодить дубликаты."""
+    lines = [line.strip() for line in current.splitlines() if line.strip()]
+    if suggestion in lines:
+        return current
+    return "\n".join([*lines, suggestion])
 
 
 def _parse_line(number: int, text: str) -> ParsedLine:

@@ -135,6 +135,17 @@
               <span class="chip out" style="font-size:13px;padding:4px 8px"><span class="glyph">✕</span>{{ line.address }}</span>
               <div class="txt">{{ line.age_text|capfirst }}. Не совпадает ни с одним разрешённым адресом и не входит ни в одну подсеть.</div>
             </div>
+            {% if is_admin %}
+              {% comment %}
+              Q-C15: кнопки дописывают строку в поле списка и ничего не сохраняют. Это ссылки,
+              а не кнопки со скриптом: клиентский код разрешён в трёх местах, и это не одно из
+              них. Дальше идёт обычный путь — построчная проверка и «Сохранить».
+              {% endcomment %}
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <a class="btn btn-sm" href="?allow={{ line.address|urlencode }}#d-sub">Разрешить адрес</a>
+                <a class="btn btn-sm" href="?allow_net={{ line.address|urlencode }}#d-sub">Добавить подсеть</a>
+              </div>
+            {% endif %}
           </div>
         {% endfor %}
       </div>
@@ -301,6 +312,12 @@
                 месте, дублировать его в JS запрещено (`CLAUDE.md`, 10.2). Без htmx.min.js
                 замечания приходят при сохранении — оно всё равно блокируется ошибочной строкой.
                 {% endcomment %}
+                {% if draft %}
+                  <div class="line-warn">
+                    <span class="ln">добавлено</span>
+                    <span>Строка дописана в поле, но ещё не сохранена. Проверьте её и нажмите «Сохранить».</span>
+                  </div>
+                {% endif %}
                 <textarea class="inp" id="d-sub" name="allowlist" rows="5"
                           hx-post="{% url 'allowlist-check' card.id %}"
                           hx-trigger="keyup changed delay:250ms"

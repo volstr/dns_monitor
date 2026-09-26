@@ -80,12 +80,28 @@ class DomainCardForm(forms.Form):
 
     registry = forms.CharField(required=False)
     history = forms.CharField(required=False)
+    #: Q-C15: кнопки «Разрешить адрес» и «Добавить подсеть» дописывают строку в поле списка.
+    #: Адрес приходит в адресе страницы, чтобы кнопка была ссылкой и работала без скриптов.
+    allow = forms.GenericIPAddressField(required=False)
+    allow_net = forms.GenericIPAddressField(required=False)
 
     def registry_filter(self) -> RegistryFilter:
         return self._enum(RegistryFilter, "registry", RegistryFilter.ALL)
 
     def history_filter(self) -> HistoryFilter:
         return self._enum(HistoryFilter, "history", HistoryFilter.ALL)
+
+    def suggestion_for(self) -> tuple[str, bool] | None:
+        """Какой адрес предложить в поле списка и подсетью ли. ``None`` — кнопку не нажимали."""
+        if not self.is_valid():
+            return None
+        address = str(self.cleaned_data.get("allow") or "")
+        if address:
+            return address, False
+        network = str(self.cleaned_data.get("allow_net") or "")
+        if network:
+            return network, True
+        return None
 
     def _enum[T: StrEnum](self, kind: type[T], field: str, default: T) -> T:
         if not self.is_valid():
