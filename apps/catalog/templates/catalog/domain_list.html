@@ -19,6 +19,7 @@
     </div>
     {% if is_admin %}
       <div class="actions">
+        <a class="btn" href="{% url 'domain-import' %}">Импорт списком</a>
         <a class="btn btn-mark" href="{% url 'domain-new' %}">Добавить домен</a>
       </div>
     {% endif %}

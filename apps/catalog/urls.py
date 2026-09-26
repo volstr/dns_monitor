@@ -10,7 +10,11 @@ from apps.catalog.views import (
     domain_create,
     domain_delete,
     domain_detail,
+    domain_import,
+    domain_import_apply,
     domain_list,
+    domain_move,
+    domain_move_apply,
     domain_save,
     domain_watch,
     global_settings,
@@ -29,11 +33,17 @@ urlpatterns: list[URLPattern] = [
     path("", overview_screen, name="overview"),
     path("domains/", domain_list, name="domain-list"),
     path("domains/new/", domain_create, name="domain-new"),
+    # Импорт списком (10.3): разбор и подтверждение — два разных адреса, два разных шага.
+    path("domains/import/", domain_import, name="domain-import"),
+    path("domains/import/apply/", domain_import_apply, name="domain-import-apply"),
     # Адрес из 8.4: ссылка в уведомлении ведёт сюда же.
     path("domains/<int:domain_id>/", domain_detail, name="domain-detail"),
     path("domains/<int:domain_id>/save/", domain_save, name="domain-save"),
     path("domains/<int:domain_id>/watch/", domain_watch, name="domain-watch"),
     path("domains/<int:domain_id>/delete/", domain_delete, name="domain-delete"),
+    # Перенос в другую группу (10.4): сначала сводка изменений, потом подтверждение.
+    path("domains/<int:domain_id>/move/", domain_move, name="domain-move"),
+    path("domains/<int:domain_id>/move/apply/", domain_move_apply, name="domain-move-apply"),
     path("domains/<int:domain_id>/check/", domain_check_now, name="domain-check"),
     # Построчная проверка списка через HTMX (10.2).
     path("domains/<int:domain_id>/allowlist/", allowlist_check, name="allowlist-check"),

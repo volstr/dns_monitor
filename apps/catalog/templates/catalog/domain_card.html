@@ -290,6 +290,19 @@
                 </span>
               </div>
             {% endfor %}
+            {% if is_admin %}
+              {% comment %}
+              10.4: перенос молча меняет расписание и режим уведомлений, поэтому кнопка ведёт
+              не к действию, а к сводке «что изменится». Место — из макета: рядом с блоком
+              «Взято из группы», то есть ровно там, где видно, что именно от группы приходит.
+              {% endcomment %}
+              <div style="margin-top:10px;display:flex;gap:7px;flex-wrap:wrap">
+                {% if card.group_id %}
+                  <a class="btn btn-sm" href="{% url 'group-edit' card.group_id %}">Настроить группу</a>
+                {% endif %}
+                <a class="btn btn-sm" href="{% url 'domain-move' card.id %}">Перенести в другую группу</a>
+              </div>
+            {% endif %}
           </div>
 
           {% if is_admin %}

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% comment %}
+Импорт списком — ТЗ 10.3, критерии 25, 26, 27.
+
+В прототипе это модальное окно с двумя шагами, которые переключает скрипт. Здесь два шага —
+две отправки формы на два адреса: клиентский код разрешён в трёх местах, и это не одно из них.
+Шаг виден по тому, пришёл разбор или нет.
+
+Флажок «Пропустить строки с ошибками» из макета не перенесён: ошибочную строку импортировать
+нечем, и флажок, который ничего не меняет, хуже его отсутствия. Расхождение — в Q-D29.
+{% endcomment %}
+
+{% block title %}Импорт списком — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="domains">
+  <div class="head">
+    <div>
+      <a class="back" href="{% url 'domain-list' %}">← Домены</a>
+      <h1>Импорт списком</h1>
+      <p>Сначала разбор, потом подтверждение: вслепую ничего не добавляется.</p>
+    </div>
+  </div>
+
+  <div class="body" style="max-width:660px">
+    <div class="panel">
+      {% if not preview %}
+      <form method="post" action="{% url 'domain-import' %}" enctype="multipart/form-data"
+            style="padding:16px;display:flex;flex-direction:column;gap:14px">
+        {% csrf_token %}
+
+        <div class="field">
+          <label for="imp-src">Вставьте список</label>
+          <div class="hint">
+            По домену в строке. Через точку с запятой можно дописать разрешённые адреса и
+            подсети через пробел, а затем комментарий — оба поля необязательны.
+            <br>Например: <code>api-v2.contoso.ru; 10.20.0.0/22 10.20.3.7; боевой API</code>
+          </div>
+          <textarea class="inp mono" id="imp-src" name="text" rows="7"
+                    placeholder="api-v2.contoso.ru; 10.20.0.0/22; боевой API">{% if draft %}{{ draft.text }}{% endif %}</textarea>
+          <div class="drop">
+            <span style="font-size:15px">⤓</span>
+            <span>Или выберите файл <code style="font-size:11.5px">.txt</code>, <code style="font-size:11.5px">.csv</code></span>
+            <input type="file" name="source" accept=".txt,.csv,text/plain,text/csv"
+                   style="margin-left:auto;font-size:12px">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="imp-group">Группа для всех строк</label>
+          <div class="hint">Домен возьмёт у неё период проверки и режим уведомлений.</div>
+          <select class="inp" id="imp-group" name="group" style="max-width:320px" data-combo data-combo-new="new_group">
+            <option value="">Без группы — всё из общих настроек</option>
+            {% for group in groups %}
+            <option value="{{ group.id }}" {% if draft and draft.group == group.id|stringformat:"s" %}selected{% endif %}>{{ group.name }} · {{ group.domain_count }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="new_group" value="">
+        </div>
+
+        <div class="field" style="margin-bottom:0">
+          <label class="tgl">
+            <input type="checkbox" name="check_now" value="yes" {% if check_now %}checked{% endif %}>
+            Проверить домены сразу после импорта
+          </label>
+          <div class="hint" style="margin:6px 0 0">
+            Первый ответ DNS станет отправной точкой: с ним будут сравниваться все следующие.
+            Снимите флажок, если импортируете много доменов сразу — они разойдутся по времени.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-solid" type="submit">Разобрать список</button>
+          <a class="btn" href="{% url 'domain-list' %}">Отмена</a>
+        </div>
+      </form>
+
+      {% else %}
+      <form method="post" action="{% url 'domain-import-apply' %}"
+            style="padding:16px;display:flex;flex-direction:column;gap:14px">
+        {% csrf_token %}
+        <input type="hidden" name="text" value="{{ source }}">
+        <input type="hidden" name="group" value="{{ draft.group }}">
+        <input type="hidden" name="new_group" value="{{ draft.new_group }}">
+        {% if check_now %}<input type="hidden" name="check_now" value="yes">{% endif %}
+
+        <div class="imp-sum">
+          <div><span class="eyebrow">Добавим</span><b style="color:var(--ok)">{{ preview.to_add }}</b></div>
+          <div><span class="eyebrow">Уже есть</span><b style="color:var(--ink-faint)">{{ preview.already_here }}</b></div>
+          <div><span class="eyebrow">С ошибкой</span><b style="color:var(--breach)">{{ preview.broken }}</b></div>
+        </div>
+
+        <div class="hint" style="margin:0">
+          Новые домены попадут в «{{ preview.group_name }}» и возьмут оттуда период проверки и
+          режим уведомлений.
+        </div>
+
+        <div class="imp-tbl">
+          <table>
+            <thead><tr><th>Строка</th><th>Разбор</th><th>Что будет</th></tr></thead>
+            <tbody>
+              {% for line in preview.lines %}
+              <tr {% if line.error %}class="bad"{% elif line.exists %}class="dup"{% endif %}>
+                <td class="d">{{ line.text }}</td>
+                <td>
+                  {% for entry in line.allowlist.entries %}<span class="chip">{{ entry.raw }}</span> {% endfor %}
+                  {% if not line.allowlist.entries %}<span style="color:var(--ink-faint)">без разрешённых адресов</span>{% endif %}
+                  {% if line.comment %}<div class="sub">{{ line.comment }}</div>{% endif %}
+                </td>
+                <td>
+                  {% if line.error %}
+                    <span class="state breach">Ошибка</span>
+                    <div class="sub">{{ line.error }}</div>
+                  {% elif line.exists %}
+                    <span class="state" style="color:var(--ink-faint)">Пропустим</span>
+                    <div class="sub">уже в «{{ line.exists_in }}»</div>
+                  {% elif line.warning %}
+                    <span class="state change">Добавим</span>
+                    <div class="sub">{{ line.warning }}</div>
+                  {% else %}
+                    <span class="state ok">Добавим</span>
+                  {% endif %}
+                  {% if line.converted_from %}
+                    <div class="sub">{{ line.converted_from }} → {{ line.name }}</div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="3">Пустой список — разбирать нечего.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <label class="tgl">
+          <input type="checkbox" name="update_existing" value="yes">
+          Обновить домены, которые уже есть
+        </label>
+        <div class="hint" style="margin:-8px 0 0">
+          Выключено намеренно: перезапись чужих настроек не должна происходить сама собой.
+          Включите — и у найденных доменов заменятся комментарий и разрешённые адреса из строки.
+          Группа при этом не меняется: для переноса есть отдельная сводка.
+        </div>
+
+        {% if preview.broken %}
+        <div class="hint" style="margin:0">
+          Строк с ошибками: {{ preview.broken }}. Они останутся в поле ввода — исправите и
+          повторите импорт.
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-solid" type="submit" {% if not preview.to_add and not preview.already_here %}disabled{% endif %}>
+            Добавить {{ preview.to_add }}
+          </button>
+          <a class="btn" href="{% url 'domain-import' %}">Назад</a>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

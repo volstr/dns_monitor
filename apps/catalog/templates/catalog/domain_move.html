@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% comment %}
+Перенос домена в другую группу — ТЗ 10.4, критерий 28.
+
+Сводка «что изменится» показывается **до** подтверждения. Выбор группы и показ сводки — форма
+методом GET на этот же адрес: она ничего не меняет, поэтому её можно открыть по ссылке и
+перезагрузить без последствий. Кнопка «Перенести» — отдельная форма методом POST, и только она
+что-то меняет.
+
+Строки сводки приходят готовыми из селектора: вычислений в шаблоне нет (CLAUDE.md).
+{% endcomment %}
+
+{% block title %}Перенести {{ page.domain_name }} — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="domains">
+  <div class="head">
+    <div>
+      <a class="back" href="{% url 'domain-detail' domain_id=page.domain_id %}">← {{ page.domain_name }}</a>
+      <h1>Перенести в другую группу</h1>
+      <p>Перенос меняет расписание и режим уведомлений — вот как именно.</p>
+    </div>
+  </div>
+
+  <div class="body" style="max-width:560px">
+    <div class="panel" style="padding:16px">
+      <div class="field" style="margin-bottom:0">
+        <label>Домен</label>
+        <div class="mono" style="font-size:13px;font-weight:500;margin-bottom:16px">
+          {{ page.domain_name }} · сейчас в «{{ page.current_group }}»
+        </div>
+
+        <form method="get" action="{% url 'domain-move' domain_id=page.domain_id %}">
+          <label for="mv-group">Новая группа</label>
+          <div class="hint">Начните печатать, чтобы найти нужную. В скобках — сколько в ней доменов.</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="inp" id="mv-group" name="group" style="max-width:320px"
+                    data-combo data-combo-new="new_group">
+              {% for option in page.options %}
+              <option value="{{ option.value }}" {% if option.selected %}selected{% endif %}>{{ option.name }} · {{ option.domain_count }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" name="new_group" value="{{ page.new_group_name }}">
+            <button class="btn btn-sm" type="submit">Показать, что изменится</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="diff-box">
+        <div class="dh"><span class="eyebrow">Что изменится после переноса</span></div>
+        {% for row in page.rows %}
+        <div class="diff-row">
+          <span class="k eyebrow">{{ row.label }}</span>
+          <span class="was mono">{{ row.was }}</span>
+          <span class="arr">▶</span>
+          <span class="now mono {% if row.changed %}warn{% endif %}">{{ row.becomes }}</span>
+        </div>
+        {% endfor %}
+        <div class="diff-keep">{{ page.keeps }}</div>
+      </div>
+
+      {% if page.incident_warning %}
+      <div class="err" style="margin:16px 0 0;border-color:#E8CFA0;background:#FBF2D8;color:#6B5310">
+        {{ page.incident_warning }}
+      </div>
+      {% endif %}
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <form method="post" action="{% url 'domain-move-apply' domain_id=page.domain_id %}">
+          {% csrf_token %}
+          <input type="hidden" name="group" value="{{ page.target_id|default_if_none:'' }}">
+          <input type="hidden" name="new_group" value="{{ page.new_group_name }}">
+          <button class="btn btn-solid" type="submit" {% if not page.is_move %}disabled{% endif %}>
+            Перенести в «{{ page.target_name }}»
+          </button>
+        </form>
+        <a class="btn" href="{% url 'domain-detail' domain_id=page.domain_id %}">Отмена</a>
+      </div>
+      {% if not page.is_move %}
+      <div class="hint" style="margin-top:9px">Домен уже в этой группе — выберите другую.</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

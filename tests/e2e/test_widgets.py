@@ -161,6 +161,48 @@ def test_10_4_combo_writes_into_the_select_that_is_submitted(
     assert page.locator("select[name=group]").input_value() == str(group.pk)
 
 
+def test_10_4_combo_offers_to_create_the_typed_group(signed_in: Any, live_server: Any) -> None:
+    """10.4: «при отсутствии совпадений предлагается создать группу с введённым названием».
+
+    Предложение появляется только когда не нашлось ничего: пока совпадения есть, человек выбирает
+    из них, и кнопка создания сбивала бы с толку.
+    """
+    Group.objects.create(name="Платёжный контур")
+    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{domain.pk}/move/")
+
+    page.locator(".combo-btn").first.click()
+    page.locator(".combo-pop input").first.fill("платёж")
+    assert not page.locator(".combo-foot button").first.is_visible()
+
+    page.locator(".combo-pop input").first.fill("Новая команда")
+    create = page.locator(".combo-foot button").first
+    assert "Создать группу «Новая команда»" in create.inner_text()
+
+    create.click()
+
+    # Имя уходит в скрытое поле, а список обнуляется: сервер не должен гадать между ними.
+    assert page.locator("form input[name=new_group]").first.input_value() == "Новая команда"
+    assert page.locator("select[name=group]").input_value() == ""
+
+
+def test_10_4_combo_does_not_create_the_group_by_itself(
+    signed_in: Any, live_server: Any
+) -> None:
+    """Группу создаёт сервис при подтверждении, а не виджет: брошенный экран не должен
+    оставлять за собой пустую группу."""
+    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{domain.pk}/move/")
+
+    page.locator(".combo-btn").first.click()
+    page.locator(".combo-pop input").first.fill("Новая команда")
+    page.locator(".combo-foot button").first.click()
+
+    assert not Group.objects.filter(name="Новая команда").exists()
+
+
 def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> None:
     """Q-D25: адрес без белого списка не красится цветом решённого.
 

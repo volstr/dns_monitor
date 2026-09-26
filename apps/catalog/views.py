@@ -24,13 +24,16 @@ from apps.catalog.forms import (
     DomainFilterForm,
     GlobalSettingsForm,
     GroupForm,
+    ImportForm,
     JournalFilterForm,
+    MoveForm,
 )
 from apps.catalog.models import Domain
 from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import DomainFilter, domain_list_page
 from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
+from apps.catalog.selectors.move import move_page
 from apps.catalog.services.allowlist import (
     ParsedAllowlist,
     parse_allowlist,
@@ -47,6 +50,8 @@ from apps.catalog.services.domains import (
     switch_watch,
 )
 from apps.catalog.services.groups import GroupNotSaved, save_group
+from apps.catalog.services.import_list import apply_import, preview_import
+from apps.catalog.services.move import MoveRefused, move_domain
 from apps.catalog.services.settings import SettingsNotSaved, save_global_settings
 from apps.monitoring.selectors.journal import ExportRefused, journal_export, journal_page
 from apps.monitoring.selectors.overview import overview
@@ -280,6 +285,122 @@ def domain_check_now(request: HttpRequest, domain_id: int) -> HttpResponse:
         messages.success(
             request, "Домен поставлен в очередь: проверка пройдёт в ближайшие секунды."
         )
+    return redirect("domain-detail", domain_id=domain_id)
+
+
+@admin_required
+def domain_import(request: HttpRequest) -> HttpResponse:
+    """Импорт списком, шаг разбора — ТЗ 10.3.
+
+    Два шага — требование 10.3 («импорт не выполняется вслепую»), и они разведены по двум
+    обработчикам: разбор ничего не меняет, применяет только второй.
+    """
+    if request.method != "POST":
+        return render(
+            request,
+            "catalog/domain_import.html",
+            {"groups": group_list_page().cards, "screen": "domains", "check_now": True},
+        )
+
+    form = ImportForm(request.POST, request.FILES)
+    preview = preview_import(
+        text=form.source_text(),
+        group_id=form.group_id(),
+        new_group_name=form.new_group_name(),
+    )
+    return render(
+        request,
+        "catalog/domain_import.html",
+        {
+            "preview": preview,
+            "screen": "domains",
+            "draft": request.POST,
+            "check_now": form.check_now_flag(),
+            "source": form.source_text(),
+        },
+    )
+
+
+@admin_required
+def domain_import_apply(request: HttpRequest) -> HttpResponse:
+    """Импорт списком, подтверждение — ТЗ 10.3, критерии 25, 26, 27."""
+    form = ImportForm(request.POST)
+    result = apply_import(
+        text=form.source_text(),
+        group_id=form.group_id(),
+        new_group_name=form.new_group_name(),
+        update_existing=form.update_existing_flag(),
+        check_now=form.check_now_flag(),
+        at=SystemClock().now(),
+    )
+
+    if result.added:
+        messages.success(
+            request,
+            f"Добавлено в «{result.group_name}» "
+            f"{plural(result.added, 'домен', 'домена', 'доменов')}.",
+        )
+    if result.updated:
+        messages.info(
+            request,
+            f"Обновлено {plural(result.updated, 'домен', 'домена', 'доменов')}.",
+        )
+    if result.skipped:
+        messages.info(
+            request,
+            f"Пропущено {plural(result.skipped, 'домен', 'домена', 'доменов')}: "
+            "они уже есть, а флаг обновления выключен.",
+        )
+
+    if not result.failed_text:
+        return redirect("domain-list")
+
+    # Критерий 25: ошибочные строки возвращаются в поле, а не выбрасываются молча.
+    messages.error(
+        request,
+        "Строки с ошибками остались в поле ввода — исправьте их и повторите импорт.",
+    )
+    return render(
+        request,
+        "catalog/domain_import.html",
+        {
+            "groups": group_list_page().cards,
+            "screen": "domains",
+            "check_now": form.check_now_flag(),
+            "draft": {"text": result.failed_text, "group": request.POST.get("group", "")},
+        },
+    )
+
+
+@member_required
+def domain_move(request: HttpRequest, domain_id: int) -> HttpResponse:
+    """Сводка переноса — ТЗ 10.4, критерий 28. Показ, ничего не меняет."""
+    form = MoveForm(request.GET)
+    if not Domain.objects.filter(pk=domain_id).exists():
+        raise Http404
+
+    page = move_page(
+        domain_id=domain_id, target_id=form.group_id(), new_group_name=form.new_group_name()
+    )
+    return render(request, "catalog/domain_move.html", {"page": page, "screen": "domains"})
+
+
+@admin_required
+def domain_move_apply(request: HttpRequest, domain_id: int) -> HttpResponse:
+    """Подтверждение переноса — ТЗ 10.4."""
+    form = MoveForm(request.POST)
+    result = move_domain(
+        domain_id=domain_id,
+        group_id=form.group_id(),
+        new_group_name=form.new_group_name(),
+        at=SystemClock().now(),
+    )
+
+    if isinstance(result, MoveRefused):
+        messages.error(request, result.reason)
+        return redirect("domain-move", domain_id=domain_id)
+
+    messages.success(request, f"{result.domain_name} перенесён в «{result.group_name}».")
     return redirect("domain-detail", domain_id=domain_id)
 
 

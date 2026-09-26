@@ -182,7 +182,7 @@ def create_domain(
     ближайший тик, а не ждёт случайного смещения: пик разбирается ограничением параллелизма, а
     со второй проверки домены расходятся сами — период отсчитывается от факта проверки.
     """
-    normalized, reason = _normalized_name(name)
+    normalized, reason = normalized_name(name)
     if normalized is None:
         return DomainNotCreated(reason=reason or "Имя домена не подходит.")
 
@@ -204,7 +204,7 @@ def create_domain(
     )
 
 
-def _normalized_name(name: str) -> tuple[str | None, str | None]:
+def normalized_name(name: str) -> tuple[str | None, str | None]:
     """Приведение имени по 10.1. Второе значение — причина отказа."""
     stripped = name.strip().rstrip(".")
     if not stripped:

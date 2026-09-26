@@ -257,6 +257,82 @@ class GlobalSettingsForm(forms.Form):
         )
 
 
+class ImportForm(forms.Form):
+    """Импорт списком — ТЗ 10.3. Два источника: вставка текста и файл `.txt` / `.csv`.
+
+    Форма только достаёт текст: разбор строк — доменное правило и живёт в сервисе. Файл
+    побеждает вставку, если пришли оба: человек выбрал файл последним действием.
+
+    Значения флагов по умолчанию заданы здесь и ровно те, что требует 10.3, — обработчику
+    ветвиться незачем.
+    """
+
+    #: Больше мегабайта в списке доменов быть не может: это уже не список, а чужой файл.
+    MAX_FILE_BYTES = 1024 * 1024
+
+    text = forms.CharField(required=False, widget=forms.Textarea)
+    source = forms.FileField(required=False)
+    group = forms.IntegerField(required=False, min_value=1)
+    new_group = forms.CharField(required=False, max_length=GROUP_NAME_MAX_LENGTH)
+    update_existing = forms.BooleanField(required=False)
+    check_now = forms.BooleanField(required=False, initial=True)
+
+    def source_text(self) -> str:
+        """Текст списка: из файла, если он загружен, иначе из поля вставки."""
+        if not self.is_valid():
+            return ""
+        uploaded = self.cleaned_data.get("source")
+        if uploaded is None:
+            return str(self.cleaned_data.get("text") or "")
+        return _decoded(uploaded.read(self.MAX_FILE_BYTES))
+
+    def group_id(self) -> int | None:
+        return self.cleaned_data.get("group") if self.is_valid() else None
+
+    def new_group_name(self) -> str:
+        return str(self.cleaned_data.get("new_group") or "") if self.is_valid() else ""
+
+    def update_existing_flag(self) -> bool:
+        return bool(self.cleaned_data.get("update_existing")) if self.is_valid() else False
+
+    def check_now_flag(self) -> bool:
+        """Включён по умолчанию (10.3): первый ответ — отправная точка для сравнений."""
+        if not self.is_bound:
+            return True
+        return bool(self.cleaned_data.get("check_now")) if self.is_valid() else True
+
+
+class MoveForm(forms.Form):
+    """Перенос домена в другую группу — ТЗ 10.4.
+
+    Пустая группа — это «Без группы», а не отсутствие выбора: переносить туда можно так же, как
+    в любую другую (11.3).
+    """
+
+    group = forms.IntegerField(required=False, min_value=1)
+    new_group = forms.CharField(required=False, max_length=GROUP_NAME_MAX_LENGTH)
+
+    def group_id(self) -> int | None:
+        return self.cleaned_data.get("group") if self.is_valid() else None
+
+    def new_group_name(self) -> str:
+        return str(self.cleaned_data.get("new_group") or "") if self.is_valid() else ""
+
+
+def _decoded(raw: bytes) -> str:
+    """Текст загруженного файла.
+
+    UTF-8 — основной случай; CP1251 — запасной, потому что `.csv` из Excel в русской локали
+    приходит именно в нём, и ронять импорт из-за кодировки незачем.
+    """
+    for encoding in ("utf-8-sig", "cp1251"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 class JournalFilterForm(forms.Form):
     """Фильтры журнала — ТЗ 11.7, Q-C21. Мусор в параметрах — это «всё», а не ошибка страницы."""
 
