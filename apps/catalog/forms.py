@@ -15,6 +15,7 @@ from apps.catalog.models import (
     GROUP_NAME_MAX_LENGTH,
     RECORD_TYPE_CHOICES,
 )
+from apps.catalog.selectors.domain_card import HistoryFilter, RegistryFilter
 from apps.catalog.selectors.domains import DomainFilter
 from apps.catalog.services.settings import SettingsInput
 from apps.monitoring.selectors.journal import JournalFilter, JournalPeriod
@@ -72,6 +73,27 @@ class DomainCreateForm(forms.Form):
 
     def comment_text(self) -> str:
         return str(self.cleaned_data.get("comment") or "")
+
+
+class DomainCardForm(forms.Form):
+    """Сегменты фильтров на карточке домена. Мусор в параметре — «все», а не ошибка страницы."""
+
+    registry = forms.CharField(required=False)
+    history = forms.CharField(required=False)
+
+    def registry_filter(self) -> RegistryFilter:
+        return self._enum(RegistryFilter, "registry", RegistryFilter.ALL)
+
+    def history_filter(self) -> HistoryFilter:
+        return self._enum(HistoryFilter, "history", HistoryFilter.ALL)
+
+    def _enum[T: StrEnum](self, kind: type[T], field: str, default: T) -> T:
+        if not self.is_valid():
+            return default
+        try:
+            return kind(str(self.cleaned_data.get(field) or ""))
+        except ValueError:
+            return default
 
 
 class DomainEditForm(forms.Form):

@@ -27,7 +27,17 @@
       <div class="actions">
         <form method="post" action="{% url 'domain-check' card.id %}">
           {% csrf_token %}
-          <button class="btn" type="submit">Проверить сейчас</button>
+          <button class="btn" type="submit" {% if not card.watch_enabled %}disabled title="Домен выключен из наблюдения"{% endif %}>Проверить сейчас</button>
+        </form>
+        <form method="post" action="{% url 'domain-watch' card.id %}">
+          {% csrf_token %}
+          {% if card.watch_enabled %}
+            <input type="hidden" name="enabled" value="no">
+            <button class="btn" type="submit">Приостановить</button>
+          {% else %}
+            <input type="hidden" name="enabled" value="yes">
+            <button class="btn btn-mark" type="submit">Возобновить</button>
+          {% endif %}
         </form>
       </div>
     {% endif %}
@@ -87,10 +97,26 @@
     </div>
 
     <div class="panel" style="margin-bottom:20px">
-      <div class="panel-h"><h2>Реестр адресов</h2></div>
+      <div class="panel-h">
+        <h2>Реестр адресов</h2>
+        <div class="right">
+          {% comment %}
+          Сегменты — ссылки: сегмент это состояние экрана, на него можно сослаться, и он
+          переживает обновление страницы. Фильтр истории при этом сохраняется.
+          {% endcomment %}
+          <div class="seg">
+            <a class="{% if card.registry_filter == 'matched' %}on{% endif %}" href="?registry=matched&history={{ card.history_filter }}">Решённые</a>
+            <a class="{% if card.registry_filter == 'unmatched' %}on{% endif %}" href="?registry=unmatched&history={{ card.history_filter }}">Нерешённые</a>
+            <a class="{% if card.registry_filter == 'stale' %}on{% endif %}" href="?registry=stale&history={{ card.history_filter }}">Неактуальные</a>
+            <a class="{% if card.registry_filter == 'all' %}on{% endif %}" href="?registry=all&history={{ card.history_filter }}">Все</a>
+          </div>
+        </div>
+      </div>
       <div style="padding:13px 0 0">
         <div style="padding:0 16px 13px;font-size:12.5px;color:var(--ink-soft);max-width:88ch">
-          Каждый адрес, который домен когда-либо отдавал.
+          Каждый адрес, который домен когда-либо отдавал. График следа по времени появится
+          вместе с виджетами: по 9.2 число корзин считается от ширины элемента, и это
+          клиентский код.
         </div>
         <div class="tw">
           <div class="reg" style="min-width:860px">
@@ -127,7 +153,17 @@
 
     <div class="grid2">
       <div class="panel">
-        <div class="panel-h"><h2>История</h2></div>
+        <div class="panel-h">
+          <h2>История</h2>
+          <div class="right">
+            <div class="seg">
+              <a class="{% if card.history_filter == 'all' %}on{% endif %}" href="?registry={{ card.registry_filter }}&history=all">Все</a>
+              <a class="{% if card.history_filter == 'changes' %}on{% endif %}" href="?registry={{ card.registry_filter }}&history=changes">Изменения</a>
+              <a class="{% if card.history_filter == 'not_allowed' %}on{% endif %}" href="?registry={{ card.registry_filter }}&history=not_allowed">Выходы</a>
+              <a class="{% if card.history_filter == 'resolve_errors' %}on{% endif %}" href="?registry={{ card.registry_filter }}&history=resolve_errors">Ошибки</a>
+            </div>
+          </div>
+        </div>
         <ul class="hist">
           {% for event in card.events %}
             <li>
@@ -237,6 +273,7 @@
 
               <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft);display:flex;gap:8px">
                 <button class="btn btn-solid" type="submit">Сохранить</button>
+                <a class="btn btn-danger" href="{% url 'domain-delete' card.id %}">Удалить домен</a>
               </div>
             </form>
           {% else %}

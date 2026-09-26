@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% comment %}
+Подтверждение удаления домена.
+
+Удаление необратимо и уносит реестр адресов, историю проверок, инциденты и записи журнала: по
+Q-D4 события без домена не существует, отдельно их сохранить нельзя. Поэтому не кнопка сразу, а
+экран, называющий цену до нажатия.
+
+В прототипе это модальное окно; здесь страница — клиентский код разрешён в трёх местах, и это не
+одно из них.
+{% endcomment %}
+
+{% block title %}Удалить {{ card.name }} — DNS monitoring{% endblock %}
+
+{% block content %}
+<section data-screen="domain">
+  <div class="head">
+    <div>
+      <a class="back" href="{% url 'domain-detail' card.id %}">← {{ card.name }}</a>
+      <h1>Удалить домен?</h1>
+      <p>Это необратимо.</p>
+    </div>
+  </div>
+
+  <div class="body" style="max-width:640px">
+    <div class="panel">
+      <div class="panel-h"><h2 class="mono">{{ card.name }}</h2></div>
+      <div style="padding:16px">
+        <p class="note-line" style="margin-top:0">Вместе с доменом исчезнут:</p>
+        <ul style="margin:10px 0 0;padding-left:22px;font-size:13px;color:var(--ink-soft);line-height:1.7">
+          <li>реестр адресов — {{ card.registry|length }} {% if card.registry|length == 1 %}адрес{% else %}адресов{% endif %};</li>
+          <li>история проверок и суточные корзины графика;</li>
+          <li>записи журнала по этому домену — {{ events }};</li>
+          <li>открытые и закрытые инциденты.</li>
+        </ul>
+        <p class="note-line">
+          Если нужно только прекратить проверки — <b>приостановите наблюдение</b>. Домен перестанет
+          проверяться и уведомлять, а реестр и история сохранятся, и наблюдение можно будет
+          вернуть.
+        </p>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line-soft);display:flex;gap:8px">
+          <form method="post" action="{% url 'domain-delete' card.id %}">
+            {% csrf_token %}
+            <button class="btn btn-danger" type="submit">Удалить безвозвратно</button>
+          </form>
+          <a class="btn" href="{% url 'domain-detail' card.id %}">Отмена</a>
+          {% if card.watch_enabled %}
+            <form method="post" action="{% url 'domain-watch' card.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="enabled" value="no">
+              <button class="btn" type="submit">Приостановить вместо удаления</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

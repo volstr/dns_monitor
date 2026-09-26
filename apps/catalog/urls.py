@@ -8,9 +8,11 @@ from apps.catalog.views import (
     allowlist_check,
     domain_check_now,
     domain_create,
+    domain_delete,
     domain_detail,
     domain_list,
     domain_save,
+    domain_watch,
     global_settings,
     global_settings_save,
     group_check_now,
@@ -30,6 +32,8 @@ urlpatterns: list[URLPattern] = [
     # Адрес из 8.4: ссылка в уведомлении ведёт сюда же.
     path("domains/<int:domain_id>/", domain_detail, name="domain-detail"),
     path("domains/<int:domain_id>/save/", domain_save, name="domain-save"),
+    path("domains/<int:domain_id>/watch/", domain_watch, name="domain-watch"),
+    path("domains/<int:domain_id>/delete/", domain_delete, name="domain-delete"),
     path("domains/<int:domain_id>/check/", domain_check_now, name="domain-check"),
     # Построчная проверка списка через HTMX (10.2).
     path("domains/<int:domain_id>/allowlist/", allowlist_check, name="allowlist-check"),

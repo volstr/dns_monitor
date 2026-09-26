@@ -18,6 +18,7 @@ from django.shortcuts import redirect, render
 
 from apps.accounts.access import admin_required, member_required
 from apps.catalog.forms import (
+    DomainCardForm,
     DomainCreateForm,
     DomainEditForm,
     DomainFilterForm,
@@ -32,10 +33,13 @@ from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
 from apps.catalog.services.allowlist import parse_allowlist
 from apps.catalog.services.domains import (
+    DomainNotCreated,
     DomainNotSaved,
     DomainsNotAdded,
     add_domains,
+    delete_domain,
     save_domain,
+    switch_watch,
 )
 from apps.catalog.services.groups import GroupNotSaved, save_group
 from apps.catalog.services.settings import SettingsNotSaved, save_global_settings
@@ -131,12 +135,62 @@ def domain_create(request: HttpRequest) -> HttpResponse:
 
 @member_required
 def domain_detail(request: HttpRequest, domain_id: int) -> HttpResponse:
-    """Карточка домена — ТЗ 9.1, 11.8."""
-    card = domain_card(domain_id=domain_id, at=SystemClock().now())
+    """Карточка домена — ТЗ 9.1, 11.8. Сегменты фильтров приходят в адресе страницы."""
+    form = DomainCardForm(request.GET)
+    card = domain_card(
+        domain_id=domain_id,
+        at=SystemClock().now(),
+        registry=form.registry_filter(),
+        history=form.history_filter(),
+    )
     if card is None:
         raise Http404
 
     return render(request, "catalog/domain_card.html", {"card": card, "screen": "domains"})
+
+
+@admin_required
+def domain_watch(request: HttpRequest, domain_id: int) -> HttpResponse:
+    """«Приостановить» и «Возобновить» — ТЗ 11.1."""
+    enabled = request.POST.get("enabled") == "yes"
+    result = switch_watch(domain_id=domain_id, enabled=enabled, at=SystemClock().now())
+
+    if isinstance(result, DomainNotCreated):
+        raise Http404
+    if result.watch_enabled:
+        messages.success(request, "Наблюдение возобновлено. Проверка пройдёт в ближайшие секунды.")
+    else:
+        messages.info(
+            request,
+            "Наблюдение приостановлено. Домен не проверяется и не шлёт уведомлений, "
+            "реестр адресов сохраняется.",
+        )
+    return redirect("domain-detail", domain_id=domain_id)
+
+
+@admin_required
+def domain_delete(request: HttpRequest, domain_id: int) -> HttpResponse:
+    """Удаление домена с подтверждением: оно необратимо и уносит историю."""
+    card = domain_card(domain_id=domain_id, at=SystemClock().now())
+    if card is None:
+        raise Http404
+
+    if request.method != "POST":
+        return render(
+            request,
+            "catalog/domain_delete.html",
+            {"card": card, "screen": "domains", "events": len(card.events)},
+        )
+
+    result = delete_domain(domain_id=domain_id)
+    if isinstance(result, DomainNotCreated):
+        raise Http404
+
+    messages.success(
+        request,
+        f"Домен {result.name} удалён вместе с реестром и записями журнала: {result.events}.",
+    )
+    return redirect("domain-list")
 
 
 @admin_required

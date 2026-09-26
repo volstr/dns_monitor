@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 from typing import cast
 
 from apps.catalog.models import (
@@ -31,6 +32,7 @@ from apps.catalog.models import (
 from apps.catalog.selectors.settings import EffectiveSettings, settings_of_group
 from apps.monitoring.models import Event, EventType
 from apps.monitoring.selectors.addresses import address_statuses
+from apps.monitoring.selectors.journal import CHANGE_TYPES, FAILURE_TYPES
 from core.text import humanize_duration, plural
 from core.types.checking import AddressStatus, AddressStatusView
 from core.types.dns import IPNetwork
@@ -60,6 +62,39 @@ EVENT_TONES = {
     EventType.RESOLVE_FAILED: "fail",
     EventType.RESOLVE_RECOVERED: "ok",
     EventType.WATCH_STARTED: "ok",
+}
+
+
+class RegistryFilter(StrEnum):
+    """Сегменты фильтра реестра из макета."""
+
+    ALL = "all"
+    MATCHED = "matched"
+    UNMATCHED = "unmatched"
+    STALE = "stale"
+
+
+class HistoryFilter(StrEnum):
+    """Сегменты фильтра истории из макета. Названия групп — те же, что в журнале (Q-C11)."""
+
+    ALL = "all"
+    CHANGES = "changes"
+    NOT_ALLOWED = "not_allowed"
+    RESOLVE_ERRORS = "resolve_errors"
+
+
+#: Какие статусы показывает сегмент. `NOT_CHECKED` идёт вместе с решёнными: у домена без списка
+#: вхождение не вычисляется, и «нерешённым» такой адрес не является (Q-D25).
+REGISTRY_STATUSES = {
+    RegistryFilter.MATCHED: (AddressStatus.MATCHED, AddressStatus.NOT_CHECKED),
+    RegistryFilter.UNMATCHED: (AddressStatus.UNMATCHED,),
+    RegistryFilter.STALE: (AddressStatus.STALE,),
+}
+
+HISTORY_TYPES = {
+    HistoryFilter.CHANGES: CHANGE_TYPES,
+    HistoryFilter.NOT_ALLOWED: (EventType.NOT_ALLOWED,),
+    HistoryFilter.RESOLVE_ERRORS: FAILURE_TYPES,
 }
 
 
@@ -138,10 +173,23 @@ class DomainCard:
     unmatched: tuple[RegistryLine, ...]
     registry: tuple[RegistryLine, ...]
     events: tuple[EventLine, ...]
+    registry_filter: RegistryFilter
+    history_filter: HistoryFilter
 
 
-def domain_card(*, domain_id: int, at: datetime) -> DomainCard | None:
-    """Карточка домена. ``None`` — домена нет, и это ответ 404, а не ошибка."""
+def domain_card(
+    *,
+    domain_id: int,
+    at: datetime,
+    registry: RegistryFilter = RegistryFilter.ALL,
+    history: HistoryFilter = HistoryFilter.ALL,
+) -> DomainCard | None:
+    """Карточка домена. ``None`` — домена нет, и это ответ 404, а не ошибка.
+
+    Фильтры касаются только списков. Сводка в заголовке панели и блок нерешённых считаются по
+    всему реестру: «1 из 3 адресов не решён» обязано означать одно и то же независимо от того,
+    какой сегмент выбран.
+    """
     domain = Domain.objects.select_related("group").filter(pk=domain_id).first()
     if domain is None:
         return None
@@ -172,8 +220,25 @@ def domain_card(*, domain_id: int, at: datetime) -> DomainCard | None:
             for line, view in zip(lines, ordered, strict=True)
             if view.status == AddressStatus.UNMATCHED
         ),
-        registry=lines,
-        events=_events(domain),
+        registry=_filtered_registry(lines, ordered, registry),
+        events=_events(domain, history),
+        registry_filter=registry,
+        history_filter=history,
+    )
+
+
+def _filtered_registry(
+    lines: tuple[RegistryLine, ...],
+    ordered: tuple[AddressStatusView, ...],
+    chosen: RegistryFilter,
+) -> tuple[RegistryLine, ...]:
+    statuses = REGISTRY_STATUSES.get(chosen)
+    if statuses is None:
+        return lines
+    return tuple(
+        line
+        for line, view in zip(lines, ordered, strict=True)
+        if view.status in statuses
     )
 
 
@@ -351,11 +416,15 @@ def _age_text(view: AddressStatusView, at: datetime) -> str:
     return f"отдавался {humanize_duration(at - view.last_seen_at)} назад"
 
 
-def _events(domain: Domain) -> tuple[EventLine, ...]:
+def _events(domain: Domain, chosen: HistoryFilter) -> tuple[EventLine, ...]:
     """Панель «История» — события домена, новые сверху (7.1)."""
+    selected = Event.objects.filter(domain=domain)
+    types = HISTORY_TYPES.get(chosen)
+    if types is not None:
+        selected = selected.filter(event_type__in=[item.value for item in types])
+
     events = (
-        Event.objects.filter(domain=domain)
-        .order_by("-occurred_at")[:EVENT_LIMIT]
+        selected.order_by("-occurred_at")[:EVENT_LIMIT]
         .values("event_type", "occurred_at", "payload", "author_name")
     )
     return tuple(

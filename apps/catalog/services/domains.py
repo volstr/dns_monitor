@@ -278,6 +278,63 @@ def _form_reasons(record_types: tuple[str, ...]) -> tuple[str, ...]:
     return ()
 
 
+@dataclass(frozen=True, slots=True)
+class WatchSwitched:
+    domain_id: int
+    watch_enabled: bool
+
+
+def switch_watch(
+    *, domain_id: int, enabled: bool, at: datetime
+) -> WatchSwitched | DomainNotCreated:
+    """Приостановить или возобновить наблюдение — ТЗ 11.1, макет («Приостановить»).
+
+    Выключенный домен не проверяется и не шлёт уведомлений, но реестр адресов сохраняется.
+
+    При возобновлении назначается время проверки, если его нет: домен с пустым `next_check_at`
+    планировщик не заберёт никогда, и возобновлённое наблюдение осталось бы наблюдением только
+    на словах.
+
+    События здесь не порождаются: `WATCH_STARTED` пишет `checking.py` на базовой проверке (7.4),
+    а возобновлённый домен её и получит — пауза дольше порога актуальности делает проверку
+    базовой (Q-D6).
+    """
+    domain = Domain.objects.filter(pk=domain_id).first()
+    if domain is None:
+        return DomainNotCreated(reason="Домен не найден.")
+
+    fields: dict[str, object] = {"watch_enabled": enabled}
+    if enabled and domain.next_check_at is None:
+        fields["next_check_at"] = at
+    Domain.objects.filter(pk=domain_id).update(**fields)
+
+    return WatchSwitched(domain_id=domain_id, watch_enabled=enabled)
+
+
+@dataclass(frozen=True, slots=True)
+class DomainDeleted:
+    name: str
+    #: Сколько записей журнала уходит вместе с доменом. Человек должен знать цену до нажатия.
+    events: int
+
+
+def delete_domain(*, domain_id: int) -> DomainDeleted | DomainNotCreated:
+    """Удалить домен вместе с его историей.
+
+    Удаление необратимо и уносит реестр адресов, историю проверок, инциденты и записи журнала:
+    по Q-D4 события без домена не существует, поэтому сохранить их отдельно нельзя. Отсюда и
+    подтверждение на экране — решение принимает человек, зная цену.
+    """
+    domain = Domain.objects.filter(pk=domain_id).first()
+    if domain is None:
+        return DomainNotCreated(reason="Домен не найден.")
+
+    name = domain.name
+    events = domain.events.count()
+    Domain.objects.filter(pk=domain_id).delete()
+    return DomainDeleted(name=name, events=events)
+
+
 def _replace_allowlist(domain_id: int, parsed: ParsedAllowlist) -> None:
     """Список заменяется целиком.
 
