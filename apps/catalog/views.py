@@ -125,6 +125,7 @@ def domain_create(request: HttpRequest) -> HttpResponse:
             messages.info(request, f"«{line.converted_from}» записан как {line.name}.")
     if result.trap_warning:
         messages.warning(request, result.trap_warning)
+    _report_warnings(request, result.allowlist)
 
     created = result.created
     if not created:
@@ -242,6 +243,7 @@ def domain_save(request: HttpRequest, domain_id: int) -> HttpResponse:
 
     for was, became in result.normalized:
         messages.info(request, f"Запись {was} приведена к {became}.")
+    _report_warnings(request, result.parsed)
     messages.success(request, "Сохранено.")
     return redirect("domain-detail", domain_id=domain_id)
 
@@ -450,6 +452,17 @@ def _rejection_text(reason: RejectionReason) -> str:
     if reason == RejectionReason.COOLDOWN:
         return "Этот домен проверяли только что. Повторная проверка доступна через полминуты."
     return "Домен выключен из наблюдения, проверять нечего."
+
+
+def _report_warnings(request: HttpRequest, parsed: ParsedAllowlist) -> None:
+    """Предупреждения 10.2 после сохранения.
+
+    Они не блокируют сохранение — так требует 10.2, и критерий 45 это проверяет. Но у строки
+    они видны только до отправки формы: после сохранения страница перерисовывается из базы, и
+    предупреждение исчезало бесследно. Человек не узнавал, что запись, скорее всего, лишняя.
+    """
+    for line in parsed.warnings:
+        messages.warning(request, f"Строка {line.number}: {line.warning}")
 
 
 def _allowlist_error(prefix: str, parsed: ParsedAllowlist) -> str:
