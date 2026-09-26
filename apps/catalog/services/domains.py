@@ -18,7 +18,15 @@ from datetime import datetime
 
 from django.db import transaction
 
-from apps.catalog.models import DOMAIN_NAME_MAX_LENGTH, AllowlistEntry, Domain
+from apps.catalog.models import (
+    DOMAIN_NAME_MAX_LENGTH,
+    AllowlistEntry,
+    Domain,
+    GlobalSettings,
+    Group,
+    NotificationMode,
+)
+from apps.catalog.selectors.settings import settings_of_group
 from apps.catalog.services.allowlist import ParsedAllowlist, parse_allowlist
 
 
@@ -54,6 +62,111 @@ class DomainNotSaved:
 
     parsed: ParsedAllowlist
     reasons: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class AddedLine:
+    """Одна строка поля «Доменные имена». Ошибка в одной не отменяет остальных."""
+
+    text: str
+    name: str | None
+    converted_from: str | None
+    reason: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DomainsAdded:
+    """Итог добавления.
+
+    Разбор списка адресов приходит целиком: экран показывает причины по строкам.
+    """
+
+    lines: tuple[AddedLine, ...]
+    allowlist: ParsedAllowlist
+    #: Ловушка 8.2: пустой список в режиме «При выходе из разрешённых» не пришлёт уведомление
+    #: никогда, и ТЗ требует предупредить об этом при сохранении. Пусто — предупреждать не о чем.
+    trap_warning: str
+
+    @property
+    def created(self) -> tuple[AddedLine, ...]:
+        return tuple(line for line in self.lines if line.name is not None)
+
+    @property
+    def refused(self) -> tuple[AddedLine, ...]:
+        return tuple(line for line in self.lines if line.reason is not None)
+
+
+@dataclass(frozen=True, slots=True)
+class DomainsNotAdded:
+    """Ничего не добавлено: список адресов содержит ошибочные строки (10.2)."""
+
+    allowlist: ParsedAllowlist
+
+
+def add_domains(
+    *, names: str, group_id: int | None, comment: str, allowlist_text: str, at: datetime
+) -> DomainsAdded | DomainsNotAdded:
+    """Добавить один или несколько доменов — ТЗ 10.1, 10.2, 8.2; макет окна «Добавить домен».
+
+    Имена принимаются по одному в строке: так их и вводят в макете. Ошибка в одной строке не
+    отменяет остальных — иначе одна опечатка в списке из двадцати имён заставляла бы набирать
+    всё заново.
+
+    Белый список — один на всё добавление и необязателен («можно заполнить позже, когда станет
+    понятно, куда домен резолвится»). Но **ошибочная строка в нём блокирует всё**: по 10.2
+    сохранение с ошибкой в списке недопустимо, а молча добавить домены без списка значило бы
+    сделать не то, о чём просили.
+    """
+    parsed = parse_allowlist(allowlist_text)
+    if not parsed.can_save:
+        return DomainsNotAdded(allowlist=parsed)
+
+    lines: list[AddedLine] = []
+    for raw in names.splitlines():
+        text = raw.strip()
+        if not text:
+            continue
+        lines.append(_added_line(text, group_id, comment, at))
+
+    if parsed.entries:
+        for line in lines:
+            if line.name is not None:
+                _replace_allowlist(Domain.objects.get(name=line.name).pk, parsed)
+
+    return DomainsAdded(
+        lines=tuple(lines),
+        allowlist=parsed,
+        trap_warning=_trap_warning(parsed, group_id, lines),
+    )
+
+
+def _added_line(
+    text: str, group_id: int | None, comment: str, at: datetime
+) -> AddedLine:
+    result = create_domain(name=text, group_id=group_id, comment=comment, at=at)
+    if isinstance(result, DomainNotCreated):
+        return AddedLine(text=text, name=None, converted_from=None, reason=result.reason)
+    return AddedLine(
+        text=text, name=result.name, converted_from=result.converted_from, reason=None
+    )
+
+
+def _trap_warning(
+    parsed: ParsedAllowlist, group_id: int | None, lines: list[AddedLine]
+) -> str:
+    """ТЗ 8.2: предупредить, если добавленный домен не пришлёт уведомление никогда."""
+    if parsed.entries or not any(line.name for line in lines):
+        return ""
+
+    group = Group.objects.filter(pk=group_id).first() if group_id else None
+    effective = settings_of_group(group, GlobalSettings.objects.get())
+    if effective.notification_mode.value != NotificationMode.NOT_ALLOWED:
+        return ""
+    return (
+        "Разрешённые адреса не заданы, а режим уведомлений — «При выходе из разрешённых». "
+        "По такому домену уведомлений не будет никогда: сравнивать не с чем. Задайте список "
+        "на карточке домена."
+    )
 
 
 def create_domain(

@@ -25,15 +25,16 @@ from apps.catalog.forms import (
     GroupForm,
     JournalFilterForm,
 )
+from apps.catalog.models import Domain
 from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import DomainFilter, domain_list_page
 from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
 from apps.catalog.services.allowlist import parse_allowlist
 from apps.catalog.services.domains import (
-    DomainNotCreated,
     DomainNotSaved,
-    create_domain,
+    DomainsNotAdded,
+    add_domains,
     save_domain,
 )
 from apps.catalog.services.groups import GroupNotSaved, save_group
@@ -81,25 +82,51 @@ def domain_create(request: HttpRequest) -> HttpResponse:
 
     form = DomainCreateForm(request.POST)
     if not form.is_valid():
-        messages.error(request, "Проверьте имя домена.")
+        messages.error(request, "Укажите хотя бы одно имя домена.")
         return redirect("domain-new")
 
-    result = create_domain(
-        name=form.domain_name(),
+    result = add_domains(
+        names=form.domain_names(),
         group_id=form.group_id(),
         comment=form.comment_text(),
+        allowlist_text=form.allowlist_text(),
         at=SystemClock().now(),
     )
 
-    if isinstance(result, DomainNotCreated):
-        messages.error(request, result.reason)
+    if isinstance(result, DomainsNotAdded):
+        # 10.2: пока в списке есть ошибочная строка, сохранять нельзя — и домены не создаются.
+        return render(
+            request,
+            "catalog/domain_new.html",
+            {
+                "groups": group_list_page().cards,
+                "screen": "domains",
+                "parsed": result.allowlist,
+                "draft": request.POST,
+            },
+        )
+
+    for line in result.refused:
+        messages.error(request, f"«{line.text}»: {line.reason}")
+    for line in result.created:
+        if line.converted_from:
+            # 10.1: перевод в punycode показывается, а не происходит молча.
+            messages.info(request, f"«{line.converted_from}» записан как {line.name}.")
+    if result.trap_warning:
+        messages.warning(request, result.trap_warning)
+
+    created = result.created
+    if not created:
         return redirect("domain-new")
 
-    if result.converted_from:
-        # 10.1: перевод в punycode показывается, а не происходит молча.
-        messages.info(request, f"«{result.converted_from}» записан как {result.name}.")
-    messages.success(request, "Домен добавлен. Первая проверка пройдёт в ближайшие секунды.")
-    return redirect("domain-detail", domain_id=result.domain_id)
+    messages.success(
+        request,
+        f"Добавлено доменов: {len(created)}. Первая проверка пройдёт в ближайшие секунды.",
+    )
+    if len(created) == 1:
+        name = created[0].name
+        return redirect("domain-detail", domain_id=Domain.objects.get(name=name).pk)
+    return redirect("domain-list")
 
 
 @member_required

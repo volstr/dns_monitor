@@ -5,7 +5,9 @@
 В прототипе это модальное окно, открываемое скриптом. Здесь отдельная страница: клиентский код
 разрешён в трёх местах, и это не одно из них, а на адрес страницы можно сослаться.
 
-Разрешённые адреса тут не задаются — их правят на карточке домена, куда и ведёт сохранение.
+Поля те же, что в макете: имена по одному в строке, группа, разрешённые адреса. Комментарий
+добавлен сверх макета — он есть у домена по 4.3, и заполнить его сразу дешевле, чем возвращаться.
+Поле выбора группы пока обычный список: поле с поиском (10.4) — виджет этапа 7.
 {% endcomment %}
 
 {% block title %}Новый домен — DNS monitoring{% endblock %}
@@ -16,7 +18,7 @@
     <div>
       <a class="back" href="{% url 'domain-list' %}">← Домены</a>
       <h1>Добавить домен</h1>
-      <p>Первая проверка пройдёт сразу после добавления. Разрешённые адреса зададите на карточке.</p>
+      <p>Первая проверка пройдёт сразу после добавления.</p>
     </div>
   </div>
 
@@ -26,12 +28,14 @@
         {% csrf_token %}
 
         <div class="field">
-          <label for="d-name">Имя домена</label>
+          <label for="d-names">Доменные имена</label>
           <div class="hint">
-            Регистр и конечная точка неважны. Имя не на латинице будет записано в punycode —
-            например, <code>пример.рф</code> станет <code>xn--e1afmkfd.xn--p1ai</code>.
+            По одному в строке — можно добавить сразу несколько. Регистр и конечная точка
+            неважны. Имя не на латинице будет записано в punycode: <code>пример.рф</code>
+            станет <code>xn--e1afmkfd.xn--p1ai</code>. Ошибка в одной строке не отменит остальные.
           </div>
-          <input class="inp mono" id="d-name" name="name" placeholder="pay-gw.contoso.ru" required autofocus>
+          <textarea class="inp mono" id="d-names" name="names" rows="3"
+                    placeholder="pay-gw.contoso.ru" required autofocus>{% if draft %}{{ draft.names }}{% endif %}</textarea>
         </div>
 
         <div class="field">
@@ -43,10 +47,23 @@
           </select>
         </div>
 
+        <div class="field">
+          <label for="d-allow">Разрешённые адреса и подсети</label>
+          <div class="hint">
+            Необязательно — можно заполнить позже, когда станет понятно, куда домен резолвится.
+            По одной записи в строке: отдельный адрес <code>10.20.3.7</code> или подсеть
+            <code>10.20.0.0/22</code>. Список применится ко всем добавленным доменам.
+          </div>
+          <textarea class="inp mono" id="d-allow" name="allowlist" rows="3"
+                    placeholder="10.20.0.0/22">{% if draft %}{{ draft.allowlist }}{% endif %}</textarea>
+          {% if parsed %}{% include "catalog/_allowlist_issues.html" %}{% endif %}
+        </div>
+
         <div class="field" style="margin-bottom:0">
           <label for="d-comment">Комментарий</label>
           <div class="hint">Уходит в текст уведомления — дежурный увидит его раньше, чем откроет интерфейс.</div>
-          <textarea class="inp" id="d-comment" name="comment" rows="3" style="font-family:inherit;font-size:13px"></textarea>
+          <textarea class="inp" id="d-comment" name="comment" rows="3"
+                    style="font-family:inherit;font-size:13px">{% if draft %}{{ draft.comment }}{% endif %}</textarea>
         </div>
 
         <div style="display:flex;gap:8px">
