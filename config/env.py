@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Final
 from urllib.parse import SplitResult, parse_qsl, unquote, urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -42,6 +43,8 @@ class Env:
     redis_db_state: int
     redis_db_cache: int
     app_base_url: str
+    #: Часовой пояс отображения (ТЗ 4.0). Хранение всегда в UTC, меняется только показ.
+    app_time_zone: str
     session_secret: str
     auth_2fa_enabled: bool
     dns_timeout_ms: int
@@ -103,6 +106,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
             "пространства ключей",
         )
     app_base_url = read.required("APP_BASE_URL", _app_base_url_problem)
+    app_time_zone = read.optional("APP_TIME_ZONE", _time_zone_problem) or "UTC"
     session_secret = read.required("SESSION_SECRET", _session_secret_problem)
     auth_2fa_enabled = read.boolean("AUTH_2FA_ENABLED", default=False)
     dns_timeout_ms = read.integer("DNS_TIMEOUT_MS", default=3000, minimum=1, maximum=60_000)
@@ -139,6 +143,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
         redis_db_state=redis_db_state,
         redis_db_cache=redis_db_cache,
         app_base_url=app_base_url.rstrip("/"),
+        app_time_zone=app_time_zone,
         session_secret=session_secret,
         auth_2fa_enabled=auth_2fa_enabled,
         dns_timeout_ms=dns_timeout_ms,
@@ -287,6 +292,19 @@ def _app_base_url_problem(value: str) -> str | None:
         return "ожидается адрес вида https://хост или https://хост:порт"
     if parts.path not in {"", "/"} or parts.query or parts.fragment:
         return "адрес установки задаётся без пути, параметров и якоря"
+    return None
+
+
+def _time_zone_problem(value: str) -> str | None:
+    """Часовой пояс отображения — ТЗ 4.0.
+
+    Имя проверяется сразу: опечатка вроде «Europe/Moskva» иначе всплыла бы уже в рантайме,
+    при первой же отрисовке страницы.
+    """
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError):
+        return "неизвестный часовой пояс; ожидается имя вида Europe/Moscow или UTC"
     return None
 
 

@@ -88,8 +88,9 @@ SESSION_ENGINE = "apps.accounts.sessions"
 SESSION_SAVE_EVERY_REQUEST = True
 
 LANGUAGE_CODE = "ru"
-# ТЗ 4.0: хранение в UTC. Часовой пояс отображения установки — Q-A3, этап 6.
-TIME_ZONE = "UTC"
+# ТЗ 4.0: «хранение в UTC, отображение в часовом поясе установки». USE_TZ оставляет хранение в
+# UTC, а TIME_ZONE задаёт только показ. Пояс приходит из APP_TIME_ZONE (Q-A3), по умолчанию UTC.
+TIME_ZONE = ENV.app_time_zone
 USE_I18N = True
 USE_TZ = True
 

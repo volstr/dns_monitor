@@ -22,6 +22,8 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import cast
 
+from django.utils.timezone import localtime
+
 from apps.catalog.models import (
     RECORD_TYPE_CHOICES,
     AllowlistEntry,
@@ -296,7 +298,10 @@ def _headline(domain: Domain, effective: EffectiveSettings) -> str:
     period = f"проверка раз в {humanize_duration(effective.check_period.value)}"
     if domain.last_successful_check_at is None:
         return f"{group} · {period} · ответов ещё не было"
-    return f"{group} · {period} · последний ответ в {domain.last_successful_check_at:%H:%M}"
+    # localtime: ТЗ 4.0 требует показывать в часовом поясе установки, а форматирование в
+    # Python идёт мимо перевода, который Django делает в шаблоне.
+    answered_at = localtime(domain.last_successful_check_at)
+    return f"{group} · {period} · последний ответ в {answered_at:%H:%M}"
 
 
 def _summary_label(statuses: tuple[AddressStatusView, ...]) -> str:

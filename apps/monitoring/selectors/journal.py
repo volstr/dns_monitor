@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 
 from django.db.models import Q, QuerySet
+from django.utils.timezone import localtime
 
 from apps.accounts.models import AuditAction, AuditRecord
 from apps.catalog.models import NotificationMode
@@ -174,7 +175,9 @@ def _csv(rows: list[JournalRow]) -> bytes:
     for row in rows:
         writer.writerow(
             [
-                row.occurred_at.isoformat(),
+                # 11.7: ISO 8601. Смещение в нём есть, поэтому момент однозначен, а время
+                # совпадает с тем, что человек видел на экране (4.0).
+                localtime(row.occurred_at).isoformat(),
                 row.domain_name,
                 row.group_name,
                 row.label,
@@ -265,7 +268,7 @@ def _delivery(event: Event) -> str:
     if notification.status == DeliveryStatus.SENT:
         if notification.sent_at is None:
             return "доставлено"
-        return f"доставлено {notification.sent_at:%H:%M:%S}"
+        return f"доставлено {localtime(notification.sent_at):%H:%M:%S}"
     if notification.status == DeliveryStatus.FAILED:
         return f"не доставлено: {notification.last_error}"
     return "в очереди"

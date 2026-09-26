@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.timezone import localtime
 
 from apps.accounts.access import admin_required
 from apps.accounts.models import Member, Role
@@ -96,7 +97,8 @@ def member_invite(request: HttpRequest) -> HttpResponse:
     elif isinstance(result, InvitationIssued):
         messages.success(
             request,
-            f"Участник создан. Ссылка действует до {result.expires_at:%d.%m.%Y %H:%M} и остаётся "
+            f"Участник создан. Ссылка действует до "
+            f"{localtime(result.expires_at):%d.%m.%Y %H:%M} и остаётся "
             f"в списке, пока не открыта.",
         )
     return redirect("member-list")
