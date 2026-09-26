@@ -102,7 +102,9 @@ def _items(
             ).freshness_threshold.value
         thresholds[incident.domain_id] = resolved[group_id]
 
-    registries = registry_of_domains(list(thresholds), at, thresholds)
+    registries = registry_of_domains(
+        list(thresholds), at, thresholds, skip_ipv6=not global_settings.check_ipv6
+    )
 
     return tuple(
         OpenDiscrepancy(

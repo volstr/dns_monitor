@@ -39,6 +39,8 @@ class SettingsInput:
     merge_window_seconds: int
     merge_threshold: int
     dns_servers: tuple[str, ...]
+    #: Q-D27: снятый флаг означает «адресов IPv6 не существует».
+    check_ipv6: bool
     resolve_failure_threshold: int
     event_retention_seconds: int
     registry_retention_seconds: int | None
@@ -78,6 +80,7 @@ def save_global_settings(values: SettingsInput) -> SettingsSaved | SettingsNotSa
             merge_window_seconds=values.merge_window_seconds,
             merge_threshold=values.merge_threshold,
             dns_servers=list(values.dns_servers),
+            check_ipv6=values.check_ipv6,
             resolve_failure_threshold=values.resolve_failure_threshold,
             event_retention_seconds=values.event_retention_seconds,
             registry_retention_seconds=values.registry_retention_seconds,

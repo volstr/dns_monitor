@@ -144,7 +144,10 @@ def domain_rows(
     }
 
     allowlists = _allowlists(domain_ids)
-    registries = registry_of_domains(domain_ids, at, thresholds)
+    # Q-D27: при снятом флаге адресов IPv6 не существует.
+    registries = registry_of_domains(
+        domain_ids, at, thresholds, skip_ipv6=not global_settings.check_ipv6
+    )
     histories = history_of_domains(domain_ids)
 
     return tuple(

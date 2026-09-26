@@ -38,6 +38,7 @@ class SettingsPage:
     merge_window_seconds: int
     merge_threshold: int
     dns_servers_text: str
+    check_ipv6: bool
     resolve_failure_threshold: int
     event_retention_days: int
     registry_retention_days: int | None
@@ -72,6 +73,7 @@ def settings_page() -> SettingsPage:
         merge_window_seconds=row.merge_window_seconds,
         merge_threshold=row.merge_threshold,
         dns_servers_text="\n".join(row.dns_servers),
+        check_ipv6=row.check_ipv6,
         resolve_failure_threshold=row.resolve_failure_threshold,
         event_retention_days=row.event_retention_seconds // DAY,
         registry_retention_days=(

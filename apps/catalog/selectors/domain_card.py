@@ -204,8 +204,13 @@ def domain_card(
     if domain is None:
         return None
 
-    effective = settings_of_group(domain.group, GlobalSettings.objects.get())
-    statuses = address_statuses(domain.pk, at, effective.freshness_threshold.value)
+    settings_row = GlobalSettings.objects.get()
+    effective = settings_of_group(domain.group, settings_row)
+    # Q-D27: при снятом флаге адресов IPv6 не существует — ни в реестре, ни на экране.
+    skip_ipv6 = not settings_row.check_ipv6
+    statuses = address_statuses(
+        domain.pk, at, effective.freshness_threshold.value, skip_ipv6=skip_ipv6
+    )
     entries = tuple(AllowlistEntry.objects.filter(domain=domain).order_by("entry"))
     ordered = _sorted(statuses)
     lines = tuple(_registry_line(view, at) for view in ordered)

@@ -74,6 +74,11 @@ class GlobalSettings(models.Model):
         default=list,
         blank=True,
     )
+    # Сверх перечня 4.1, по решению разработчика (Q-D27). Снятый флаг означает «адресов IPv6
+    # не существует»: AAAA не спрашивается ни у одного домена, такие адреса не попадают ни в
+    # реестр, ни в события, ни на экраны. Главнее флага AAAA у домена (4.3): иначе «полностью
+    # игнорируем» соблюдалось бы не полностью.
+    check_ipv6 = models.BooleanField(default=True)
     # Q-C6: это N из 7.1 — сколько неудачных проверок подряд считать сбоем домена.
     resolve_failure_threshold = models.PositiveIntegerField(default=3)
 

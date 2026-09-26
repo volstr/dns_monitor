@@ -36,7 +36,7 @@ from apps.monitoring.models import (
     EventType,
     Incident,
 )
-from apps.monitoring.selectors.addresses import address_statuses, fresh_set
+from apps.monitoring.selectors.addresses import IPV4, address_statuses, fresh_set
 from core.ports.resolver import ResolveOutcome, Resolver, ResolveResult
 from core.types.checking import AddressStatus, AddressStatusView, CheckOutcome
 from core.types.dns import IPAddress, RecordType
@@ -69,9 +69,17 @@ def run_check(*, domain_id: int, at: datetime, resolver: Resolver) -> CheckRepor
     # FOR UPDATE в PostgreSQL. Наследование настроек и так идёт отдельным запросом.
     domain = Domain.objects.select_for_update().get(pk=domain_id)
     threshold = effective_settings(domain_id).freshness_threshold.value
-    failure_threshold = GlobalSettings.objects.get().resolve_failure_threshold
+
+    settings_row = GlobalSettings.objects.get()
+    failure_threshold = settings_row.resolve_failure_threshold
+    skip_ipv6 = not settings_row.check_ipv6
 
     record_types = frozenset(RecordType(kind) for kind in domain.record_types)
+    if skip_ipv6:
+        # Q-D27: снятый общий флаг главнее флага AAAA у домена (4.3). «Полностью игнорируем»
+        # значит и не спрашивать: иначе сервер отвечал бы, а мы бы ответ выбрасывали.
+        record_types -= {RecordType.AAAA}
+
     result = resolver.resolve(domain.name, record_types)
 
     if result.outcome is ResolveOutcome.UNAVAILABLE:
@@ -83,7 +91,9 @@ def run_check(*, domain_id: int, at: datetime, resolver: Resolver) -> CheckRepor
     if result.outcome is ResolveOutcome.NO_RECORDS:
         return _no_records(domain, at, result, failure_threshold)
 
-    return _answered(domain, at, result, threshold, is_baseline=is_baseline)
+    return _answered(
+        domain, at, result, threshold, is_baseline=is_baseline, skip_ipv6=skip_ipv6
+    )
 
 
 def _not_performed(domain: Domain, at: datetime, result: ResolveResult) -> CheckReport:
@@ -146,6 +156,7 @@ def _answered(
     threshold: timedelta,
     *,
     is_baseline: bool,
+    skip_ipv6: bool = False,
 ) -> CheckReport:
     events: list[EventType] = []
     event_ids: list[int] = []
@@ -160,18 +171,22 @@ def _answered(
     # обоих, разность оказывается пустой и `ADDRESS_GONE` не возникает никогда.
     previous_at = domain.last_successful_check_at
     before_set: frozenset[IPAddress] = (
-        fresh_set(domain.pk, previous_at, threshold) if previous_at else frozenset()
+        fresh_set(domain.pk, previous_at, threshold, skip_ipv6=skip_ipv6)
+        if previous_at
+        else frozenset()
     )
     before_unmatched: frozenset[IPAddress] = (
-        _unmatched(address_statuses(domain.pk, previous_at, threshold))
+        _unmatched(address_statuses(domain.pk, previous_at, threshold, skip_ipv6=skip_ipv6))
         if previous_at
         else frozenset()
     )
 
-    _write_registry(domain, at, result.answer)
+    # Q-D27: адрес IPv6 при снятом флаге не попадает даже в реестр — «его не существует».
+    answer = _without_ipv6(result.answer) if skip_ipv6 else result.answer
+    _write_registry(domain, at, answer)
 
-    after_set = fresh_set(domain.pk, at, threshold)
-    statuses = address_statuses(domain.pk, at, threshold)
+    after_set = fresh_set(domain.pk, at, threshold, skip_ipv6=skip_ipv6)
+    statuses = address_statuses(domain.pk, at, threshold, skip_ipv6=skip_ipv6)
 
     appeared = after_set - before_set
     gone = before_set - after_set
@@ -251,6 +266,16 @@ def _write_registry(domain: Domain, at: datetime, answer: frozenset[IPAddress]) 
     AddressRegistryEntry.objects.filter(domain=domain).exclude(
         address__in=[str(address) for address in answer]
     ).update(consecutive_misses=F("consecutive_misses") + 1)
+
+
+def _without_ipv6(answer: frozenset[IPAddress]) -> frozenset[IPAddress]:
+    """Подстраховка к запрету запрашивать AAAA — решение Q-D27.
+
+    Запрос AAAA уже не уходит, но ответ на A теоретически может принести что угодно, а обещано
+    было «делаем вид, что адресов IPv6 не существует». Дешевле отфильтровать, чем однажды
+    обнаружить такой адрес в реестре.
+    """
+    return frozenset(address for address in answer if address.version == IPV4)
 
 
 def _buckets(at: datetime) -> tuple[tuple[str, datetime], ...]:

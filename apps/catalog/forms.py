@@ -197,6 +197,7 @@ class GlobalSettingsForm(forms.Form):
     merge_window_seconds = forms.IntegerField(min_value=1)
     merge_threshold = forms.IntegerField(min_value=1)
     dns_servers = forms.CharField(required=False, widget=forms.Textarea)
+    check_ipv6 = forms.BooleanField(required=False)
     resolve_failure_threshold = forms.IntegerField(min_value=1)
     event_retention_days = forms.IntegerField(min_value=1)
     registry_retention_days = forms.IntegerField(required=False, min_value=1)
@@ -223,6 +224,7 @@ class GlobalSettingsForm(forms.Form):
             merge_window_seconds=data["merge_window_seconds"],
             merge_threshold=data["merge_threshold"],
             dns_servers=_lines(data.get("dns_servers")),
+            check_ipv6=bool(data.get("check_ipv6")),
             resolve_failure_threshold=data["resolve_failure_threshold"],
             event_retention_seconds=data["event_retention_days"] * SECONDS_IN_DAY,
             registry_retention_seconds=(

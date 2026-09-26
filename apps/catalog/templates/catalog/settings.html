@@ -49,6 +49,10 @@
               <div><textarea class="inp mono" name="dns_servers" rows="3">{{ page.dns_servers_text }}</textarea></div>
             </div>
             <div class="row">
+              <div class="k">Проверять адреса IPv6<div class="d">Снятый флаг означает, что адресов IPv6 не существует: записи AAAA не запрашиваются, такие адреса не попадают ни в реестр, ни в историю, ни в журнал. Флаг главнее типа записи AAAA у домена.</div></div>
+              <div><label class="tgl"><input type="checkbox" name="check_ipv6" {% if page.check_ipv6 %}checked{% endif %}> Проверять</label></div>
+            </div>
+            <div class="row">
               <div class="k">Сколько неудачных проверок подряд считать сбоем</div>
               <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="resolve_failure_threshold" value="{{ page.resolve_failure_threshold }}"></div>
             </div>

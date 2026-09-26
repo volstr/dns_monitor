@@ -48,6 +48,7 @@ def values(**extra: object) -> SettingsInput:
         "merge_window_seconds": 60,
         "merge_threshold": 5,
         "dns_servers": ("10.0.0.1", "10.0.0.2"),
+        "check_ipv6": True,
         "resolve_failure_threshold": 3,
         "event_retention_seconds": 90 * 24 * HOUR,
         "registry_retention_seconds": None,
@@ -178,6 +179,39 @@ def test_8_3_settings_screen_has_no_field_for_the_bot_token(
     assert 'type="password"' not in body
     # Адресат при этом задаётся здесь и полем быть обязан (Q-D11).
     assert 'name="telegram_chat_id"' in body
+
+
+def test_d27_ipv6_switch_is_saved_from_the_screen(client: Client, admin: Member) -> None:
+    """Q-D27: снятый флажок означает «адресов IPv6 не существует»."""
+    client.force_login(admin)
+    fields = {
+        "check_period_minutes": "5",
+        "freshness_threshold_hours": "24",
+        "notification_mode": NotificationMode.NOT_ALLOWED.value,
+        "reminder_interval_hours": "6",
+        "merge_window_seconds": "60",
+        "merge_threshold": "5",
+        "dns_servers": "10.0.0.1",
+        "resolve_failure_threshold": "3",
+        "event_retention_days": "90",
+        "session_lifetime_hours": "168",
+        "login_failure_threshold": "5",
+    }
+
+    client.post(reverse("settings-save"), fields)
+    assert GlobalSettings.objects.get().check_ipv6 is False
+
+    client.post(reverse("settings-save"), fields | {"check_ipv6": "on"})
+    assert GlobalSettings.objects.get().check_ipv6 is True
+
+
+def test_d27_screen_offers_the_ipv6_switch(client: Client, admin: Member) -> None:
+    client.force_login(admin)
+
+    body = client.get(reverse("settings")).content.decode()
+
+    assert "Проверять адреса IPv6" in body
+    assert 'name="check_ipv6"' in body
 
 
 def test_4_1_admin_saves_through_the_form(client: Client, admin: Member) -> None:
