@@ -77,6 +77,13 @@ def navigation(request: HttpRequest) -> dict[str, object]:
 
     # Импорт внутри функции: `access` зовут из настроек шаблонов, и на уровне модуля он потянул
     # бы приложения до того, как реестр Django их загрузит.
+    from apps.catalog.selectors.health import install_warnings
     from apps.catalog.selectors.navigation import navigation_counts
 
-    return {"is_admin": user.role == Role.ADMIN, "counts": navigation_counts()}
+    return {
+        "is_admin": user.role == Role.ADMIN,
+        "counts": navigation_counts(),
+        # Состояния, в которых продукт цел, но не делает своего дела. Показываются на каждом
+        # экране: пустой реестр сам по себе ничего не объясняет.
+        "install_warnings": install_warnings(),
+    }

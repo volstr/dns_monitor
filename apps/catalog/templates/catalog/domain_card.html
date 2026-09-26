@@ -182,7 +182,12 @@
                 </div>
               </div>
             {% empty %}
-              <div class="reg-row"><div class="addr"><span class="sub">Домен пока не отдавал ни одного адреса</span></div></div>
+              <div class="reg-row">
+                <div class="addr" style="grid-column:1/-1">
+                  <span class="sub">Домен пока не отдавал ни одного адреса.</span>
+                  {% if card.empty_reason %}<span class="sub" style="display:block;margin-top:4px">{{ card.empty_reason }}</span>{% endif %}
+                </div>
+              </div>
             {% endfor %}
           </div>
           </div>

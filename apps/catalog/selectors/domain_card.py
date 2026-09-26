@@ -29,6 +29,7 @@ from apps.catalog.models import (
     GlobalSettings,
     NotificationMode,
 )
+from apps.catalog.selectors.health import checks_are_possible
 from apps.catalog.selectors.settings import EffectiveSettings, settings_of_group
 from apps.monitoring.models import Event, EventType
 from apps.monitoring.selectors.addresses import address_statuses
@@ -182,6 +183,8 @@ class DomainCard:
     history_filter: HistoryFilter
     #: Данные графика следа (9.2) для виджета. Уходят в шаблон одним JSON рядом с элементом.
     trace: TraceData
+    #: Почему реестр пуст. Пусто — объяснять нечего: проверки идут или уже прошли.
+    empty_reason: str
 
 
 def domain_card(
@@ -236,7 +239,24 @@ def domain_card(
             at=at,
             statuses={str(view.address): str(view.status) for view in statuses},
         ),
+        empty_reason=_empty_reason(domain, statuses),
     )
+
+
+def _empty_reason(domain: Domain, statuses: tuple[AddressStatusView, ...]) -> str:
+    """Почему в реестре пусто. Пустая таблица сама по себе ничего не объясняет."""
+    if statuses:
+        return ""
+    if not checks_are_possible():
+        return (
+            "Проверки не идут: в общих настройках пуст список DNS-серверов. Пока он пуст, "
+            "спрашивать некого, и реестр останется пустым."
+        )
+    if not domain.watch_enabled:
+        return "Наблюдение приостановлено, поэтому домен не проверяется."
+    if domain.next_check_at is None:
+        return "Время проверки не назначено. Нажмите «Проверить сейчас»."
+    return "Домен ещё не проверялся. Первая проверка пройдёт в ближайшие секунды."
 
 
 def _filtered_registry(

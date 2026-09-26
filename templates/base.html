@@ -80,6 +80,23 @@ HTMX нужен валидации белого списка (10.2) и выбо�
   </aside>
 
   <div class="main">
+    {% comment %}
+    Установка цела, но не делает своего дела: сказать об этом нужно на экране, а не только в
+    журнале процесса. Иначе человек ждёт проверок и видит пустой реестр без объяснений.
+    {% endcomment %}
+    {% for warning in install_warnings %}
+      <div class="banner" style="margin:18px 32px 0">
+        <div class="bi">•</div>
+        <div>
+          <b>Проверки не идут</b>
+          <p>{{ warning.text }}</p>
+        </div>
+        {% if is_admin %}
+          <div class="ba"><a class="btn btn-sm" href="{% url warning.url_name %}">{{ warning.action }}</a></div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
     {% if messages %}
       {% for message in messages %}
         <div class="banner"><div class="bi">•</div><p>{{ message }}</p></div>
