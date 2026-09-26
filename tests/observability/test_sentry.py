@@ -288,6 +288,38 @@ def test_74_member_email_is_not_sent(sentry: Recorder, admin: Member) -> None:
     assert admin.email not in sentry.text()
 
 
+def test_74_login_body_does_not_ride_along_on_the_next_event(
+    sentry: Recorder, client: Client, admin: Member
+) -> None:
+    """11.14: тело запроса к входу вырезается целиком — вместе с логином, а не только паролем.
+
+    Тест написан по найденной утечке. Правило сначала смотрело на адрес обработчика, но в
+    событие от Django поле `url` попадает не всегда: тогда оно молча не срабатывало, и почтовый
+    адрес участника уезжал в Sentry внутри тела запроса к `/login/`.
+    """
+    client.post(reverse("login"), {"email": admin.email, "password": "неверный"})
+    sentry_sdk.capture_message("что-то пошло не так", level="error")
+    flush()
+
+    assert admin.email not in sentry.text()
+    assert "data" not in sentry.last.get("request", {})
+
+
+def test_74_an_ordinary_request_body_is_kept(sentry: Recorder) -> None:
+    """Обратная сторона: тело без учётных данных нужно для разбора ошибки и остаётся."""
+    with sentry_sdk.new_scope() as scope:
+        scope.add_event_processor(
+            lambda event, hint: {
+                **event,
+                "request": {"url": "http://testserver/domains/", "data": {"names": "a.ru"}},
+            }
+        )
+        sentry_sdk.capture_message("что-то пошло не так", level="error")
+    flush()
+
+    assert sentry.last["request"]["data"] == {"names": "a.ru"}
+
+
 def test_74_domain_names_and_addresses_are_kept(sentry: Recorder) -> None:
     """Обратное правило 11.14: имена доменов и адреса не вырезаются."""
     report(

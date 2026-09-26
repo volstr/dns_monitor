@@ -84,6 +84,9 @@ class GlobalSettings(models.Model):
 
     # Сроки хранения — ТЗ 11.3. NULL у реестра означает «бессрочно».
     event_retention_seconds = models.PositiveIntegerField(default=90 * 24 * 60 * 60)
+    # Когда уборка по 11.3 проходила в последний раз. В базе, а не в памяти процесса:
+    # перезапуск не должен ни пропускать уборку, ни запускать её заново каждые пять секунд.
+    last_purge_at = models.DateTimeField(null=True, blank=True, default=None)
     registry_retention_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     # Состав сообщения — ТЗ 8.4, Q-C4: только здесь, наследования нет.

@@ -18,6 +18,7 @@ from django.conf import settings
 
 from apps.catalog.models import GlobalSettings
 from apps.monitoring.services.health import check_health, record_checks_stopped
+from apps.monitoring.services.retention import purge_due
 from apps.monitoring.services.tick import TickReport, tick
 from apps.notifications.services.outage import send_outage_alert
 from core.adapters.dns_resolver import DnsResolver
@@ -74,6 +75,14 @@ def run_one_tick(
             )
         return TickSkipped(reason=reason, healthy=False)
 
+    # Уборка по 11.3 живёт здесь, а не отдельным процессом и не заданием по расписанию:
+    # `run_checker` — единственная долгоживущая команда, которая и так идёт по кругу, а своего
+    # планировщика в проекте нет и не будет. Чаще раза в час она сама себя не запускает.
+    #
+    # Стоит **до** проверки списка DNS-серверов: срок хранения не перестаёт истекать оттого,
+    # что проверять домены пока нечем.
+    _purge(clock.now())
+
     global_settings = GlobalSettings.objects.get()
     servers = list(global_settings.dns_servers)
     if not servers:
@@ -89,6 +98,23 @@ def run_one_tick(
         resolver=resolver,
         state_store=state_store,
         concurrency=settings.ENV.resolve_concurrency,
+    )
+
+
+def _purge(at: datetime) -> None:
+    """Уборка по срокам хранения. Молчит, когда убирать нечего: раз в час это обычное дело."""
+    purged = purge_due(at=at)
+    if purged is None or not purged.total:
+        return
+    logger.info(
+        "уборка по срокам хранения",
+        extra={
+            "events": purged.events,
+            "audit": purged.audit_records,
+            "registry": purged.registry_entries,
+            "buckets": purged.hourly_buckets + purged.daily_buckets,
+            "notifications": purged.notifications,
+        },
     )
 
 

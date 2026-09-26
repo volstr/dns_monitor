@@ -93,16 +93,28 @@ def scrub_event(event: dict[str, Any]) -> dict[str, Any]:
         cleaned["user"] = {key: user[key] for key in USER_KEPT if key in user}
 
     request = cleaned.get("request")
-    if isinstance(request, dict) and _is_body_free(str(request.get("url", ""))):
-        # «Тела запросов к обработчикам входа и смены пароля целиком» (11.14). Пароль в теле
-        # лежит в открытом виде, и отдельного имени поля для него может не быть.
+    if isinstance(request, dict) and _body_is_credentials(request):
+        # «Тела запросов к обработчикам входа и смены пароля **целиком**» (11.14). Именно
+        # целиком: рядом с паролем в том же теле лежит логин, а логин участника — это его
+        # почтовый адрес, который 11.14 отправлять запрещает отдельным пунктом.
         request.pop("data", None)
 
     return cleaned
 
 
-def _is_body_free(url: str) -> bool:
-    return any(part in url for part in BODY_FREE_PATHS)
+def _body_is_credentials(request: dict[str, Any]) -> bool:
+    """Тело запроса с учётными данными — по обработчику или по самому телу.
+
+    Проверять только адрес обработчика оказалось недостаточно: в событие от Django поле `url`
+    попадает не всегда, и тогда правило по адресу молча не срабатывало — тело запроса к входу
+    уходило целиком, вместе с почтовым адресом участника. Поэтому второй признак смотрит на
+    само тело: поле с именем секрета означает форму учётных данных независимо от того, по
+    какому адресу её отправили.
+    """
+    if any(part in str(request.get("url", "")) for part in BODY_FREE_PATHS):
+        return True
+    data = request.get("data")
+    return isinstance(data, dict) and any(is_secret(str(key)) for key in data)
 
 
 def _clean(value: Any, *, depth: int) -> Any:
