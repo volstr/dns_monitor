@@ -14,6 +14,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Final
 from urllib.parse import SplitResult, parse_qsl, unquote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,6 +22,11 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.core.exceptions import ImproperlyConfigured
 
 SESSION_SECRET_MIN_LENGTH: Final = 50
+#: Откуда берётся системный пояс, если `APP_TIME_ZONE` и `TZ` не заданы.
+LOCALTIME_PATH: Final = Path("/etc/localtime")
+ZONEINFO_MARKER: Final = "zoneinfo/"
+#: Имена, означающие тот же пояс, что и `UTC`.
+UTC_ALIASES: Final = frozenset({"Etc/UTC", "Etc/GMT", "Etc/Universal", "Universal", "Zulu"})
 REDIS_DB_MAX: Final = 15
 
 _SENTRY_DSN: Final = re.compile(r"https?://[^:@/\s]+(?::[^@/\s]*)?@[^/\s]+/(?:[^/\s]+/)*\d+")
@@ -106,7 +112,9 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
             "пространства ключей",
         )
     app_base_url = read.required("APP_BASE_URL", _app_base_url_problem)
-    app_time_zone = read.optional("APP_TIME_ZONE", _time_zone_problem) or "UTC"
+    app_time_zone = read.optional("APP_TIME_ZONE", _time_zone_problem) or _system_time_zone(
+        source
+    )
     session_secret = read.required("SESSION_SECRET", _session_secret_problem)
     auth_2fa_enabled = read.boolean("AUTH_2FA_ENABLED", default=False)
     dns_timeout_ms = read.integer("DNS_TIMEOUT_MS", default=3000, minimum=1, maximum=60_000)
@@ -293,6 +301,41 @@ def _app_base_url_problem(value: str) -> str | None:
     if parts.path not in {"", "/"} or parts.query or parts.fragment:
         return "адрес установки задаётся без пути, параметров и якоря"
     return None
+
+
+def _system_time_zone(source: Mapping[str, str]) -> str:
+    """Пояс, когда `APP_TIME_ZONE` не задан — ТЗ 4.0.
+
+    Порядок: переменная `TZ`, затем `/etc/localtime`, затем UTC. Смысл в том, чтобы установка вне
+    контейнера показывала местное время без лишней настройки.
+
+    **В контейнере это почти всегда UTC**: образ собран на `python:3.12-slim`, где
+    `/etc/localtime` указывает на `Etc/UTC`, а пояс хоста Docker внутрь не передаёт. Чтобы пояс
+    отличался от UTC, его нужно либо задать `APP_TIME_ZONE`, либо пробросить `TZ` в компоузе.
+
+    Значение из окружения проверяется так же, как `APP_TIME_ZONE`, но неверное здесь не роняет
+    запуск: это догадка, а не требование, и падать из-за чужой переменной неправильно.
+    """
+    declared = source.get("TZ", "").strip()
+    if declared and _time_zone_problem(declared) is None:
+        return declared
+    return _time_zone_from_localtime() or "UTC"
+
+
+def _time_zone_from_localtime() -> str | None:
+    """Имя пояса из ссылки `/etc/localtime` — так его хранит любой дистрибутив Linux."""
+    try:
+        target = str(LOCALTIME_PATH.resolve())
+    except OSError:
+        return None
+    if ZONEINFO_MARKER not in target:
+        return None
+    name = target.split(ZONEINFO_MARKER, 1)[1]
+    if name in UTC_ALIASES:
+        # `Etc/UTC` — ссылка на тот же пояс, что и `UTC`. Каноническое имя короче и
+        # понятнее в настройках и логах, а поведение одинаковое.
+        return "UTC"
+    return name if _time_zone_problem(name) is None else None
 
 
 def _time_zone_problem(value: str) -> str | None:

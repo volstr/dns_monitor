@@ -50,8 +50,13 @@ def test_4_0_primary_keys_are_bigint() -> None:
 
 
 def test_4_0_time_is_stored_in_utc() -> None:
+    """4.0: хранение в UTC. За это отвечает USE_TZ, и он не зависит от пояса показа."""
     assert settings.USE_TZ is True
-    assert settings.TIME_ZONE == "UTC"
+
+
+def test_4_0_display_time_zone_comes_from_the_environment() -> None:
+    """4.0: отображение — в часовом поясе установки, а он приходит из окружения (Q-A3)."""
+    assert settings.ENV.app_time_zone == settings.TIME_ZONE
 
 
 def test_interface_language_is_russian() -> None:
