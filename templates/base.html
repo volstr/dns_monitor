@@ -81,26 +81,38 @@ HTMX нужен валидации белого списка (10.2) и выбо�
 
   <div class="main">
     {% comment %}
-    Установка цела, но не делает своего дела: сказать об этом нужно на экране, а не только в
-    журнале процесса. Иначе человек ждёт проверок и видит пустой реестр без объяснений.
-    {% endcomment %}
-    {% for warning in install_warnings %}
-      <div class="banner" style="margin:18px 32px 0">
-        <div class="bi">•</div>
-        <div>
-          <b>Проверки не идут</b>
-          <p>{{ warning.text }}</p>
-        </div>
-        {% if is_admin %}
-          <div class="ba"><a class="btn btn-sm" href="{% url warning.url_name %}">{{ warning.action }}</a></div>
-        {% endif %}
-      </div>
-    {% endfor %}
+    Полоса сообщений. Здесь же предупреждения об установке: она цела, но не делает своего дела,
+    и сказать об этом нужно на экране, а не только в журнале процесса.
 
-    {% if messages %}
-      {% for message in messages %}
-        <div class="banner"><div class="bi">•</div><p>{{ message }}</p></div>
-      {% endfor %}
+    Вид зависит от уровня: ошибка красная, предупреждение янтарное, успех зелёный. Одинаковые
+    плашки заставляли бы читать текст, чтобы понять, сохранилось или нет, — а это первое, что
+    человек хочет узнать взглядом.
+    {% endcomment %}
+    {% if install_warnings or messages %}
+      <div class="msgs">
+        {% for warning in install_warnings %}
+          <div class="banner">
+            <div class="bi">•</div>
+            <div>
+              <b>Проверки не идут</b>
+              <p>{{ warning.text }}</p>
+            </div>
+            {% if is_admin %}
+              <div class="ba"><a class="btn btn-sm" href="{% url warning.url_name %}">{{ warning.action }}</a></div>
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        {% for message in messages %}
+          {% if message.level_tag == 'error' %}
+            <div class="err">{{ message }}</div>
+          {% elif message.level_tag == 'warning' %}
+            <div class="banner"><div class="bi">•</div><p>{{ message }}</p></div>
+          {% else %}
+            <div class="ok">{{ message }}</div>
+          {% endif %}
+        {% endfor %}
+      </div>
     {% endif %}
     {% block content %}{% endblock %}
   </div>

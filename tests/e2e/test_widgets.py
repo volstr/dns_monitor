@@ -194,6 +194,30 @@ def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> 
     assert page.locator("[data-trace-row] i.a").count() == 0
 
 
+def test_11_4_message_strip_lines_up_with_the_page_content(
+    signed_in: Any, live_server: Any, sample_domain: Domain
+) -> None:
+    """Полоса сообщений стоит по сетке страницы, а не враспор по всей ширине.
+
+    Сравнивается настоящее положение на отрисованной странице: в разметке отступ задан классом,
+    и по ней не видно, совпал он с содержимым или нет.
+    """
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{sample_domain.pk}/")
+    page.fill("textarea[name=allowlist]", "10.20.999.0/24")
+    # Именно кнопка формы сохранения: первой на странице стоит «Проверить сейчас».
+    page.locator('form[action$="/save/"] button[type=submit]').click()
+
+    strip = page.locator(".msgs .err").first.bounding_box()
+    # Сравнение именно с содержимым: у самого `.body` отступ свой, и его левый край левее.
+    content = page.locator("section .body .panel").first.bounding_box()
+
+    assert strip is not None
+    assert content is not None
+    assert abs(strip["x"] - content["x"]) < 2
+    assert abs(strip["width"] - content["width"]) < 2
+
+
 def test_page_works_with_javascript_disabled(
     browser: Any, live_server: Any, sample_domain: Domain
 ) -> None:

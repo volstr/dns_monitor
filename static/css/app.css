@@ -18,7 +18,9 @@
       доменов), ссылка задаёт состояние экрана, на которое можно сослаться (фильтры реестра и
       истории на карточке).
    6. Добавлена отметка следа `.trace i.n` — «не проверяется» (Q-D25). В прототипе такого
-      состояния не было. */
+      состояния не было.
+   7. Добавлена полоса сообщений `.msgs`: в прототипе экраны не сохранялись, и показывать
+      результат было нечем. Отступы повторяют `.head` и `.body`. */
 
 @font-face{font-family:"IBM Plex Sans";font-weight:400;font-style:normal;font-display:swap;
   src:local("IBM Plex Sans"),url("../fonts/ibm-plex-sans-400.woff2") format("woff2")}
@@ -122,6 +124,15 @@ a{color:inherit}
 .rail-foot b{display:block;color:var(--ink);font-weight:500;font-size:13px}
 
 .main{min-width:0}
+/* Правка переноса: полоса сообщений. В прототипе экраны не сохранялись, и показывать результат
+   было нечем — своего места у сообщений там нет. Отступы повторяют `.head` и `.body`, иначе
+   плашка растягивается во всю ширину и выпадает из сетки страницы. */
+.msgs{padding:18px 32px 0;display:flex;flex-direction:column;gap:10px}
+.msgs .banner,.msgs .err{margin:0}
+.msgs .ok{
+  border:1px solid #A9CBBA;background:var(--ok-bg);color:#1F5C41;
+  border-radius:var(--r);padding:9px 12px;font-size:12.5px;
+}
 .head{
   padding:22px 32px 18px;border-bottom:1px solid var(--line);background:var(--paper);
   display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;
@@ -559,7 +570,7 @@ input.mono,select.inp{font-family:"JetBrains Mono",ui-monospace,monospace}
   .nav{display:flex;gap:6px;overflow-x:auto;padding:8px}
   .nav button,.nav a{width:auto;white-space:nowrap}
   .rail-foot{display:none}
-  .head,.body{padding-left:20px;padding-right:20px}
+  .head,.body,.msgs{padding-left:20px;padding-right:20px}
   .stats{grid-template-columns:1fr 1fr}
   .stat:nth-child(2){border-right:0}
   .stat:nth-child(-n+2){border-bottom:1px solid var(--line-soft)}

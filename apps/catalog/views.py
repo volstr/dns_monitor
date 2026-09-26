@@ -31,7 +31,7 @@ from apps.catalog.selectors.domain_card import domain_card
 from apps.catalog.selectors.domains import DomainFilter, domain_list_page
 from apps.catalog.selectors.global_settings import settings_page
 from apps.catalog.selectors.groups import group_edit_page, group_list_page
-from apps.catalog.services.allowlist import parse_allowlist
+from apps.catalog.services.allowlist import ParsedAllowlist, parse_allowlist
 from apps.catalog.services.domains import (
     DomainNotCreated,
     DomainNotSaved,
@@ -53,6 +53,7 @@ from apps.monitoring.services.manual_check import (
 )
 from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
+from core.text import plural
 
 
 @member_required
@@ -99,6 +100,7 @@ def domain_create(request: HttpRequest) -> HttpResponse:
 
     if isinstance(result, DomainsNotAdded):
         # 10.2: пока в списке есть ошибочная строка, сохранять нельзя — и домены не создаются.
+        messages.error(request, _allowlist_error("Домены не добавлены", result.allowlist))
         return render(
             request,
             "catalog/domain_new.html",
@@ -423,9 +425,25 @@ def _rejection_text(reason: RejectionReason) -> str:
     return "Домен выключен из наблюдения, проверять нечего."
 
 
+def _allowlist_error(prefix: str, parsed: ParsedAllowlist) -> str:
+    """Сколько строк списка не годится. Причина у каждой видна рядом с ней самой (10.2)."""
+    broken = len(parsed.errors)
+    lines = plural(broken, "ошибочная строка", "ошибочные строки", "ошибочных строк")
+    return (
+        f"{prefix}: в списке разрешённых адресов {broken} {lines}. "
+        f"Причина показана у каждой из них."
+    )
+
+
 def _card_with_errors(
     request: HttpRequest, domain_id: int, result: DomainNotSaved
 ) -> HttpResponse:
+    # Сообщение сверху, рядом с «Сохранено»: причина видна у строки, но сам факт «не сохранено»
+    # оттуда не читается — человек не понимает, сохранилось ли, пока не долистает до поля.
+    if result.reasons:
+        messages.error(request, "Не сохранено. " + " ".join(result.reasons))
+    else:
+        messages.error(request, _allowlist_error("Не сохранено", result.parsed))
     card = domain_card(domain_id=domain_id, at=SystemClock().now())
     if card is None:
         raise Http404
