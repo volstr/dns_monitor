@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from config.env import django_database, load_env
+from core.observability.setup import configure_sentry
 
 ENV = load_env()
 
@@ -110,4 +111,11 @@ LOGGING = {
     "root": {"handlers": ["console"], "level": "INFO"},
 }
 
-# TODO(ТЗ 11.14): инициализация sentry-sdk при заданном SENTRY_DSN — этап 8.
+# Отправка ошибок в Sentry — ТЗ 11.14. Подключение необязательное: при пустом SENTRY_DSN
+# функция ничего не делает и приложение работает как обычно (критерий 67).
+SENTRY_ENABLED = configure_sentry(
+    dsn=ENV.sentry_dsn,
+    environment=ENV.sentry_environment,
+    traces_sample_rate=ENV.sentry_traces_sample_rate,
+    release=ENV.app_release,
+)

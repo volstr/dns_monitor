@@ -42,7 +42,7 @@ class Retrying:
 
 @dataclass(frozen=True, slots=True)
 class GaveUp:
-    """Повторы исчерпаны. TODO(ТЗ 11.14): отправка в Sentry — этап 8."""
+    """Повторы исчерпаны. Отправку в Sentry делает `notifier`, где известен исход (11.14)."""
 
     notification_id: int
     attempts: int

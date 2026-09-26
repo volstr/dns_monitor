@@ -22,6 +22,7 @@ from apps.monitoring.services.tick import TickReport, tick
 from apps.notifications.services.outage import send_outage_alert
 from core.adapters.dns_resolver import DnsResolver
 from core.adapters.telegram import TelegramChannel
+from core.observability.report import Failure, report
 from core.ports.clock import Clock
 from core.ports.state_store import StateStore
 
@@ -53,6 +54,16 @@ def run_one_tick(
         reason = f"инфраструктура недоступна: {health.failed_component}"
         logger.error(reason, extra={"component": health.failed_component})
         if previously_healthy:
+            # 11.14, критерий 69: авария инфраструктуры — единственное, что уходит **в оба
+            # канала**. Дежурным, потому что сервис перестал следить за доменами; в Sentry,
+            # потому что разработчикам нужна причина. Группировка — по отказавшему компоненту.
+            report(
+                Failure(
+                    cause=f"infrastructure:{health.failed_component}",
+                    message=reason,
+                    tags={"component": health.failed_component or "неизвестен"},
+                )
+            )
             record_checks_stopped(at=clock.now(), report=health)
             # Критерий 65: сообщение уходит в канал напрямую, минуя очередь и окно слияния —
             # компонент, сообщающий об отказе, не может зависеть от отказавшего (11.13).

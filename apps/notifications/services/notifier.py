@@ -23,10 +23,12 @@ from apps.monitoring.models import Event, Incident
 from apps.notifications.models import Notification
 from apps.notifications.services.message import compose_summary
 from apps.notifications.services.outbox import GaveUp, due, mark_delivered, mark_failed
+from core.observability.report import Failure, report
 from core.ports.notification_channel import NotificationChannel, Sent
 from core.ports.state_store import StateKey, StateStore
 
 logger = logging.getLogger(__name__)
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,10 +91,18 @@ def _send_one(
         notification_id=notification.pk, at=at, error=result.error, retryable=result.retryable
     )
     if isinstance(outcome, GaveUp):
-        # TODO(ТЗ 11.14): исчерпанные повторы уходят в Sentry — этап 8.
         logger.error(
             "уведомление не доставлено, повторы исчерпаны",
             extra={"notification": notification.pk, "error": result.error},
+        )
+        # 11.14: неудача доставки **после исчерпания всех повторов** — ошибка приложения.
+        # Отдельная неудачная попытка ею не является: ради этого и существуют повторы.
+        report(
+            Failure(
+                cause="delivery:gave-up",
+                message=f"уведомление не доставлено, повторы исчерпаны: {result.error}",
+                tags={"notification": str(notification.pk)},
+            )
         )
         return _plus(run, gave_up=1)
     return _plus(run, failed=1)

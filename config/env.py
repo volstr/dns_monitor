@@ -64,6 +64,9 @@ class Env:
     sentry_dsn: str | None
     sentry_environment: str
     sentry_traces_sample_rate: float
+    #: Версия сборки. Уходит в Sentry релизом (11.14): без неё не понять, какое
+    #: развёртывание сломало работу. Пустая строка означает «не задана».
+    app_release: str
     # Сверх таблицы 11.10: подключение канала Telegram по 8.3, см. Q-A2.
     telegram_bot_token: str | None
 
@@ -139,6 +142,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
     sentry_dsn = read.optional("SENTRY_DSN", _sentry_dsn_problem)
     sentry_environment = read.text("SENTRY_ENVIRONMENT", default="production")
     sentry_traces_sample_rate = read.fraction("SENTRY_TRACES_SAMPLE_RATE", default=0.0)
+    app_release = read.text("APP_RELEASE", default="")
 
     telegram_bot_token = read.optional("TELEGRAM_BOT_TOKEN", _telegram_bot_token_problem)
 
@@ -165,6 +169,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
         sentry_dsn=sentry_dsn,
         sentry_environment=sentry_environment,
         sentry_traces_sample_rate=sentry_traces_sample_rate,
+        app_release=app_release,
         telegram_bot_token=telegram_bot_token,
     )
     return EnvParseResult(env=env, errors=())
