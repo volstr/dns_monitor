@@ -44,13 +44,33 @@
     empty.textContent = "Ничего не найдено";
     empty.hidden = true;
 
+    /* 10.4: «при отсутствии совпадений предлагается создать группу с введённым названием».
+       Группа здесь не создаётся — имя кладётся в скрытое поле, а создаёт её сервис при
+       подтверждении. Иначе брошенный посреди дела экран оставлял бы за собой пустую группу. */
+    var fresh = select.dataset.comboNew
+      ? select.form.querySelector('input[name="' + select.dataset.comboNew + '"]')
+      : null;
+    var foot = document.createElement("div");
+    foot.className = "combo-foot";
+    var create = document.createElement("button");
+    create.type = "button";
+    foot.appendChild(create);
+    foot.hidden = true;
+
     pop.appendChild(search);
     pop.appendChild(list);
     pop.appendChild(empty);
+    if (fresh) {
+      pop.appendChild(foot);
+    }
     combo.appendChild(button);
     combo.appendChild(pop);
 
     function label() {
+      if (fresh && fresh.value) {
+        current.textContent = fresh.value + " · новая";
+        return;
+      }
       var option = select.options[select.selectedIndex];
       current.textContent = option ? option.textContent.trim() : "";
     }
@@ -61,6 +81,9 @@
     }
 
     function pick(option, node) {
+      if (fresh) {
+        fresh.value = "";
+      }
       select.value = option.value;
       // Событие нужно всему, что слушает поле: и HTMX, и обычной отправке формы.
       select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -106,6 +129,25 @@
         shown += match ? 1 : 0;
       });
       empty.hidden = shown !== 0;
+      if (fresh) {
+        var typed = search.value.trim();
+        foot.hidden = shown !== 0 || typed === "";
+        create.textContent = "Создать группу «" + typed + "»";
+      }
+    });
+
+    create.addEventListener("click", function () {
+      var typed = search.value.trim();
+      if (!typed) {
+        return;
+      }
+      fresh.value = typed;
+      // Список по-прежнему шлёт своё значение, поэтому его надо обнулить: иначе сервер получил
+      // бы и новое имя, и номер старой группы и должен был бы гадать, что из этого главное.
+      select.value = "";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      current.textContent = typed + " · новая";
+      close();
     });
 
     button.addEventListener("click", function () {
