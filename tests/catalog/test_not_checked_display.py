@@ -76,7 +76,8 @@ def test_d25_a_real_match_still_reads_as_resolved() -> None:
 
 
 def test_d25_summary_does_not_claim_success() -> None:
+    """Уточнение Q-D15: домен без списка требует внимания, а не выглядит благополучным."""
     result = card(make_domain())
 
     assert "не заданы" in result.summary_label
-    assert result.summary_tone == ""
+    assert result.summary_tone == "change"

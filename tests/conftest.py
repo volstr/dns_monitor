@@ -14,6 +14,22 @@ def env() -> dict[str, str]:
     return dict(REQUIRED_ENV)
 
 
+@pytest.fixture(autouse=True)
+def clean_state_store() -> None:
+    """Чистое состояние Redis перед каждым тестом.
+
+    Ключи состояния переживают тестовую базу: кулдаун ручной проверки живёт тридцать секунд, и
+    повторный прогон в ту же минуту падал на пустом месте. База здесь тестовая
+    (`TEST_REDIS_DB_STATE`), а не рабочая, поэтому сброс безопасен — с рабочей так делать нельзя
+    ни в коем случае (11.11: состояние не кэш).
+    """
+    import redis
+    from django.conf import settings
+
+    client = redis.Redis.from_url(settings.ENV.redis_url, db=settings.ENV.redis_db_state)
+    client.flushdb()
+
+
 @pytest.fixture
 def global_settings() -> object:
     """Строка общих настроек — ТЗ 4.1.

@@ -82,6 +82,9 @@ class DomainRow:
     #: Ловушка 8.2: пустой список в режиме «При выходе из разрешённых». Уведомлений не будет
     #: никогда, и пользователь этого не ожидает, поэтому строка помечается (Q-D15).
     silent_trap: bool
+    #: Список не задан вообще. Помечается независимо от режима: домен под наблюдением, с
+    #: которым нечего сравнивать, требует внимания (Q-D15, уточнение 2026-09-26).
+    needs_allowlist: bool
     history: DomainHistory
 
 
@@ -266,6 +269,7 @@ def _row(
         notification_mode=str(mode.label),
         notification_origin=effective.notification_mode.origin,
         silent_trap=not entries and mode == NotificationMode.NOT_ALLOWED,
+        needs_allowlist=not entries,
         history=history,
     )
 

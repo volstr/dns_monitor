@@ -90,7 +90,9 @@ def test_d25_empty_allowlist_is_not_a_breach(domain: Domain) -> None:
 
     assert result.registry[0].status_label == "Не проверяется"
     assert result.registry[0].match_text == "список не задан"
-    assert result.summary_tone == ""
+    # Не «сломано», но и не «в порядке»: домен под наблюдением, а сравнивать не с чем
+    # (уточнение Q-D15). Красный здесь был бы враньём, зелёный — тоже.
+    assert result.summary_tone == "change"
 
 
 def test_9_1_registry_shows_first_and_last_time(domain: Domain) -> None:

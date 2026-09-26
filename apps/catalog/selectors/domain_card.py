@@ -188,6 +188,8 @@ class DomainCard:
     trace: TraceData
     #: Почему реестр пуст. Пусто — объяснять нечего: проверки идут или уже прошли.
     empty_reason: str
+    #: Ловушка 8.2: пустой список в режиме «При выходе из разрешённых».
+    silent_trap: bool
 
 
 def domain_card(
@@ -248,6 +250,8 @@ def domain_card(
             statuses={str(view.address): str(view.status) for view in statuses},
         ),
         empty_reason=_empty_reason(domain, statuses),
+        silent_trap=not entries
+        and effective.notification_mode.value == NotificationMode.NOT_ALLOWED,
     )
 
 
@@ -315,7 +319,7 @@ def _summary_label(statuses: tuple[AddressStatusView, ...]) -> str:
     if unmatched:
         return f"{unmatched} из {len(fresh)} {word} не решён"
     if fresh[0].status == AddressStatus.NOT_CHECKED:
-        return "Разрешённые адреса не заданы — проверялось только изменение"
+        return "Разрешённые адреса не заданы — сравнивать не с чем"
     return f"Все {len(fresh)} {word} решены" if len(fresh) > 1 else "Адрес решён"
 
 
@@ -324,7 +328,9 @@ def _summary_tone(statuses: tuple[AddressStatusView, ...]) -> str:
     if any(view.status == AddressStatus.UNMATCHED for view in fresh):
         return "breach"
     if fresh and fresh[0].status == AddressStatus.NOT_CHECKED:
-        return ""
+        # Не «решено» и не «сломано», а «требует внимания»: домен под наблюдением, а сравнивать
+        # его адреса не с чем (уточнение Q-D15). Зелёным это красить нельзя, серым — мало.
+        return "change"
     return "ok" if fresh else ""
 
 
