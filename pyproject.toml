@@ -2,6 +2,8 @@
 name = "dns-monitoring"
 version = "0.1.0"
 description = "DNS monitoring — наблюдение за адресами доменов"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = "==3.12.*"
 # Диапазоны — здесь, точные версии — в uv.lock.
 dependencies = [
