@@ -19,26 +19,43 @@
 (`pip install fonttools[woff]`, затем `fonttools ttLib.woff2 compress`) — это штатный путь, им
 же пользуются Google Fonts.
 
-Положить в `static/fonts/` в формате **woff2**, с точно такими именами — на них ссылается
-блок `@font-face` в начале `css/app.css`:
+Файлы лежат в `static/fonts/` под именами, на которые ссылается блок `@font-face` в начале
+`css/app.css`:
 
-| Файл | Семейство | Начертание |
+| Файл | Что это | Откуда взят |
 |---|---|---|
-| `ibm-plex-sans-400.woff2` | IBM Plex Sans | 400 |
-| `ibm-plex-sans-500.woff2` | IBM Plex Sans | 500 |
-| `ibm-plex-sans-600.woff2` | IBM Plex Sans | 600 |
-| `ibm-plex-sans-condensed-500.woff2` | IBM Plex Sans Condensed | 500 |
-| `ibm-plex-sans-condensed-600.woff2` | IBM Plex Sans Condensed | 600 |
-| `jetbrains-mono-400.woff2` | JetBrains Mono | 400 |
-| `jetbrains-mono-500.woff2` | JetBrains Mono | 500 |
-| `jetbrains-mono-700.woff2` | JetBrains Mono | 700 |
+| `ibm-plex-sans-var.woff2` | IBM Plex Sans, **переменный** (`wght 100–700`, `wdth 85–100`) | `IBM Plex Sans Var-Roman.woff2` |
+| `ibm-plex-sans-condensed-500.woff2` | IBM Plex Sans Condensed Medium | `IBMPlexSansCondensed-Medium.woff2` |
+| `ibm-plex-sans-condensed-600.woff2` | IBM Plex Sans Condensed SemiBold | `IBMPlexSansCondensed-SemiBold.woff2` |
+| `jetbrains-mono-400.woff2` | JetBrains Mono Regular | `JetBrainsMono-Regular.woff2` |
+| `jetbrains-mono-500.woff2` | JetBrains Mono Medium | `JetBrainsMono-Medium.woff2` |
+| `jetbrains-mono-700.woff2` | JetBrains Mono Bold | `JetBrainsMono-Bold.woff2` |
 
-Набор начертаний — ровно тот, что запрашивал прототип (`wght@400;500;600`, `500;600`,
-`400;500;700`).
+Имена в релизах не совпадают с ожидаемыми, поэтому скачанные файлы **переименовываются**. Это
+не прихоть: имя файла — единственное, что связывает его с `@font-face`, и несовпадение ничем
+себя не выдаёт (см. ниже).
 
-**Пока файлов нет, ничего не сломано.** В `@font-face` первым источником стоит `local()`, а за
-именем семейства везде идёт цепочка запасных (`system-ui`, `ui-monospace`). Интерфейс работает и
-выглядит разумно; в консоли браузера будут 404 на недостающие файлы.
+Курсивные начертания и прочие насыщенности не нужны: курсив в оформлении не используется,
+а из Condensed и Mono берутся ровно те веса, что стоят в CSS. Лишние файлы в репозиторий не
+кладите — это мёртвый груз, который придётся скачивать каждому.
+
+**Кириллица обязательна.** В `@font-face` нет `unicode-range`, то есть один файл на начертание
+должен содержать и латиницу, и кириллицу — интерфейс полностью русский. Подмножества вида
+`*-latin-400-normal.woff2` с CDN не годятся: кириллица уйдёт в системный запасной шрифт, и
+будет казаться, что шрифты «не заработали». Проверить скачанный файл:
+
+```sh
+python3 -c "from fontTools.ttLib import TTFont; c=TTFont('static/fonts/jetbrains-mono-400.woff2').getBestCmap(); print('кириллица:', 'есть' if 0x0410 in c else 'НЕТ')"
+```
+
+**Пропажа шрифта молчалива.** В `@font-face` первым источником стоит `local()`, за именем
+семейства идёт цепочка запасных, и страница выглядит разумно, даже когда не загрузился ни один
+файл. Поэтому на загрузку стоит браузерный тест
+(`tests/e2e/test_widgets.py::test_c20_all_three_font_families_actually_load`), который смотрит
+`document.fonts`, а не на внешний вид.
+
+Цепочка запасных шрифтов в CSS остаётся на месте и после появления файлов: установка может
+раздавать статику иначе, и интерфейс не должен от этого ломаться.
 
 ## HTMX
 
@@ -48,7 +65,7 @@
 Положить `htmx.min.js` в `static/js/`. На него ссылается `templates/base.html`. Источник —
 `github.com/bigskysoftware/htmx`, релизы; та же сборка лежит на cdnjs и jsDelivr.
 
-Пока файла нет, страницы отдаются и читаются полностью: HTMX нужен ровно двум местам —
+Файл на месте (2.0.11). Без него страницы отдавались и читались полностью: HTMX нужен ровно двум местам —
 построчной валидации белого списка (ТЗ 10.2) и полю выбора группы с поиском (10.4). Без него
 фильтры списка доменов работают обычной перезагрузкой, потому что форма фильтров — обычный
 `GET`-запрос, и HTMX лишь избавляет её от перерисовки страницы.

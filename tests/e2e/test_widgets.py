@@ -135,6 +135,35 @@ def test_9_2_scale_switch_narrows_the_axis(
     assert "7 суток" in page.locator("[data-trace-caption]").inner_text()
 
 
+def test_c20_all_three_font_families_actually_load(
+    signed_in: Any, live_server: Any, sample_domain: Domain
+) -> None:
+    """Q-C20: шрифты лежат файлами в `static/`, а не грузятся с Google Fonts.
+
+    Пропажа шрифта ничем себя не выдаёт: в `@font-face` первым источником стоит `local()`, за
+    именем семейства идёт цепочка запасных, и страница выглядит разумно даже когда не загрузился
+    ни один файл. Ровно так и было — имена файлов не совпадали с ожидаемыми, и этого никто не
+    замечал. Поэтому проверяется `document.fonts`, а не внешний вид.
+    """
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{sample_domain.pk}/")
+    page.wait_for_timeout(1500)
+
+    for spec in (
+        '400 14px "IBM Plex Sans"',
+        '600 14px "IBM Plex Sans"',
+        '600 11px "IBM Plex Sans Condensed"',
+        '400 13px "JetBrains Mono"',
+    ):
+        assert page.evaluate(f"document.fonts.check({spec!r})"), spec
+
+    broken = page.evaluate(
+        "() => Array.from(document.fonts)"
+        ".filter(f => f.status === 'error').map(f => f.family + ' ' + f.weight)"
+    )
+    assert broken == []
+
+
 def test_10_2_allowlist_is_checked_line_by_line_while_typing(
     signed_in: Any, live_server: Any, sample_domain: Domain
 ) -> None:
