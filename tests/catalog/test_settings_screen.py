@@ -297,3 +297,29 @@ def test_c12_overview_screen_does_not_promise_a_round(client: Client, observer: 
     body = client.get(reverse("overview")).content.decode()
 
     assert "круг проверок" not in body.lower()
+
+
+def test_d40_a_bot_token_in_the_chat_id_field_is_refused() -> None:
+    """
+    Q-D40: токен бота в поле адресата — отказ, а не предупреждение.
+
+    Ошибка лёгкая: и то, и другое выдаёт @BotFather. Но токен по 8.3 живёт только в окружении, а
+    это поле уходит в базу, в резервные копии, на экран администратору и снимком в каждую строку
+    очереди. Предупреждение человек прочёл бы уже после того, как секрет попал в базу.
+    """
+    token = "8155827613:" + "A" * 35  # вид токена, не настоящий
+    values_with_token = values(telegram_chat_id=token)
+
+    result = save_global_settings(values_with_token)
+
+    assert isinstance(result, SettingsNotSaved)
+    assert any("токен бота" in reason for reason in result.reasons)
+    assert GlobalSettings.objects.get().telegram_chat_id == ""
+
+
+def test_d40_a_real_chat_id_is_accepted() -> None:
+    """Обратная сторона: обычный идентификатор чата — в том числе отрицательный — проходит."""
+    result = save_global_settings(values(telegram_chat_id="-1001234567890"))
+
+    assert isinstance(result, SettingsSaved)
+    assert GlobalSettings.objects.get().telegram_chat_id == "-1001234567890"

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
@@ -26,6 +27,9 @@ from apps.catalog.models import GlobalSettings
 from apps.catalog.services.intervals import warnings_after_global_change
 
 MIN_PERIOD_SECONDS = 60
+
+#: Токен бота: число, двоеточие и длинный хвост. Тот же вид, что проверяет `config/env.py`.
+_BOT_TOKEN = re.compile(r"\d{6,}:[A-Za-z0-9_-]{30,}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,9 +126,33 @@ def _reasons(values: SettingsInput) -> tuple[str, ...]:
     if values.login_failure_threshold < 1:
         collected.append("Порог блокировки входа — не меньше одной попытки.")
 
+    collected.extend(_chat_id_reasons(values.telegram_chat_id))
     collected.extend(_dns_reasons(values.dns_servers))
     collected.extend(_email_reasons(values.email_recipients))
     return tuple(collected)
+
+
+def _chat_id_reasons(chat_id: str) -> tuple[str, ...]:
+    """
+    Отказ, если в поле адресата оказался токен бота — Q-D40.
+
+    Ошибка лёгкая: и то, и другое выдаёт @BotFather, и оба выглядят «настройками Telegram». Но
+    цена разная. Токен по 8.3 и Q-A2 живёт **только** в окружении, потому что даёт доступ к чужой
+    инфраструктуре; а это поле уходит в базу, в резервные копии и на экран любому администратору,
+    да ещё копируется снимком в каждую строку очереди доставки. Записанный сюда токен придётся
+    отзывать, а не просто стирать.
+
+    Поэтому отказ, а не предупреждение: предупреждение здесь человек прочтёт уже после того, как
+    секрет попал в базу.
+    """
+    if _BOT_TOKEN.fullmatch(chat_id.strip()):
+        return (
+            "В поле «Идентификатор чата» похоже записан токен бота. Токен задаётся только "
+            "переменной окружения TELEGRAM_BOT_TOKEN (ТЗ 8.3) — здесь нужен идентификатор чата, "
+            "например -1001234567890. Если токен уже был сохранён, отзовите его в @BotFather: "
+            "поле уходит в базу и видно на этом экране.",
+        )
+    return ()
 
 
 def _dns_reasons(servers: tuple[str, ...]) -> tuple[str, ...]:
