@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from django.conf import settings
+from django.utils.timezone import localtime
 
 from apps.notifications.services.notifier import DeliveryRun, deliver_due
 from apps.notifications.services.reminders import queue_due_reminders
@@ -50,10 +51,14 @@ def run_one_delivery(
 
 
 def describe(result: DeliveryRun | DeliverySkipped, at: datetime) -> str:
-    """Строка структурного лога: по ней видно, что проход вообще происходил."""
+    """Строка структурного лога: по ней видно, что проход вообще происходил.
+
+    Время местное, как и в метке `ts` рядом (Q-D34).
+    """
+    moment = localtime(at)
     if isinstance(result, DeliverySkipped):
-        return f"доставка пропущена в {at:%H:%M:%S}: {result.reason}"
+        return f"доставка пропущена в {moment:%H:%M:%S}: {result.reason}"
     return (
-        f"доставка в {at:%H:%M:%S}: отправлено {result.sent}, "
+        f"доставка в {moment:%H:%M:%S}: отправлено {result.sent}, "
         f"слито {result.merged}, отложено {result.failed}, брошено {result.gave_up}"
     )

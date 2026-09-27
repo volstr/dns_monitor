@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils.timezone import localtime
 
 from apps.accounts.models import AuditAction, AuditRecord, Member, Role
 from apps.catalog.models import Domain, GlobalSettings, Group, NotificationMode
@@ -121,7 +122,8 @@ def test_4_5_delivery_result_is_shown_next_to_the_event(domain: Domain) -> None:
     row = journal_page(at=MOMENT).rows[0]
 
     assert row.channel == "Telegram"
-    assert row.delivery == "доставлено 14:38:00"
+    # 14:38 UTC в поясе установки — 17:38 (ТЗ 4.0).
+    assert row.delivery == "доставлено 17:38:00"
 
 
 def test_4_5_event_without_a_notification_says_nothing_about_delivery(domain: Domain) -> None:
@@ -168,7 +170,10 @@ def test_11_7_export_columns_follow_the_spec(domain: Domain) -> None:
     assert isinstance(result, ExportReady)
     lines = result.content.decode("utf-8").splitlines()
     columns = lines[1].split(CSV_DELIMITER)
-    assert columns[0] == MOMENT.isoformat()
+    # Выгрузку открывают в Excel рядом с другими отчётами, поэтому время местное — но со
+    # смещением, иначе столбец нельзя ни отсортировать вместе с чужим, ни прочитать через год.
+    assert columns[0] == localtime(MOMENT).isoformat()
+    assert columns[0].endswith("+03:00")
     assert columns[1] == "pay-gw.contoso.ru"
     assert columns[2] == "Платёжный контур"
     assert columns[3] == "Адрес вне разрешённых"

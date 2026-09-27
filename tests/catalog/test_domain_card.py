@@ -238,5 +238,7 @@ def test_headline_names_group_and_period(domain: Domain) -> None:
     Domain.objects.filter(pk=domain.pk).update(group=group)
     GlobalSettings.objects.filter(pk=1).update(notification_mode=NotificationMode.NOT_ALLOWED)
 
-    expected = "Группа «Платёжный контур» · проверка раз в 5 мин · последний ответ в 14:38"
+    # 14:38 UTC — это 17:38 в поясе установки. ТЗ 4.0: хранение в UTC, показ в местном поясе,
+    # и подпись карточки — как раз показ.
+    expected = "Группа «Платёжный контур» · проверка раз в 5 мин · последний ответ в 17:38"
     assert card(domain).headline == expected

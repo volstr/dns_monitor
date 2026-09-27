@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import threading
 from datetime import UTC, datetime
 
 import pytest
+from django.utils.timezone import localtime
 
 from apps.catalog.models import Domain
+from apps.monitoring.services.runner import TickSkipped, describe
 from apps.monitoring.services.tick import tick
 from core.adapters.fake_clock import FakeClock
 from core.adapters.fake_resolver import FakeResolver, answered
@@ -68,11 +71,35 @@ def test_extra_becomes_a_field_of_its_own() -> None:
     assert payload["component"] == "redis"
 
 
-def test_time_is_utc_and_iso() -> None:
-    """Журналы читают вперемешку с чужими, а часовой пояс приложения — настройка показа."""
-    payload = formatted(record())
+def test_time_is_local_and_iso() -> None:
+    """Q-D34: местное время, но **со смещением** — метка обязана остаться однозначной.
 
-    assert str(payload["ts"]).endswith("+00:00")
+    Без смещения журнал нельзя ни сравнить с чужим, ни прочитать через полгода, когда пояс
+    установки поменяли.
+    """
+    payload = formatted(record())
+    stamp = str(payload["ts"])
+
+    # ISO 8601 со смещением: `…+03:00`, `…+00:00` или `…-05:00`.
+    assert re.fullmatch(r".+T.+[+-]\d{2}:\d{2}", stamp), stamp
+    assert stamp.endswith(_offset_now())
+
+
+def _offset_now() -> str:
+    """Смещение пояса, в котором запущен процесс. В тестах это пояс `TIME_ZONE` настроек."""
+    return datetime.now().astimezone().isoformat()[-6:]
+
+
+def test_11_14_the_stamp_matches_the_message_scale() -> None:
+    """Две шкалы в одной строке — худший вариант: их начинают сверять между собой.
+
+    Метка `ts` и время внутри текста обязаны показывать одно и то же.
+    """
+    moment = datetime(2026, 9, 27, 9, 33, 10, tzinfo=UTC)
+
+    assert describe(TickSkipped(reason="нечем"), moment) == (
+        f"тик пропущен в {localtime(moment):%H:%M:%S}: нечем"
+    )
 
 
 def test_russian_text_stays_readable() -> None:

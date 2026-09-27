@@ -55,13 +55,20 @@ class RunIdFilter(logging.Filter):
 class JsonFormatter(logging.Formatter):
     """Одна запись — одна строка JSON.
 
-    Время в UTC и по ISO 8601: журнал читают вперемешку с журналами других систем, а часовой
-    пояс приложения — настройка **показа** (ТЗ 4.0), к хранению и к логам отношения не имеющая.
+    Время местное и по ISO 8601 — **со смещением**: `2026-09-27T12:33:10.237+03:00`. Смещение
+    здесь не украшение, а то, ради чего формат и выбран: метка остаётся однозначной и
+    сравнимой с журналами других систем, но читается без пересчёта в уме (Q-D34).
+
+    Пояс берётся из окружения процесса, а не через `django.utils.timezone`, и на то две причины.
+    Django при загрузке настроек сам кладёт `TIME_ZONE` в `TZ` и зовёт `tzset()`, так что
+    значение то же самое — но эта дорога короче и, главное, не может бросить исключение. Запись
+    в журнал случается и до того, как настройки загружены, и падать из-за форматирования времени
+    журналу нельзя.
     """
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
-            "ts": dt.datetime.fromtimestamp(record.created, tz=dt.UTC).isoformat(),
+            "ts": dt.datetime.fromtimestamp(record.created).astimezone().isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

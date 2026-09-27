@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from django.conf import settings
+from django.utils.timezone import localtime
 
 from apps.catalog.models import GlobalSettings
 from apps.monitoring.services.health import check_health, record_checks_stopped
@@ -119,10 +120,15 @@ def _purge(at: datetime) -> None:
 
 
 def describe(report: TickReport | TickSkipped, at: datetime) -> str:
-    """Строка для структурного лога: по ней видно, что тик вообще происходил."""
+    """Строка для структурного лога: по ней видно, что тик вообще происходил.
+
+    Время местное — то же, что в метке `ts` рядом (Q-D34). Две разные шкалы в одной строке
+    журнала были бы худшим из вариантов: читающий сверяет их между собой, а не с часами.
+    """
+    moment = localtime(at)
     if isinstance(report, TickSkipped):
-        return f"тик пропущен в {at:%H:%M:%S}: {report.reason}"
+        return f"тик пропущен в {moment:%H:%M:%S}: {report.reason}"
     return (
-        f"тик в {at:%H:%M:%S}: взято {report.claimed}, проверено {report.checked}, "
+        f"тик в {moment:%H:%M:%S}: взято {report.claimed}, проверено {report.checked}, "
         f"пропущено {report.skipped}, упало {report.failed}"
     )
