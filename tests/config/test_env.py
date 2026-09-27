@@ -280,3 +280,23 @@ def test_a_broken_host_name_is_named(env: dict[str, str]) -> None:
         load_env(env)
 
     assert {error.variable for error in raised.value.errors} == {"ALLOWED_HOSTS"}
+
+
+def test_env_example_is_a_working_environment() -> None:
+    """
+    `.env.example` обязан заводиться копированием: README велит начинать именно с этого.
+
+    Проверка дешёвая, а ломается такое молча. На момент написания теста файл не стартовал вовсе:
+    `DATABASE_URL` был обрезан до `postgresql://dns_monitoring:dns_monitoring`, без хоста и базы,
+    а `SESSION_SECRET` не дотягивал до пятидесяти символов.
+    """
+    source = {}
+    for raw in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#") and "=" in line:
+            name, _, value = line.partition("=")
+            source[name.strip()] = value.strip()
+
+    result = parse_env(source)
+
+    assert result.errors == (), [(e.variable, e.reason) for e in result.errors]
