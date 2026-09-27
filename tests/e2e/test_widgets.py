@@ -12,7 +12,13 @@ from typing import Any
 import pytest
 
 from apps.catalog.models import Domain, Group
-from apps.monitoring.models import AddressObservationBucket, AddressRegistryEntry, BucketSize
+from apps.monitoring.models import (
+    AddressObservationBucket,
+    AddressRegistryEntry,
+    BucketSize,
+    Check,
+)
+from core.types.checking import CheckOutcome
 from tests.e2e.conftest import EMAIL, PASSWORD
 
 pytestmark = pytest.mark.e2e
@@ -159,6 +165,33 @@ def test_10_4_combo_writes_into_the_select_that_is_submitted(
     page.locator(".combo-opt", has_text="Платёжный контур").first.click()
 
     assert page.locator("select[name=group]").input_value() == str(group.pk)
+
+
+def test_d36_normal_check_is_green_and_distinct_from_an_empty_mark(
+    signed_in: Any, live_server: Any
+) -> None:
+    """Q-D36: норма зелёная, пустая отметка — серая, и это разные цвета.
+
+    Проверяется вычисленный цвет, а не класс. Прежние два серых отличались на четырнадцать
+    единиц яркости и на полоске 3×9px не различались вовсе, хотя 11.5 требует различать:
+    «пустая отметка не означает „всё хорошо"».
+    """
+    moment = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
+    domain = Domain.objects.create(name="pay-gw.contoso.ru", last_successful_check_at=moment)
+    Check.objects.create(
+        domain=domain, checked_at=moment, outcome=CheckOutcome.NORMAL, answered_by="1.1.1.1"
+    )
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/")
+
+    normal = page.locator(".tape i.e-ok").first
+    # У пустой отметки атрибут класса есть, но пустой: шаблон печатает `class="{{ mark }}"`.
+    empty = page.locator('.tape i[class=""]').first
+    colour = "node => getComputedStyle(node).backgroundColor"
+
+    # --ok из палитры прототипа — #2E7D5B.
+    assert normal.evaluate(colour) == "rgb(46, 125, 91)"
+    assert empty.evaluate(colour) != normal.evaluate(colour)
 
 
 def test_10_4_combo_offers_to_create_the_typed_group(signed_in: Any, live_server: Any) -> None:
