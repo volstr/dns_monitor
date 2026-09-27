@@ -15,9 +15,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+
+from django.conf import settings
 
 from apps.catalog.models import GlobalSettings
+from apps.monitoring.models import EventType
+from apps.notifications.services.message import MessageInput, compose
 from core.ports.notification_channel import NotificationChannel, Sent
 
 
@@ -45,12 +49,28 @@ class ProbeRefused:
 
 type ProbeResult = ProbeSent | ProbeRefused
 
-#: Текст тестового сообщения. Нарочно говорит, откуда он и что означает: сообщение приходит
-#: дежурному, который мог не знать, что кто-то нажал кнопку.
-PROBE_TEXT = (
+#: Заголовок тестового сообщения. Нужен обязательно: сообщение приходит дежурному, который не
+#: знает, что кто-то нажал кнопку, и без пометки примет пример за настоящую тревогу.
+PROBE_HEADER = (
     "<b>Проверка канала</b>\n"
-    "Это тестовое сообщение из DNS monitoring. Настройка доставки работает: "
-    "уведомления о расхождениях будут приходить сюда."
+    "Это тестовое сообщение из DNS monitoring: доставка работает. Ниже — пример того, как будет "
+    "выглядеть настоящее уведомление.\n"
+)
+
+#: Пример для тестового сообщения — состав строк из 8.4, с вымышленным доменом.
+#:
+#: Собирается **тем же составителем**, что настоящие уведомления, и это главное в кнопке. Иначе
+#: она проверяла бы только доступность чата, а не то, ради чего её нажимают: дойдёт ли разметка,
+#: станет ли ссылка ссылкой, не режется ли список адресов. Разработчик заметил ровно это —
+#: тестовое сообщение не походило на макет, потому что ссылки в нём не было вовсе (Q-D41).
+PROBE_EXAMPLE = MessageInput(
+    event_type=EventType.NOT_ALLOWED,
+    domain_name="pay-gw.example",
+    domain_url="",
+    changed=("185.44.9.201",),
+    current=("10.20.1.14", "10.20.2.61", "185.44.9.201"),
+    group_name="Платёжный контур",
+    domain_comment="Пример комментария домена: он попадает в сообщение по 8.4.",
 )
 
 
@@ -71,7 +91,8 @@ def send_probe(*, channel: NotificationChannel, typed_recipient: str = "") -> Pr
             from_channel=False,
         )
 
-    saved = GlobalSettings.objects.get().telegram_chat_id
+    settings_row = GlobalSettings.objects.get()
+    saved = settings_row.telegram_chat_id
     recipient = typed_recipient.strip() or saved
     if not recipient:
         return ProbeRefused(
@@ -79,10 +100,31 @@ def send_probe(*, channel: NotificationChannel, typed_recipient: str = "") -> Pr
             from_channel=False,
         )
 
-    result = channel.send(recipient=recipient, text=PROBE_TEXT)
+    result = channel.send(recipient=recipient, text=_probe_text(settings_row))
     if isinstance(result, Sent):
         return ProbeSent(recipient=recipient, unsaved=recipient != saved)
     return ProbeRefused(reason=result.error, from_channel=True)
+
+
+def _probe_text(settings_row: GlobalSettings) -> str:
+    """
+    Пример собирается с теми же переключателями, что настоящее уведомление (8.4, Q-C4).
+
+    Если администратор отключил ссылку или комментарий, тестовое сообщение обязано прийти без
+    них: иначе кнопка покажет не то, что придёт дежурному, и проверять её будет бессмысленно.
+
+    Ссылка ведёт на список доменов, а не на вымышленный домен: неработающая ссылка в проверке
+    связи — худшее, что можно прислать. Зато по ней сразу видно, открывается ли `APP_BASE_URL`
+    из того места, где сидит дежурный.
+    """
+    example = replace(PROBE_EXAMPLE, domain_url=f"{settings.APP_BASE_URL}/domains/")
+    body = compose(
+        example,
+        include_current=settings_row.message_include_full_set,
+        include_comment=settings_row.message_include_comment,
+        include_link=settings_row.message_include_link,
+    )
+    return f"{PROBE_HEADER}\n{body}"
 
 
 @dataclass(frozen=True, slots=True)

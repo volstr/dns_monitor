@@ -7,10 +7,11 @@
 """
 
 import pytest
+from django.conf import settings as django_settings
 
 from apps.catalog.models import GlobalSettings
 from apps.notifications.services.probe import (
-    PROBE_TEXT,
+    PROBE_HEADER,
     ProbeRefused,
     ProbeSent,
     disconnect_telegram,
@@ -34,7 +35,7 @@ def test_8_3_probe_goes_to_the_saved_chat() -> None:
     assert result.recipient == CHAT
     assert result.unsaved is False
     assert channel.messages[0].recipient == CHAT
-    assert channel.messages[0].text == PROBE_TEXT
+    assert channel.messages[0].text.startswith(PROBE_HEADER)
 
 
 def test_probe_checks_what_is_typed_not_what_is_saved() -> None:
@@ -103,3 +104,53 @@ def test_8_3_disconnect_forgets_the_recipient_only() -> None:
     disconnect_telegram()
 
     assert GlobalSettings.objects.get().telegram_chat_id == ""
+
+
+def test_d41_the_probe_shows_what_a_real_message_looks_like() -> None:
+    """
+    Q-D41: тестовое собирается тем же составителем, что настоящие уведомления.
+
+    Иначе кнопка проверяет только доступность чата, а не то, ради чего её нажимают: дойдёт ли
+    разметка и станет ли ссылка ссылкой. Именно этого и не хватало — в прежнем тексте ссылки
+    «Открыть домен» не было вовсе, и сообщение не походило на макет.
+    """
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id=CHAT)
+    channel = FakeChannel()
+
+    send_probe(channel=channel)
+    text = channel.messages[0].text
+
+    # Пометка, что это проверка, и состав строк из 8.4.
+    assert "Проверка канала" in text
+    assert "Адрес вне разрешённых" in text
+    assert "pay-gw.example" in text
+    assert "Группа: Платёжный контур" in text
+    assert "Открыть домен" in text
+
+
+def test_d41_the_probe_follows_the_message_switches() -> None:
+    """
+    Отключённая ссылка должна отсутствовать и в тестовом.
+
+    Иначе кнопка показывает не то, что придёт дежурному, и проверять её незачем.
+    """
+    GlobalSettings.objects.filter(pk=1).update(
+        telegram_chat_id=CHAT, message_include_link=False, message_include_comment=False
+    )
+    channel = FakeChannel()
+
+    send_probe(channel=channel)
+    text = channel.messages[0].text
+
+    assert "Открыть домен" not in text
+    assert "Пример комментария" not in text
+
+
+def test_d41_the_probe_link_is_a_working_one() -> None:
+    """Неработающая ссылка в проверке связи — худшее, что можно прислать дежурному."""
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id=CHAT)
+    channel = FakeChannel()
+
+    send_probe(channel=channel)
+
+    assert f'href="{django_settings.APP_BASE_URL}/domains/"' in channel.messages[0].text
