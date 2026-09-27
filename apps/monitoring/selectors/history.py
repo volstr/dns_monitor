@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -26,6 +27,8 @@ from core.types.checking import CheckOutcome
 
 #: 11.5: ровно двадцать отметок.
 HISTORY_LENGTH = 20
+
+logger = logging.getLogger(__name__)
 
 
 class HistoryMark(StrEnum):
@@ -85,14 +88,31 @@ def history_of_domains(domain_ids: Sequence[int]) -> dict[int, DomainHistory]:
 
     collected: dict[int, list[tuple[datetime, HistoryMark]]] = {}
     for row in numbered:
-        outcome = CheckOutcome(row["outcome"])
         collected.setdefault(row["domain_id"], []).append(
-            (row["checked_at"], MARK_OF_OUTCOME[outcome])
+            (row["checked_at"], _mark(row["outcome"]))
         )
 
     return {
         domain_id: _padded(rows) for domain_id, rows in collected.items()
     }
+
+
+def _mark(outcome: str) -> HistoryMark:
+    """Отметка по исходу. Незнакомое значение даёт пустую, а не роняет экран.
+
+    Строка приходит из базы и может быть записана прежней версией кода: долгоживущие команды
+    `run_checker` и `run_notifier` не перезагружаются сами, и после переименования исхода они
+    ещё какое-то время пишут старое значение — в том числе **после** миграции, которая перенесла
+    прежние строки. Один такой ряд валил весь список доменов пятисотой ошибкой.
+
+    Показать пустую отметку — честнее, чем упасть: список доменов главный экран продукта, и
+    цена незнакомой строки не должна быть такой.
+    """
+    try:
+        return MARK_OF_OUTCOME[CheckOutcome(outcome)]
+    except ValueError:
+        logger.warning("неизвестный исход проверки", extra={"outcome": outcome})
+        return HistoryMark.NONE
 
 
 def _padded(rows: list[tuple[datetime, HistoryMark]]) -> DomainHistory:

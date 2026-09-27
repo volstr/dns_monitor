@@ -262,3 +262,21 @@ def test_query_count_does_not_grow_with_the_number_of_domains() -> None:
 
     assert len(rows) == 21
     assert len(second) == len(first)
+
+
+def test_an_unknown_outcome_does_not_bring_down_the_domain_list() -> None:
+    """Строка исхода приходит из базы и может быть записана прежней версией кода.
+
+    Так и случилось при переименовании `no_allowlist` в `not_confirmed` (Q-D37): миграция
+    перенесла прежние строки, а `run_checker` — долгоживущая команда, она не перезагружается
+    сама и продолжала писать старое значение уже после миграции. Один такой ряд валил весь
+    список доменов пятисотой ошибкой.
+    """
+    domain = Domain.objects.create(name="pay-gw.contoso.ru", next_check_at=MOMENT)
+    Check.objects.create(domain=domain, checked_at=MOMENT, outcome="no_allowlist")
+
+    page = domain_list_page(at=MOMENT)
+
+    assert len(page.rows) == 1
+    # Незнакомое значение показывается пустой отметкой, а не притворяется нормой.
+    assert page.rows[0].history.marks[-1] == ""
