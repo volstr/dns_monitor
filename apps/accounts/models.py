@@ -32,7 +32,7 @@ class MemberManager(BaseUserManager["Member"]):
     """Тонкий менеджер: хеширование пароля и нормализация почты.
 
     Полные сценарии создания участника — приглашение письмом, ссылкой и выдачей пароля (ТЗ 3) —
-    живут в сервисах, а не здесь. TODO(ТЗ 3): `apps.accounts.services` на этапе участников.
+    живут в `apps.accounts.services.members`, а не здесь.
     """
 
     def create_superuser(self, email: str, name: str, password: str) -> "Member":

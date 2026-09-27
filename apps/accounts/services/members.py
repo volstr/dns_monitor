@@ -219,6 +219,32 @@ def reset_password(
     return MemberSaved(member_id=member_id)
 
 
+def set_own_password(*, member_id: int, password: str) -> MemberResult:
+    """Участник задаёт себе пароль сам — критерий 32, обязательная смена при первом входе.
+
+    Отличия от `reset_password`, из-за которых это отдельная функция, а не флаг:
+
+    - **Автора нет.** Действие совершает сам участник, и `AuditAction` такого значения не
+      содержит: список в 3.1 закрытый, а вводить новый термин без спроса нельзя (`CLAUDE.md`).
+    - **Признак «сменить пароль» снимается**, а не ставится: ради этого шаг и существует.
+    - **Сессии не завершаются.** Завершать нечего: пароль участнику выдал администратор, и
+      `reset_password` уже поднял `session_epoch` в тот момент.
+    """
+    member = Member.objects.filter(pk=member_id).first()
+    if member is None:
+        return Refused(reason="Участник не найден.")
+    refusal = _password_refusal(password)
+    if refusal:
+        return refusal
+
+    with transaction.atomic():
+        member.set_password(password)
+        member.must_change_password = False
+        member.save(update_fields=["password", "must_change_password"])
+
+    return MemberSaved(member_id=member_id)
+
+
 def terminate_sessions(*, member_id: int, author: Member, at: datetime) -> MemberResult:
     """«Завершить все сессии» без смены пароля — 3.1."""
     member = Member.objects.filter(pk=member_id).first()

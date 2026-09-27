@@ -1,10 +1,14 @@
 """Проба работоспособности и ответ 503 — ТЗ 11.13, Q-E4, критерий 64."""
 
 import dataclasses
+from datetime import UTC, datetime
 
 import pytest
 from django.conf import settings
+from django.http import HttpResponse
 from django.test import Client, override_settings
+
+from config.middleware import HEALTH_TTL, InfrastructureHealthMiddleware
 
 pytestmark = pytest.mark.django_db
 
@@ -12,6 +16,7 @@ HEALTHY = 200
 UNHEALTHY = 503
 #: Порт, на котором заведомо никто не слушает: имитация недоступного Redis.
 DEAD_REDIS = "redis://127.0.0.1:6399"
+MOMENT = datetime(2026, 9, 27, 14, 38, tzinfo=UTC)
 
 
 def broken_env() -> object:
@@ -60,3 +65,42 @@ def test_healthy_installation_serves_normal_responses(client: Client) -> None:
     response = client.get("/any-screen/")
 
     assert response.status_code == 404
+
+
+def probe() -> InfrastructureHealthMiddleware:
+    return InfrastructureHealthMiddleware(lambda request: HttpResponse("экран"))
+
+
+def test_11_12_health_is_not_probed_on_every_request() -> None:
+    """11.12: состояние кэшируется, иначе на каждый запрос приходится `PING` к Redis.
+
+    Проверяется через наблюдаемое: Redis «чинится» между двумя вызовами, но ответ в пределах
+    срока кэша прежний — значит, второй пробы не было.
+    """
+    middleware = probe()
+
+    with override_settings(ENV=broken_env()):
+        first = middleware.health_at(MOMENT)
+    second = middleware.health_at(MOMENT + HEALTH_TTL / 2)
+
+    assert first.healthy is False
+    assert second.healthy is False
+
+
+def test_11_12_stale_report_is_probed_again() -> None:
+    """Кэш обязан быть коротким: иначе восстановленный Redis не заметили бы вовсе."""
+    middleware = probe()
+
+    with override_settings(ENV=broken_env()):
+        assert middleware.health_at(MOMENT).healthy is False
+
+    assert middleware.health_at(MOMENT + HEALTH_TTL).healthy is True
+
+
+def test_11_13_outage_is_noticed_within_the_cache_lifetime() -> None:
+    """Обратная сторона: цена кэша — задержка, и она обязана быть ограниченной."""
+    middleware = probe()
+
+    assert middleware.health_at(MOMENT).healthy is True
+    with override_settings(ENV=broken_env()):
+        assert middleware.health_at(MOMENT + HEALTH_TTL).healthy is False

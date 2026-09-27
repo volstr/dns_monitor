@@ -34,7 +34,7 @@ from apps.accounts.services.authentication import (
     new_totp_secret,
     provisioning_uri,
 )
-from apps.accounts.services.members import Refused, accept_invitation
+from apps.accounts.services.members import Refused, accept_invitation, set_own_password
 from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
 
@@ -267,12 +267,13 @@ class PasswordChange(PublicView):
         if not form.is_valid():
             return render(request, "accounts/password_change.html", {"form": form})
 
-        # TODO(CLAUDE.md, «Границы слоёв»): запись пароля обязана уехать в сервис — `.save()`
-        # в обработчике запрещён. Перенесено не здесь намеренно: этот коммит только меняет
-        # форму обработчиков, а смешивать с ним исправление границы слоёв нечестно.
-        member.set_password(form.new_password())
-        member.must_change_password = False
-        member.save(update_fields=["password", "must_change_password"])
+        result = set_own_password(member_id=member.pk, password=form.new_password())
+        if isinstance(result, Refused):
+            return render(
+                request,
+                "accounts/password_change.html",
+                {"form": form, "error": result.reason},
+            )
 
         del request.session[PENDING_MEMBER]
         start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")

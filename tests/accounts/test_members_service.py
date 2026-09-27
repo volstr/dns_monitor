@@ -16,6 +16,7 @@ from apps.accounts.services.members import (
     invite_with_link,
     invite_with_password,
     reset_password,
+    set_own_password,
     terminate_sessions,
     unbind_authenticator,
     update_member,
@@ -330,3 +331,61 @@ def test_duplicate_email_is_refused(admin: Member) -> None:
 
     assert isinstance(result, Refused)
     assert "уже есть" in result.reason
+
+
+def test_32_member_sets_the_password_and_the_flag_goes_down() -> None:
+    """Критерий 32: обязательная смена при первом входе — тот самый шаг, ради которого флаг."""
+    member = Member.objects.create_member(
+        email="boss@contoso.ru",
+        name="Анна Кирилова",
+        created_at=MOMENT,
+        password=PASSWORD,
+        must_change_password=True,
+    )
+
+    result = set_own_password(member_id=member.pk, password="novyj-parol-9-krisa")
+
+    member.refresh_from_db()
+    assert isinstance(result, MemberSaved)
+    assert member.must_change_password is False
+    assert member.check_password("novyj-parol-9-krisa")
+
+
+def test_32_a_short_password_is_refused_by_the_service_too() -> None:
+    """Форма проверяет длину, но сервис обязан быть безопасен сам по себе (`CLAUDE.md`)."""
+    member = Member.objects.create_member(
+        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT, password=PASSWORD
+    )
+
+    result = set_own_password(member_id=member.pk, password="корот")
+
+    member.refresh_from_db()
+    assert isinstance(result, Refused)
+    assert member.check_password(PASSWORD)
+
+
+def test_32_own_password_change_leaves_no_audit_record() -> None:
+    """Список действий 3.1 закрытый, и смены пароля самим участником в нём нет (Q-C11).
+
+    Запись без автора была бы вымышленным термином, а вводить его без спроса нельзя.
+    """
+    member = Member.objects.create_member(
+        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT, password=PASSWORD
+    )
+
+    set_own_password(member_id=member.pk, password="novyj-parol-9-krisa")
+
+    assert AuditRecord.objects.count() == 0
+
+
+def test_32_own_password_change_does_not_terminate_the_session() -> None:
+    """Участник входит этим же шагом: завершать его собственную сессию бессмысленно."""
+    member = Member.objects.create_member(
+        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT, password=PASSWORD
+    )
+    epoch = member.session_epoch
+
+    set_own_password(member_id=member.pk, password="novyj-parol-9-krisa")
+
+    member.refresh_from_db()
+    assert member.session_epoch == epoch
