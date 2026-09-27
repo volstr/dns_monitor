@@ -37,7 +37,7 @@ SUCCESSFUL_OUTCOMES = (
     CheckOutcome.NORMAL.value,
     CheckOutcome.ADDRESS_SET_CHANGED.value,
     CheckOutcome.HAS_UNMATCHED.value,
-    CheckOutcome.NO_ALLOWLIST.value,
+    CheckOutcome.NOT_CONFIRMED.value,
 )
 #: Домен не отрезолвился или спросить не удалось — это и есть материал для разбора.
 FAILED_OUTCOMES = (CheckOutcome.RESOLVE_ERROR.value, CheckOutcome.NOT_PERFORMED.value)

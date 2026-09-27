@@ -355,17 +355,22 @@ def _texts(addresses: frozenset[IPAddress] | set[IPAddress]) -> list[str]:
 def _outcome(statuses: tuple[AddressStatusView, ...], *, changed: bool) -> CheckOutcome:
     """Цвет отметки в колонке «История» — ТЗ 11.5.
 
-    Порядок важен и идёт от частного к общему. Последняя ступень — `NO_ALLOWLIST`, а не
-    `NORMAL`: у домена без белого списка несовпавших адресов не бывает по определению, и без
-    этой ступени каждая его проверка объявлялась бы нормой (Q-D37). Норма означает «сравнили и
-    сошлось», а тут не сравнивали.
+    Порядок важен и идёт от частного к общему. Ключевая ступень — предпоследняя: **норма
+    требует хотя бы одного подтверждённого адреса** (Q-D37). Норма означает «сравнили и
+    сошлось»; если сошлось не с чем — это не норма, а повод посмотреть.
+
+    Правило записано через `MATCHED`, а не через «список пуст», и это не придирка. Пустой
+    список — лишь один из способов не получить ни одного совпадения. Есть и другие: все адреса
+    неактуальны (6.4), либо ответ состоял из одних IPv6 при снятом флаге (Q-D27) и после
+    фильтра не осталось ничего. Проверка «все адреса NOT_CHECKED» покрывала только первый
+    случай и ломалась, едва у домена появлялся хоть один неактуальный адрес.
     """
     if _unmatched(statuses):
         return CheckOutcome.HAS_UNMATCHED
     if changed:
         return CheckOutcome.ADDRESS_SET_CHANGED
-    if statuses and all(view.status == AddressStatus.NOT_CHECKED for view in statuses):
-        return CheckOutcome.NO_ALLOWLIST
+    if not any(view.status == AddressStatus.MATCHED for view in statuses):
+        return CheckOutcome.NOT_CONFIRMED
     return CheckOutcome.NORMAL
 
 

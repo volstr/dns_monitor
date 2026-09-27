@@ -19,7 +19,7 @@ CHECK_OUTCOME_CHOICES = [
     (CheckOutcome.NORMAL.value, "Норма"),
     (CheckOutcome.ADDRESS_SET_CHANGED.value, "Набор адресов изменился"),
     (CheckOutcome.HAS_UNMATCHED.value, "Есть несовпавший адрес"),
-    (CheckOutcome.NO_ALLOWLIST.value, "Список не задан"),
+    (CheckOutcome.NOT_CONFIRMED.value, "Совпадений нет"),
     (CheckOutcome.RESOLVE_ERROR.value, "Ошибка резолва"),
     (CheckOutcome.NOT_PERFORMED.value, "Не состоялась"),
 ]

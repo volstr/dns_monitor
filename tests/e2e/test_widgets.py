@@ -205,12 +205,12 @@ def test_d37_a_domain_without_an_allowlist_is_not_painted_green(
     moment = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
     bare = Domain.objects.create(name="github.com", last_successful_check_at=moment)
     Check.objects.create(
-        domain=bare, checked_at=moment, outcome=CheckOutcome.NO_ALLOWLIST, answered_by="1.1.1.1"
+        domain=bare, checked_at=moment, outcome=CheckOutcome.NOT_CONFIRMED, answered_by="1.1.1.1"
     )
     page = signed_in
     page.goto(f"{live_server.url}/domains/")
 
-    mark = page.locator(".tape i.e-nolist").first
+    mark = page.locator(".tape i.e-unconfirmed").first
     assert mark.count() > 0
     # Не зелёная и вообще не залита: отметка контурная, как «не проверялось» в реестре.
     assert mark.evaluate("node => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"

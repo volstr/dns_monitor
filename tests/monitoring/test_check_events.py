@@ -8,8 +8,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from apps.catalog.models import AllowlistEntry, Domain
-from apps.monitoring.models import Check, Event, EventType, Incident
+from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings
+from apps.monitoring.models import (
+    AddressRegistryEntry,
+    Check,
+    Event,
+    EventType,
+    Incident,
+)
 from apps.monitoring.services.checking import run_check
 from core.adapters.fake_resolver import FakeResolver, answered, no_records, unavailable
 from core.types.checking import AddressStatus, CheckOutcome
@@ -224,7 +230,7 @@ def test_d37_a_domain_without_an_allowlist_is_not_a_normal_check() -> None:
     run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
 
     assert Check.objects.filter(domain=bare).latest("checked_at").outcome == (
-        CheckOutcome.NO_ALLOWLIST
+        CheckOutcome.NOT_CONFIRMED
     )
 
 
@@ -244,7 +250,7 @@ def test_d37_the_same_domain_becomes_normal_once_the_list_is_set() -> None:
     outcomes = list(
         Check.objects.filter(domain=bare).order_by("checked_at").values_list("outcome", flat=True)
     )
-    assert outcomes[-2:] == [CheckOutcome.NO_ALLOWLIST, CheckOutcome.NORMAL]
+    assert outcomes[-2:] == [CheckOutcome.NOT_CONFIRMED, CheckOutcome.NORMAL]
 
 
 def test_d37_a_domain_with_a_matching_list_stays_normal(domain: Domain) -> None:
@@ -255,6 +261,49 @@ def test_d37_a_domain_with_a_matching_list_stays_normal(domain: Domain) -> None:
     run_check(domain_id=domain.pk, at=START + PERIOD, resolver=resolver)
 
     assert Check.objects.filter(domain=domain).latest("checked_at").outcome == CheckOutcome.NORMAL
+
+
+def test_d37_a_stale_address_does_not_bring_the_green_back() -> None:
+    """Дыра прежней проверки: она требовала, чтобы **все** адреса были «не проверяется».
+
+    Стоило домену без списка завести хоть один неактуальный адрес — `all(...)` становилось
+    ложным, и лента снова зеленела. Правило записано через наличие совпадения, а не через
+    отсутствие списка, и от этого свободно.
+    """
+    bare = Domain.objects.create(name="github.com")
+    AddressRegistryEntry.objects.create(
+        domain=bare,
+        address="140.82.121.99",
+        first_seen_at=START - timedelta(days=30),
+        last_seen_at=START - timedelta(days=30),
+    )
+    resolver = FakeResolver({"github.com": [answered("140.82.121.3")]})
+    run_check(domain_id=bare.pk, at=START, resolver=resolver)
+
+    run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
+
+    latest = Check.objects.filter(domain=bare).latest("checked_at")
+    assert latest.outcome == CheckOutcome.NOT_CONFIRMED
+
+
+def test_d37_nothing_matched_is_not_normal_even_with_a_list() -> None:
+    """Правило шире пустого списка: норма требует **подтверждённого** адреса.
+
+    Здесь список задан, но после фильтра IPv6 (Q-D27) актуальных адресов не остаётся, и
+    подтверждать нечего. Зелёная отметка утверждала бы обратное.
+    """
+    GlobalSettings.objects.filter(pk=1).update(check_ipv6=False)
+    ipv6_only = Domain.objects.create(name="ipv6.contoso.ru")
+    AllowlistEntry.objects.create(
+        domain=ipv6_only, entry="2a00:1450::/32", raw="2a00:1450::/32"
+    )
+    resolver = FakeResolver({"ipv6.contoso.ru": [answered("2a00:1450:400e:809::200e")]})
+    run_check(domain_id=ipv6_only.pk, at=START, resolver=resolver)
+
+    run_check(domain_id=ipv6_only.pk, at=START + PERIOD, resolver=resolver)
+
+    latest = Check.objects.filter(domain=ipv6_only).latest("checked_at")
+    assert latest.outcome != CheckOutcome.NORMAL
 
 
 def test_d37_a_changed_set_wins_over_the_missing_list() -> None:
