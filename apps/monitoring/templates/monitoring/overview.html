@@ -37,11 +37,22 @@
   </div>
 
   <div class="body">
-    <div class="stats" style="margin-bottom:20px">
-      <div class="stat"><span class="k">Доменов</span><b class="mono">{{ page.domains_total }}</b></div>
-      <div class="stat"><span class="k">Под наблюдением</span><b class="mono">{{ page.domains_watched }}</b></div>
-      <div class="stat"><span class="k">Групп</span><b class="mono">{{ page.groups_total }}</b></div>
-      <div class="stat"><span class="k">Базовый период</span><b class="mono">{{ page.base_period }}</b></div>
+    {% comment %}
+    Верхняя сводка — разметка прототипа, строки 738–743: подпись `.eyebrow`, число `<b>` и
+    пояснение `<small>` под ним. Модификатор цвета приходит готовым из селектора; вычислений в
+    шаблоне нет.
+
+    Пояснение под числом обязательно, и это не украшение: 11.9 прямо говорит, что счётчик
+    «Не решены: 1» сам по себе недостаточен, потому что не называет ни домена, ни давности.
+    {% endcomment %}
+    <div class="stats" style="margin-bottom:22px">
+      {% for stat in page.stats %}
+        <div class="stat {{ stat.tone }}">
+          <div class="eyebrow">{{ stat.label }}</div>
+          <b>{{ stat.value }}</b>
+          <small>{{ stat.note }}</small>
+        </div>
+      {% endfor %}
     </div>
 
     <div class="panel">

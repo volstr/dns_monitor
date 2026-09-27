@@ -23,10 +23,13 @@ from django.db.models import Max, Min
 
 from apps.catalog.models import Domain, GlobalSettings, Group
 from apps.catalog.selectors.settings import settings_of_group
-from apps.monitoring.models import Incident
+from apps.monitoring.models import Event, EventType, Incident
 from apps.monitoring.selectors.addresses import registry_of_domains
-from core.text import humanize_duration
+from core.text import humanize_duration, plural
 from core.types.checking import AddressStatus
+
+#: Окно карточки «Адреса изменились» — подпись в прототипе говорит «за последние сутки».
+CHANGED_WINDOW = timedelta(days=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,18 +46,35 @@ class OpenDiscrepancy:
 
 
 @dataclass(frozen=True, slots=True)
+class Stat:
+    """
+    Карточка верхней сводки — разметка прототипа, строки 738–743.
+
+    Три части: подпись, число и пояснение мелким шрифтом под ним. Пояснение обязательно: без
+    него «Не решены: 1» — ровно тот счётчик, который 11.9 называет недостаточным.
+
+    ``tone`` — модификатор из палитры прототипа (`s-breach`, `s-change`, `s-fail`); пусто у
+    нейтральной карточки. Ноль обесцвечивается намеренно: «не решены: 0» не должно кричать
+    красным, иначе спокойное состояние выглядит тревожным.
+    """
+
+    label: str
+    value: int
+    note: str
+    tone: str
+
+
+@dataclass(frozen=True, slots=True)
 class Overview:
     """Экран «Обзор»."""
 
     open_items: tuple[OpenDiscrepancy, ...]
     #: Когда закрылся последний инцидент. Нужен строке «Открытых расхождений нет» (11.9).
     last_closed_at: datetime | None
-    domains_total: int
-    domains_watched: int
-    groups_total: int
+    #: Четыре карточки верхней сводки. Готовы целиком: шаблон ничего не считает.
+    stats: tuple[Stat, ...]
     last_check_at: datetime | None
     next_check_at: datetime | None
-    base_period: str
 
 
 def overview(*, at: datetime) -> Overview:
@@ -78,13 +98,83 @@ def overview(*, at: datetime) -> Overview:
             if not incidents
             else None
         ),
-        domains_total=Domain.objects.count(),
-        domains_watched=Domain.objects.filter(watch_enabled=True).count(),
-        groups_total=Group.objects.count(),
+        stats=_stats(incidents, at, global_settings),
         last_check_at=schedule["last"],
         next_check_at=schedule["following"],
-        base_period=humanize_duration(timedelta(seconds=global_settings.check_period_seconds)),
     )
+
+
+def _stats(
+    incidents: list[Incident], at: datetime, global_settings: GlobalSettings
+) -> tuple[Stat, ...]:
+    """
+    Четыре карточки сводки — разметка прототипа, строки 738–743.
+
+    Карточки про **состояние**, а не про опись: сколько под наблюдением, сколько не решено,
+    у скольких изменились адреса, сколько не резолвится. Раньше здесь стояли домены, группы и
+    базовый период — величины, которые не меняются неделями и ни о чём не предупреждают.
+    """
+    watched = Domain.objects.filter(watch_enabled=True).count()
+    groups = Group.objects.count()
+    changed_since = at - CHANGED_WINDOW
+    changed = (
+        Event.objects.filter(
+            occurred_at__gte=changed_since,
+            event_type__in=(EventType.ADDRESS_APPEARED, EventType.ADDRESS_GONE),
+        )
+        .values("domain_id")
+        .distinct()
+        .count()
+    )
+    failing = Domain.objects.filter(
+        consecutive_resolve_failures__gte=global_settings.resolve_failure_threshold
+    )
+    attempts = failing.aggregate(worst=Max("consecutive_resolve_failures"))["worst"] or 0
+
+    return (
+        Stat(
+            label="Под наблюдением",
+            value=watched,
+            note=f"в {groups} {plural(groups, 'группе', 'группах', 'группах')}",
+            tone="",
+        ),
+        Stat(
+            label="Не решены",
+            value=len(incidents),
+            note=_unresolved_note(incidents),
+            tone="s-breach" if incidents else "",
+        ),
+        Stat(
+            label="Адреса изменились",
+            value=changed,
+            note="за последние сутки",
+            tone="s-change" if changed else "",
+        ),
+        Stat(
+            label="Не резолвится",
+            value=failing.count(),
+            note=(
+                f"{attempts} {plural(attempts, 'попытка', 'попытки', 'попыток')} подряд"
+                if attempts
+                else "все домены отвечают"
+            ),
+            tone="s-fail" if attempts else "",
+        ),
+    )
+
+
+def _unresolved_note(incidents: list[Incident]) -> str:
+    """
+    Под числом — имя домена, как в прототипе. Счётчик без имени 11.9 называет недостаточным.
+
+    Инциденты отсортированы по возрасту, поэтому назван самый старый: если разбирать, то с него.
+    """
+    if not incidents:
+        return "расхождений нет"
+    first = incidents[0].domain.name
+    if len(incidents) == 1:
+        return first
+    return f"{first} и ещё {len(incidents) - 1}"
 
 
 def _items(
