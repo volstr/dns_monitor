@@ -135,6 +135,80 @@ def test_9_2_scale_switch_narrows_the_axis(
     assert "7 суток" in page.locator("[data-trace-caption]").inner_text()
 
 
+def test_10_2_allowlist_is_checked_line_by_line_while_typing(
+    signed_in: Any, live_server: Any, sample_domain: Domain
+) -> None:
+    """10.2: построчная проверка во время ввода, задержка около 250 мс.
+
+    Проверка откладывалась с самого начала (Q-C20): без `htmx.min.js` её нечем было запустить в
+    браузере. Разбор при этом один и тот же, что и при сохранении, — дублировать его в JS
+    запрещено прямо (`CLAUDE.md`), и этот тест заодно подтверждает, что второй реализации нет:
+    замечание приходит с сервера, ответом на запрос.
+    """
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{sample_domain.pk}/")
+
+    field = page.locator("#d-sub")
+    field.clear()
+    field.press_sequentially("10.20.999.0/24")
+    # Задержка триггера — 250 мс, плюс сам запрос.
+    page.wait_for_selector("#allowlist-issues .line-err", timeout=5000)
+
+    issues = page.locator("#allowlist-issues").inner_text()
+    assert "стр. 1" in issues
+    assert "999" in issues
+    assert "сохранить нельзя" in issues
+
+
+def test_10_2_a_pasted_list_is_checked_too(
+    signed_in: Any, live_server: Any, sample_domain: Domain
+) -> None:
+    """Список адресов чаще вставляют, чем набирают.
+
+    Триггером был `keyup`, а вставка правой или средней кнопкой мыши клавиатурных событий не
+    порождает: замечания не появлялись бы до первого нажатия клавиши. `fill` в Playwright ведёт
+    себя ровно так же — меняет значение и шлёт `input`, но не `keyup`, — поэтому этот тест и
+    ловит разницу.
+    """
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{sample_domain.pk}/")
+
+    page.locator("#d-sub").fill("10.20.999.0/24")
+    page.wait_for_selector("#allowlist-issues .line-err", timeout=5000)
+
+    assert "999" in page.locator("#allowlist-issues").inner_text()
+
+
+def test_10_2_a_correct_line_leaves_no_complaint(
+    signed_in: Any, live_server: Any, sample_domain: Domain
+) -> None:
+    """Обратная сторона: на годной строке замечаний быть не должно."""
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{sample_domain.pk}/")
+
+    page.locator("#d-sub").fill("10.20.0.0/22")
+    page.wait_for_timeout(700)
+
+    assert page.locator("#allowlist-issues .line-err").count() == 0
+
+
+def test_10_2_the_page_is_not_reloaded_while_checking(
+    signed_in: Any, live_server: Any, sample_domain: Domain
+) -> None:
+    """Проверка идёт запросом, а не отправкой формы: введённое не должно потеряться.
+
+    Перезагрузка стёрла бы и комментарий, и типы записей — всё, что человек уже наменял.
+    """
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/{sample_domain.pk}/")
+    page.evaluate("window.__stayed = true")
+
+    page.locator("#d-sub").fill("10.20.999.0/24")
+    page.wait_for_selector("#allowlist-issues .line-err", timeout=5000)
+
+    assert page.evaluate("window.__stayed") is True
+
+
 def test_10_4_group_combo_filters_by_search(signed_in: Any, live_server: Any) -> None:
     """10.4: поле выбора группы с поиском."""
     Group.objects.create(name="Платёжный контур")

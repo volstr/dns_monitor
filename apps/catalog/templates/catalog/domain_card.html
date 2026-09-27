@@ -333,7 +333,14 @@
                 {% endif %}
                 <textarea class="inp" id="d-sub" name="allowlist" rows="5"
                           hx-post="{% url 'allowlist-check' card.id %}"
-                          hx-trigger="keyup changed delay:250ms"
+                          {% comment %}
+                          `input`, а не `keyup`: поле существует ради вставки списка адресов, а
+                          вставка правой кнопкой или средней кнопкой мыши клавиатурных событий
+                          не порождает — замечания не появлялись бы до первого нажатия клавиши.
+                          `input` ловит и набор, и вставку любым способом, и перетаскивание, и
+                          отмену. Задержка та же, 250 мс (10.2).
+                          {% endcomment %}
+                          hx-trigger="input changed delay:250ms"
                           hx-target="#allowlist-issues"
                           hx-include="closest form">{% if draft %}{{ draft.allowlist }}{% else %}{{ card.allowlist_text }}{% endif %}</textarea>
                 <div id="allowlist-issues">
