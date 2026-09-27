@@ -194,6 +194,30 @@ def test_d36_normal_check_is_green_and_distinct_from_an_empty_mark(
     assert empty.evaluate(colour) != normal.evaluate(colour)
 
 
+def test_d37_a_domain_without_an_allowlist_is_not_painted_green(
+    signed_in: Any, live_server: Any
+) -> None:
+    """Q-D37: «ничего не задано» обязано привлекать внимание, а не выглядеть нормой.
+
+    Проверяется вычисленный цвет: зелёная отметка здесь означала бы, что экран утверждает
+    «проверено и в порядке» про домен, который не с чем сравнивать.
+    """
+    moment = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
+    bare = Domain.objects.create(name="github.com", last_successful_check_at=moment)
+    Check.objects.create(
+        domain=bare, checked_at=moment, outcome=CheckOutcome.NO_ALLOWLIST, answered_by="1.1.1.1"
+    )
+    page = signed_in
+    page.goto(f"{live_server.url}/domains/")
+
+    mark = page.locator(".tape i.e-nolist").first
+    assert mark.count() > 0
+    # Не зелёная и вообще не залита: отметка контурная, как «не проверялось» в реестре.
+    assert mark.evaluate("node => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
+    assert mark.evaluate("node => getComputedStyle(node).boxShadow") != "none"
+    assert page.locator(".tape i.e-ok").count() == 0
+
+
 def test_10_4_combo_offers_to_create_the_typed_group(signed_in: Any, live_server: Any) -> None:
     """10.4: «при отсутствии совпадений предлагается создать группу с введённым названием».
 

@@ -35,6 +35,8 @@ class HistoryMark(StrEnum):
     OK = "e-ok"
     CHANGE = "e-change"
     BREACH = "e-breach"
+    #: Q-D37: проверка прошла, но сравнивать было не с чем — белый список пуст.
+    NO_ALLOWLIST = "e-nolist"
     FAIL = "e-fail"
 
 
@@ -43,6 +45,7 @@ MARK_OF_OUTCOME = {
     CheckOutcome.NORMAL: HistoryMark.OK,
     CheckOutcome.ADDRESS_SET_CHANGED: HistoryMark.CHANGE,
     CheckOutcome.HAS_UNMATCHED: HistoryMark.BREACH,
+    CheckOutcome.NO_ALLOWLIST: HistoryMark.NO_ALLOWLIST,
     CheckOutcome.RESOLVE_ERROR: HistoryMark.FAIL,
     CheckOutcome.NOT_PERFORMED: HistoryMark.NONE,
 }

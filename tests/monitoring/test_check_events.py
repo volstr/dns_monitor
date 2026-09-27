@@ -206,3 +206,67 @@ def test_d12_cname_target_is_written_only_with_the_flag() -> None:
     without_flag.refresh_from_db()
     assert with_flag.cname_target == "edge.cdn.example"
     assert without_flag.cname_target == ""
+
+
+# ─────────────── исход проверки домена без белого списка — Q-D37 ───────────────
+
+
+def test_d37_a_domain_without_an_allowlist_is_not_a_normal_check() -> None:
+    """Норма означает «сравнили и сошлось». Здесь не сравнивали: сравнивать не с чем.
+
+    Без этой ступени каждая проверка такого домена объявлялась бы нормой, а в колонке «История»
+    красилась бы зелёным — то есть экран утверждал бы, что всё проверено и в порядке.
+    """
+    bare = Domain.objects.create(name="github.com")
+    resolver = FakeResolver({"github.com": [answered("140.82.121.3")]})
+
+    run_check(domain_id=bare.pk, at=START, resolver=resolver)
+    run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
+
+    assert Check.objects.filter(domain=bare).latest("checked_at").outcome == (
+        CheckOutcome.NO_ALLOWLIST
+    )
+
+
+def test_d37_the_same_domain_becomes_normal_once_the_list_is_set() -> None:
+    """Отметка историческая: старые проверки остаются «не сравнивали», новые — нормой.
+
+    Так видно момент, с которого домен действительно начали проверять.
+    """
+    bare = Domain.objects.create(name="github.com")
+    resolver = FakeResolver({"github.com": [answered("140.82.121.3")]})
+    run_check(domain_id=bare.pk, at=START, resolver=resolver)
+    run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
+
+    AllowlistEntry.objects.create(domain=bare, entry="140.82.121.0/24", raw="140.82.121.0/24")
+    run_check(domain_id=bare.pk, at=START + 2 * PERIOD, resolver=resolver)
+
+    outcomes = list(
+        Check.objects.filter(domain=bare).order_by("checked_at").values_list("outcome", flat=True)
+    )
+    assert outcomes[-2:] == [CheckOutcome.NO_ALLOWLIST, CheckOutcome.NORMAL]
+
+
+def test_d37_a_domain_with_a_matching_list_stays_normal(domain: Domain) -> None:
+    """Обратная сторона: там, где сравнение было и сошлось, норма остаётся нормой."""
+    resolver = FakeResolver({NAME: [answered("10.20.1.14")]})
+    run_check(domain_id=domain.pk, at=START, resolver=resolver)
+
+    run_check(domain_id=domain.pk, at=START + PERIOD, resolver=resolver)
+
+    assert Check.objects.filter(domain=domain).latest("checked_at").outcome == CheckOutcome.NORMAL
+
+
+def test_d37_a_changed_set_wins_over_the_missing_list() -> None:
+    """Порядок исходов: «набор изменился» — про эту проверку, «список не задан» — про домен."""
+    bare = Domain.objects.create(name="github.com")
+    resolver = FakeResolver(
+        {"github.com": [answered("140.82.121.3"), answered("140.82.121.4")]}
+    )
+    run_check(domain_id=bare.pk, at=START, resolver=resolver)
+
+    run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
+
+    assert Check.objects.filter(domain=bare).latest("checked_at").outcome == (
+        CheckOutcome.ADDRESS_SET_CHANGED
+    )

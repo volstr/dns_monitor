@@ -45,6 +45,10 @@ class CheckOutcome(StrEnum):
     ADDRESS_SET_CHANGED = "address_set_changed"
     #: Прежнее имя `UNRESOLVED` убрано по Q-13.8: одно слово стояло в двух перечислениях.
     HAS_UNMATCHED = "has_unmatched"
+    #: Проверка прошла, но сравнивать было не с чем: белый список домена пуст (Q-D37).
+    #: Не `NOT_CHECKED` — так называется статус адреса, а повторять одно слово в двух
+    #: перечислениях в этом проекте уже признали ошибкой (Q-13.8). Здесь названа причина.
+    NO_ALLOWLIST = "no_allowlist"
     RESOLVE_ERROR = "resolve_error"
     #: Q-D5: ни один сервер не ответил. В журнал событий не пишется, в колонке — пустая отметка.
     NOT_PERFORMED = "not_performed"

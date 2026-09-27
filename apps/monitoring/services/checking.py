@@ -353,11 +353,19 @@ def _texts(addresses: frozenset[IPAddress] | set[IPAddress]) -> list[str]:
 
 
 def _outcome(statuses: tuple[AddressStatusView, ...], *, changed: bool) -> CheckOutcome:
-    """Цвет отметки в колонке «История» — ТЗ 11.5."""
+    """Цвет отметки в колонке «История» — ТЗ 11.5.
+
+    Порядок важен и идёт от частного к общему. Последняя ступень — `NO_ALLOWLIST`, а не
+    `NORMAL`: у домена без белого списка несовпавших адресов не бывает по определению, и без
+    этой ступени каждая его проверка объявлялась бы нормой (Q-D37). Норма означает «сравнили и
+    сошлось», а тут не сравнивали.
+    """
     if _unmatched(statuses):
         return CheckOutcome.HAS_UNMATCHED
     if changed:
         return CheckOutcome.ADDRESS_SET_CHANGED
+    if statuses and all(view.status == AddressStatus.NOT_CHECKED for view in statuses):
+        return CheckOutcome.NO_ALLOWLIST
     return CheckOutcome.NORMAL
 
 
