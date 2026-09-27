@@ -3,9 +3,9 @@
 import dataclasses
 
 from .base import *  # noqa: F403
-from .base import APP_HOST, ENV
+from .base import ENV
 
-ALLOWED_HOSTS = ["testserver", APP_HOST]
+ALLOWED_HOSTS = ["testserver"]
 
 # Пояс тестов задан жёстко и **не** берётся из `.env`. Две причины, и обе прикладные.
 #

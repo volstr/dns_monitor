@@ -33,6 +33,9 @@ REDIS_DB_MAX: Final = 15
 _SENTRY_DSN: Final = re.compile(r"https?://[^:@/\s]+(?::[^@/\s]*)?@[^/\s]+/(?:[^/\s]+/)*\d+")
 _TELEGRAM_BOT_TOKEN: Final = re.compile(r"\d+:[A-Za-z0-9_-]{30,}")
 _INTEGER: Final = re.compile(r"-?\d+")
+#: Имя хоста, адрес или `*`. Django сам допускает поддоменную маску вида `.example.com`,
+#: поэтому ведущая точка разрешена.
+_HOST_NAME: Final = re.compile(r"\*|\.?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|\[?[0-9a-fA-F:.]+]?")
 
 type _Check = Callable[[str], str | None]
 
@@ -50,6 +53,9 @@ class Env:
     redis_db_state: int
     redis_db_cache: int
     app_base_url: str
+    #: Имена, под которыми приложение отвечает. Пусто — режим сам решает, ошибка это или
+    #: норма: в `prod` старт останавливается, в `dev` подставляются localhost и 127.0.0.1.
+    allowed_hosts: tuple[str, ...]
     #: Часовой пояс отображения (ТЗ 4.0). Хранение всегда в UTC, меняется только показ.
     app_time_zone: str
     session_secret: str
@@ -116,6 +122,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
             "пространства ключей",
         )
     app_base_url = read.required("APP_BASE_URL", _app_base_url_problem)
+    allowed_hosts = read.host_list("ALLOWED_HOSTS")
     app_time_zone = read.optional("APP_TIME_ZONE", _time_zone_problem) or _system_time_zone(
         source
     )
@@ -156,6 +163,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
         redis_db_state=redis_db_state,
         redis_db_cache=redis_db_cache,
         app_base_url=app_base_url.rstrip("/"),
+        allowed_hosts=allowed_hosts,
         app_time_zone=app_time_zone,
         session_secret=session_secret,
         auth_2fa_enabled=auth_2fa_enabled,
@@ -222,6 +230,23 @@ class _Reader:
 
     def text(self, variable: str, *, default: str) -> str:
         return self.optional(variable) or default
+
+    def host_list(self, variable: str) -> tuple[str, ...]:
+        """
+        Список имён через запятую: `dns.example.com, 10.20.0.7`.
+
+        Пусто — допустимо: обязательность зависит от режима, и решается она в настройках, где
+        режим известен. В `prod` пустой список останавливает старт, в `dev` он норма.
+        """
+        raw = self.optional(variable)
+        if raw is None:
+            return ()
+
+        names = tuple(part.strip() for part in raw.split(",") if part.strip())
+        for name in names:
+            if _HOST_NAME.fullmatch(name) is None:
+                self.fail(variable, f"«{name}» не похоже на имя хоста или адрес")
+        return names
 
     def integer(self, variable: str, *, default: int, minimum: int, maximum: int) -> int:
         raw = self.optional(variable)

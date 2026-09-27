@@ -256,3 +256,27 @@ def test_django_database_is_built_from_url() -> None:
     assert database["HOST"] == "db"
     assert database["PORT"] == "5433"
     assert database["OPTIONS"] == {"sslmode": "require"}
+
+
+def test_allowed_hosts_are_split_on_commas(env: dict[str, str]) -> None:
+    env["ALLOWED_HOSTS"] = " dns.example.com ,10.20.0.7,  .internal "
+
+    parsed = load_env(env)
+
+    assert parsed.allowed_hosts == ("dns.example.com", "10.20.0.7", ".internal")
+
+
+def test_allowed_hosts_may_be_absent(env: dict[str, str]) -> None:
+    """Обязательность зависит от режима, поэтому разбор окружения её не требует."""
+    del env["ALLOWED_HOSTS"]
+
+    assert load_env(env).allowed_hosts == ()
+
+
+def test_a_broken_host_name_is_named(env: dict[str, str]) -> None:
+    env["ALLOWED_HOSTS"] = "dns.example.com, не хост"
+
+    with pytest.raises(EnvironmentConfigError) as raised:
+        load_env(env)
+
+    assert {error.variable for error in raised.value.errors} == {"ALLOWED_HOSTS"}

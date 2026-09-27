@@ -1,10 +1,14 @@
 """Режим разработчика: ``docker-compose-dev.yml``."""
 
 from .base import *  # noqa: F403
-from .base import APP_HOST, INSTALLED_APPS, LOGGING, TEMPLATES
+from .base import ALLOWED_HOSTS, INSTALLED_APPS, LOGGING, TEMPLATES
 
 DEBUG = True
-ALLOWED_HOSTS = [APP_HOST, "localhost", "127.0.0.1"]
+
+# В режиме разработчика `ALLOWED_HOSTS` задавать необязательно: локальные имена добавляются
+# сами. Заданные значения при этом сохраняются — установка может открываться и по имени
+# машины в сети, и через проброс порта.
+ALLOWED_HOSTS = [*ALLOWED_HOSTS, "localhost", "127.0.0.1", "[::1]"]
 
 # Журнал разработчик читает глазами в терминале, а не собирает по полям.
 LOGGING["handlers"]["console"]["formatter"] = "plain"

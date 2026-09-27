@@ -21,6 +21,7 @@ PROD_ENV = {
     "REDIS_URL": "redis://redis:6379",
     "APP_BASE_URL": "https://dns-monitoring.example.com",
     "SESSION_SECRET": "prod-session-secret-" + "0123456789" * 4,
+    "ALLOWED_HOSTS": "dns-monitoring.example.com",
 }
 
 
@@ -64,23 +65,58 @@ def test_interface_language_is_russian() -> None:
     assert settings.LANGUAGE_CODE == "ru"
 
 
-def test_a3_allowed_hosts_follow_app_base_url() -> None:
+def test_allowed_hosts_come_from_their_own_variable() -> None:
+    """
+    Имена задаются `ALLOWED_HOSTS` и только ею — из `APP_BASE_URL` они больше не выводятся.
+
+    Это разные величины: `APP_BASE_URL` — адрес, по которому установку открывает человек и
+    который уходит в ссылки уведомлений (8.4); отвечать приложение может ещё и по внутреннему
+    имени или за обратным прокси.
+    """
+    env = PROD_ENV | {"ALLOWED_HOSTS": "dns.example.com, 10.20.0.7, .internal"}
+
     values = settings_of(
-        "config.settings.prod", PROD_ENV, "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", "DEBUG"
+        "config.settings.prod", env, "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", "DEBUG"
     )
 
-    assert values["ALLOWED_HOSTS"] == ["dns-monitoring.example.com"]
+    assert values["ALLOWED_HOSTS"] == ["dns.example.com", "10.20.0.7", ".internal"]
+    # Адрес из ссылок остаётся своим: его в список имён никто не переносит.
     assert values["CSRF_TRUSTED_ORIGINS"] == ["https://dns-monitoring.example.com"]
     assert values["DEBUG"] is False
 
 
-def test_dev_adds_localhost_to_allowed_hosts() -> None:
-    env = PROD_ENV | {"APP_BASE_URL": "http://localhost:8000"}
+def test_prod_refuses_to_start_without_allowed_hosts() -> None:
+    """
+    Пустой список в бою — не мелочь: Django отверг бы тогда любой запрос.
+
+    Приложение выглядело бы сломанным, не называя причины, поэтому оно не стартует вовсе —
+    как и при любой другой недостающей обязательной переменной (11.10).
+    """
+    env = {name: value for name, value in PROD_ENV.items() if name != "ALLOWED_HOSTS"}
+
+    with pytest.raises(AssertionError) as failure:
+        settings_of("config.settings.prod", env, "ALLOWED_HOSTS")
+
+    assert "ALLOWED_HOSTS" in str(failure.value)
+
+
+def test_dev_does_not_require_allowed_hosts() -> None:
+    """В режиме разработчика переменную задавать необязательно: локальные имена добавляются сами."""
+    env = {name: value for name, value in PROD_ENV.items() if name != "ALLOWED_HOSTS"}
 
     values = settings_of("config.settings.dev", env, "ALLOWED_HOSTS", "DEBUG")
 
     assert values["DEBUG"] is True
-    assert set(values["ALLOWED_HOSTS"]) == {"localhost", "127.0.0.1"}  # type: ignore[arg-type]
+    assert set(values["ALLOWED_HOSTS"]) == {"localhost", "127.0.0.1", "[::1]"}  # type: ignore[arg-type]
+
+
+def test_dev_keeps_the_names_that_were_given() -> None:
+    """Установку разработчика открывают и по имени машины в сети — заданное не теряется."""
+    env = PROD_ENV | {"ALLOWED_HOSTS": "dev-box.local"}
+
+    values = settings_of("config.settings.dev", env, "ALLOWED_HOSTS")
+
+    assert "dev-box.local" in values["ALLOWED_HOSTS"]  # type: ignore[operator]
 
 
 @pytest.mark.parametrize(

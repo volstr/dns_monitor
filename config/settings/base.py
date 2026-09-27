@@ -6,7 +6,6 @@
 """
 
 from pathlib import Path
-from urllib.parse import urlsplit
 
 from config.env import django_database, load_env
 from core.observability.setup import configure_sentry
@@ -16,11 +15,20 @@ ENV = load_env()
 BASE_DIR = Path(__file__).resolve().parents[2]
 
 APP_BASE_URL = ENV.app_base_url
-APP_HOST = urlsplit(ENV.app_base_url).hostname or ""
 
 SECRET_KEY = ENV.session_secret
 DEBUG = False
-ALLOWED_HOSTS = [APP_HOST]
+
+# Имена, под которыми приложение отвечает, задаются переменной `ALLOWED_HOSTS` и только ею.
+# Раньше имя выводилось из `APP_BASE_URL`, и это было неверно: `APP_BASE_URL` — адрес, по
+# которому установку открывает человек и который уходит в ссылки уведомлений (8.4), а отвечать
+# приложение может ещё и по внутреннему имени, по адресу, за обратным прокси — и наоборот, имя
+# из ссылки может до приложения вовсе не доходить. Две разные величины, и выводить одну из
+# другой значит угадывать.
+#
+# Пустое значение здесь не ошибка: обязательность зависит от режима, и решают её `dev.py`
+# и `prod.py`, где режим известен.
+ALLOWED_HOSTS = list(ENV.allowed_hosts)
 CSRF_TRUSTED_ORIGINS = [ENV.app_base_url]
 
 INSTALLED_APPS = [
