@@ -10,7 +10,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.test import RequestFactory
 
-from apps.accounts.access import admin_required, member_required, navigation
+from apps.accounts.access import AdminView, MemberView, navigation
 from apps.accounts.models import Member, Role
 
 pytestmark = pytest.mark.django_db
@@ -24,8 +24,16 @@ def make_member(email: str, role: str = Role.OBSERVER, **extra: object) -> Membe
     )
 
 
-def open_screen(request: HttpRequest) -> HttpResponse:
-    return HttpResponse("экран")
+class MemberScreen(MemberView):
+    def get(self, request: HttpRequest) -> HttpResponse:
+        del request
+        return HttpResponse("экран")
+
+
+class AdminScreen(AdminView):
+    def get(self, request: HttpRequest) -> HttpResponse:
+        del request
+        return HttpResponse("экран")
 
 
 def request_from(member: Member | None) -> HttpRequest:
@@ -45,7 +53,7 @@ def test_3_anonymous_visitor_is_sent_to_the_login_screen() -> None:
 
     Адрес запоминается — ссылка из уведомления (8.4) после входа откроется сама.
     """
-    response = member_required(open_screen)(request_from(None))
+    response = MemberScreen.as_view()(request_from(None))
 
     assert response.status_code == 302
     assert response["Location"].startswith("/login/")
@@ -55,7 +63,7 @@ def test_3_anonymous_visitor_is_sent_to_the_login_screen() -> None:
 def test_3_observer_reads_domains() -> None:
     observer = make_member("watch@contoso.ru")
 
-    response = member_required(open_screen)(request_from(observer))
+    response = MemberScreen.as_view()(request_from(observer))
 
     assert response.status_code == 200
 
@@ -69,13 +77,25 @@ def test_3_observer_has_no_access_to_the_members_screen() -> None:
     observer = make_member("watch@contoso.ru")
 
     with pytest.raises(PermissionDenied):
-        admin_required(open_screen)(request_from(observer))
+        AdminScreen.as_view()(request_from(observer))
 
 
 def test_3_administrator_has_access_to_the_members_screen() -> None:
     admin = make_member("boss@contoso.ru", role=Role.ADMIN)
 
-    assert admin_required(open_screen)(request_from(admin)).status_code == 200
+    assert AdminScreen.as_view()(request_from(admin)).status_code == 200
+
+
+def test_3_anonymous_visitor_on_an_admin_screen_is_also_sent_to_login() -> None:
+    """Не `PermissionDenied`: анонимный посетитель не знает, что он не администратор.
+
+    Раньше это обеспечивалось повторённой проверкой в `admin_required`; теперь — наследованием
+    `AdminView` от `MemberView`, и проверка стоит здесь, чтобы разойтись они не могли.
+    """
+    response = AdminScreen.as_view()(request_from(None))
+
+    assert response.status_code == 302
+    assert response["Location"].startswith("/login/")
 
 
 def test_3_1_navigation_hides_the_members_item_from_an_observer() -> None:

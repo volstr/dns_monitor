@@ -5,28 +5,28 @@ from __future__ import annotations
 from django.urls import URLPattern, path
 
 from apps.accounts.member_views import (
-    member_action,
-    member_invite,
-    member_list,
-    member_update,
+    MemberAction,
+    MemberInvite,
+    MemberList,
+    MemberUpdate,
 )
 from apps.accounts.views import (
-    accept_invitation_view,
-    login_view,
-    logout_view,
-    password_change_view,
-    totp_setup_view,
+    AcceptInvitation,
+    Login,
+    Logout,
+    PasswordChange,
+    TotpSetup,
 )
 
 urlpatterns: list[URLPattern] = [
-    path("login/", login_view, name="login"),
-    path("logout/", logout_view, name="logout"),
-    path("login/authenticator/", totp_setup_view, name="totp-setup"),
-    path("login/password/", password_change_view, name="password-change"),
+    path("login/", Login.as_view(), name="login"),
+    path("logout/", Logout.as_view(), name="logout"),
+    path("login/authenticator/", TotpSetup.as_view(), name="totp-setup"),
+    path("login/password/", PasswordChange.as_view(), name="password-change"),
     # Адрес приглашения взят из прототипа.
-    path("join/<str:token>/", accept_invitation_view, name="join"),
-    path("members/", member_list, name="member-list"),
-    path("members/invite/", member_invite, name="member-invite"),
-    path("members/<int:member_id>/", member_update, name="member-update"),
-    path("members/<int:member_id>/<str:action>/", member_action, name="member-action"),
+    path("join/<str:token>/", AcceptInvitation.as_view(), name="join"),
+    path("members/", MemberList.as_view(), name="member-list"),
+    path("members/invite/", MemberInvite.as_view(), name="member-invite"),
+    path("members/<int:member_id>/", MemberUpdate.as_view(), name="member-update"),
+    path("members/<int:member_id>/<str:action>/", MemberAction.as_view(), name="member-action"),
 ]

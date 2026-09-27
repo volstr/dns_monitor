@@ -77,6 +77,12 @@ Dockerfile  docker-compose-dev.yml
 Запрещено: ветвления по доменным правилам, вычисление наследования настроек, `timezone.now()`,
 обращения к Redis, `.save()`, циклы по queryset с решениями внутри.
 
+Обработчики — классы с `get` и `post` (Q-D33). Роль задаётся базовым классом из
+`apps/accounts/access.py`: `PublicView` — экран до входа, `MemberView` — для участника,
+`AdminView` — только для администратора. Generic CBV Django (`ListView`, `DetailView`,
+`UpdateView`) не использовать: они устроены вокруг `get_queryset()` и `form_valid()`, то есть
+вокруг запрещённого выше.
+
 Функция сервиса не знает про `HttpRequest`: принимает примитивы и dataclass, возвращает dataclass.
 Понадобился `request` внутри сервиса — граница проведена неправильно.
 

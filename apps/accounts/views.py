@@ -1,7 +1,10 @@
 """Экраны входа — ТЗ 3; критерии 32, 33, 50, 51, 52, 56.
 
 Обработчику разрешены разбор формы, один вызов сервиса, выбор шаблона и редирект (`CLAUDE.md`).
-Решение о том, пускать ли, принимает `authenticate`, а не эти функции.
+Решение о том, пускать ли, принимает `authenticate`, а не эти классы.
+
+Все они наследуют `PublicView`: это единственные экраны, доступные до входа, и отдельное имя
+базового класса говорит, что проверку доступа здесь не забыли, а её тут не должно быть.
 
 Промежуточные шаги — привязка аутентификатора и обязательная смена пароля — помнят участника
 в сессии. Это не вход: до завершения шага доступа к остальным экранам нет, чего и требуют
@@ -17,6 +20,7 @@ from django.contrib.auth import logout as end_session
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
+from apps.accounts.access import PublicView
 from apps.accounts.forms import LoginForm, PasswordChangeForm, TotpBindingForm
 from apps.accounts.models import Member
 from apps.accounts.services.authentication import (
@@ -50,34 +54,37 @@ def _client_ip(request: HttpRequest) -> str:
     return request.META.get("REMOTE_ADDR") or "unknown"
 
 
-def login_view(request: HttpRequest) -> HttpResponse:
+class Login(PublicView):
     """Вход. При выключенном втором факторе поля кода в разметке нет вовсе (критерий 50)."""
-    two_factor = settings.ENV.auth_2fa_enabled
-    if request.method != "POST":
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        two_factor = settings.ENV.auth_2fa_enabled
         return render(
             request,
             "accounts/login.html",
             {"form": LoginForm(two_factor_enabled=two_factor), "two_factor": two_factor},
         )
 
-    form = LoginForm(request.POST, two_factor_enabled=two_factor)
-    if not form.is_valid():
-        return render(
-            request,
-            "accounts/login.html",
-            {"form": form, "two_factor": two_factor, "error": _form_error(form, two_factor)},
-        )
+    def post(self, request: HttpRequest) -> HttpResponse:
+        two_factor = settings.ENV.auth_2fa_enabled
+        form = LoginForm(request.POST, two_factor_enabled=two_factor)
+        if not form.is_valid():
+            return render(
+                request,
+                "accounts/login.html",
+                {"form": form, "two_factor": two_factor, "error": _form_error(form, two_factor)},
+            )
 
-    result = authenticate(
-        email=form.login_email(),
-        password=form.login_password(),
-        code=form.totp_code(),
-        ip=_client_ip(request),
-        at=SystemClock().now(),
-        state_store=_store(),
-        two_factor_enabled=two_factor,
-    )
-    return _after_authenticate(request, result, two_factor)
+        result = authenticate(
+            email=form.login_email(),
+            password=form.login_password(),
+            code=form.totp_code(),
+            ip=_client_ip(request),
+            at=SystemClock().now(),
+            state_store=_store(),
+            two_factor_enabled=two_factor,
+        )
+        return _after_authenticate(request, result, two_factor)
 
 
 def _form_error(form: LoginForm, two_factor: bool) -> str:
@@ -126,46 +133,74 @@ def _after_authenticate(
     )
 
 
-def logout_view(request: HttpRequest) -> HttpResponse:
-    end_session(request)
-    return redirect("login")
+class Logout(PublicView):
+    """Выход.
+
+    Только `POST`, и это уточнение, а не перенос: функция принимала любой метод, хотя в макете
+    выход — кнопка в форме. Выход меняет состояние, и открываться по ссылке ему незачем.
+    """
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        end_session(request)
+        return redirect("login")
 
 
-def totp_setup_view(request: HttpRequest) -> HttpResponse:
+class TotpSetup(PublicView):
     """Обязательная привязка аутентификатора — критерий 51.
 
     До её завершения доступа к остальным экранам нет: участник ещё не вошёл, в сессии лежит
     только отметка о пройденном пароле.
     """
+
+    def get(self, request: HttpRequest) -> HttpResponse:
+        member = _pending_member(request)
+        if member is None:
+            return redirect("login")
+        return _totp_screen(request, member, _secret(request))
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        member = _pending_member(request)
+        if member is None:
+            return redirect("login")
+
+        secret = _secret(request)
+        form = TotpBindingForm(request.POST)
+        if not form.is_valid():
+            return _totp_screen(
+                request, member, secret, error="Введите шесть цифр из приложения."
+            )
+
+        bound = confirm_totp_binding(
+            member_id=member.pk,
+            secret=secret,
+            code=form.totp_code(),
+            at=SystemClock().now(),
+            state_store=_store(),
+        )
+        if not bound:
+            return _totp_screen(
+                request, member, secret, error="Код не подошёл. Попробуйте следующий."
+            )
+
+        del request.session[PENDING_BINDING]
+        del request.session[PENDING_MEMBER]
+        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
+        return redirect("overview")
+
+
+def _pending_member(request: HttpRequest) -> Member | None:
+    """Участник промежуточного шага. ``None`` — шага нет, идти некуда, кроме входа."""
     member_id = request.session.get(PENDING_MEMBER)
     if not member_id:
-        return redirect("login")
+        return None
+    return Member.objects.get(pk=member_id)
 
-    member = Member.objects.get(pk=member_id)
+
+def _secret(request: HttpRequest) -> str:
+    """Секрет держится в сессии между показом QR-кода и вводом кода: он один и тот же."""
     secret = request.session.get(PENDING_BINDING) or new_totp_secret()
     request.session[PENDING_BINDING] = secret
-
-    if request.method != "POST":
-        return _totp_screen(request, member, secret)
-
-    form = TotpBindingForm(request.POST)
-    if not form.is_valid():
-        return _totp_screen(request, member, secret, error="Введите шесть цифр из приложения.")
-
-    bound = confirm_totp_binding(
-        member_id=member.pk,
-        secret=secret,
-        code=form.totp_code(),
-        at=SystemClock().now(),
-        state_store=_store(),
-    )
-    if not bound:
-        return _totp_screen(request, member, secret, error="Код не подошёл. Попробуйте следующий.")
-
-    del request.session[PENDING_BINDING]
-    del request.session[PENDING_MEMBER]
-    start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-    return redirect("overview")
+    return str(secret)
 
 
 def _totp_screen(
@@ -183,53 +218,63 @@ def _totp_screen(
     )
 
 
-def accept_invitation_view(request: HttpRequest, token: str) -> HttpResponse:
+class AcceptInvitation(PublicView):
     """Открытие ссылки-приглашения — ТЗ 3, критерии 30, 31.
 
     Открывший задаёт себе пароль сам. Ссылка одноразовая: повторное открытие и просроченная
     ссылка получают отказ с причиной, а не форму.
     """
-    if request.method != "POST":
-        return render(request, "accounts/join.html", {"form": PasswordChangeForm(), "token": token})
 
-    form = PasswordChangeForm(request.POST)
-    if not form.is_valid():
-        return render(request, "accounts/join.html", {"form": form, "token": token})
+    def get(self, request: HttpRequest, token: str) -> HttpResponse:
+        return render(
+            request, "accounts/join.html", {"form": PasswordChangeForm(), "token": token}
+        )
 
-    result = accept_invitation(
-        token=token,
-        password=form.new_password(),
-        at=SystemClock().now(),
-        state_store=_store(),
-    )
-    if isinstance(result, Refused):
-        return render(request, "accounts/join.html", {"error": result.reason, "token": token})
+    def post(self, request: HttpRequest, token: str) -> HttpResponse:
+        form = PasswordChangeForm(request.POST)
+        if not form.is_valid():
+            return render(request, "accounts/join.html", {"form": form, "token": token})
 
-    member = Member.objects.get(pk=result.member_id)
-    start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-    messages.success(request, "Пароль задан. Добро пожаловать.")
-    return redirect("overview")
+        result = accept_invitation(
+            token=token,
+            password=form.new_password(),
+            at=SystemClock().now(),
+            state_store=_store(),
+        )
+        if isinstance(result, Refused):
+            return render(request, "accounts/join.html", {"error": result.reason, "token": token})
+
+        member = Member.objects.get(pk=result.member_id)
+        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
+        messages.success(request, "Пароль задан. Добро пожаловать.")
+        return redirect("overview")
 
 
-def password_change_view(request: HttpRequest) -> HttpResponse:
+class PasswordChange(PublicView):
     """Смена пароля при первом входе — критерий 32: до смены доступа к экранам нет."""
-    member_id = request.session.get(PENDING_MEMBER)
-    if not member_id:
-        return redirect("login")
 
-    if request.method != "POST":
+    def get(self, request: HttpRequest) -> HttpResponse:
+        if _pending_member(request) is None:
+            return redirect("login")
         return render(request, "accounts/password_change.html", {"form": PasswordChangeForm()})
 
-    form = PasswordChangeForm(request.POST)
-    if not form.is_valid():
-        return render(request, "accounts/password_change.html", {"form": form})
+    def post(self, request: HttpRequest) -> HttpResponse:
+        member = _pending_member(request)
+        if member is None:
+            return redirect("login")
 
-    member = Member.objects.get(pk=member_id)
-    member.set_password(form.new_password())
-    member.must_change_password = False
-    member.save(update_fields=["password", "must_change_password"])
+        form = PasswordChangeForm(request.POST)
+        if not form.is_valid():
+            return render(request, "accounts/password_change.html", {"form": form})
 
-    del request.session[PENDING_MEMBER]
-    start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-    messages.success(request, "Пароль изменён.")
-    return redirect("overview")
+        # TODO(CLAUDE.md, «Границы слоёв»): запись пароля обязана уехать в сервис — `.save()`
+        # в обработчике запрещён. Перенесено не здесь намеренно: этот коммит только меняет
+        # форму обработчиков, а смешивать с ним исправление границы слоёв нечестно.
+        member.set_password(form.new_password())
+        member.must_change_password = False
+        member.save(update_fields=["password", "must_change_password"])
+
+        del request.session[PENDING_MEMBER]
+        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
+        messages.success(request, "Пароль изменён.")
+        return redirect("overview")

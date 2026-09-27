@@ -12,54 +12,52 @@ TODO(ТЗ 11.12): если профилирование покажет, что �
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from functools import wraps
-
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
+from django.views import View
 
 from apps.accounts.models import Role
 
-type View = Callable[..., HttpResponse]
+
+class PublicView(View):
+    """Экран, доступный до входа: вход, приглашение, привязка аутентификатора.
+
+    Существует ради явности. Обработчик без ограничения доступа и обработчик, у которого
+    ограничение забыли, выглядят одинаково; отдельное имя эту пару разводит, и «почему у этого
+    экрана нет проверки» становится вопросом к классу, а не к ревью.
+    """
 
 
-def member_required(view: View) -> View:
+class MemberView(View):
     """Экран доступен только участнику рабочего пространства.
 
     Анонимный запрос ведёт на вход с запомненным адресом: человек, открывший ссылку из
     уведомления (8.4), после входа попадает именно на неё, а не на обзор.
     """
 
-    @wraps(view)
-    def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+    def dispatch(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
         if not request.user.is_authenticated:
             return redirect_to_login(request.get_full_path(), reverse("login"))
-        return view(request, *args, **kwargs)
-
-    return wrapper
+        return super().dispatch(request, *args, **kwargs)
 
 
-def admin_required(view: View) -> View:
+class AdminView(MemberView):
     """Экран доступен только администратору.
 
     ТЗ 3: «Наблюдатель вообще не имеет доступа к этому разделу». Проверка живёт здесь, а не в
     шаблоне: спрятанный пункт меню не является ограничением доступа (критерии 29, 87).
 
     Наблюдатель получает именно отказ, а не вход: он уже вошёл, и предлагать ему войти снова
-    значило бы врать о причине.
+    значило бы врать о причине. Поэтому наследование от `MemberView`, а не повторная проверка:
+    анонимный посетитель обязан получить тот же ответ, что и на любом другом экране.
     """
 
-    @wraps(view)
-    def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
-        if not request.user.is_authenticated:
-            return redirect_to_login(request.get_full_path(), reverse("login"))
-        if request.user.role != Role.ADMIN:
+    def dispatch(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        if request.user.is_authenticated and request.user.role != Role.ADMIN:
             raise PermissionDenied
-        return view(request, *args, **kwargs)
-
-    return wrapper
+        return super().dispatch(request, *args, **kwargs)
 
 
 def navigation(request: HttpRequest) -> dict[str, object]:

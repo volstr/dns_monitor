@@ -6,10 +6,10 @@
 
 from django.urls import URLPattern, URLResolver, include, path
 
-from apps.monitoring.views import healthcheck
+from apps.monitoring.views import Healthcheck
 
 urlpatterns: list[URLPattern | URLResolver] = [
-    path("health/", healthcheck, name="healthcheck"),
+    path("health/", Healthcheck.as_view(), name="healthcheck"),
     path("", include("apps.accounts.urls")),
     path("", include("apps.catalog.urls")),
 ]
