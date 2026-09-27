@@ -323,3 +323,35 @@ def test_d40_a_real_chat_id_is_accepted() -> None:
 
     assert isinstance(result, SettingsSaved)
     assert GlobalSettings.objects.get().telegram_chat_id == "-1001234567890"
+
+
+def test_channel_buttons_are_on_the_screen(client: Client, admin: Member) -> None:
+    """Кнопки из макета, блок «Каналы доставки»."""
+    client.force_login(admin)
+
+    body = client.get(reverse("settings")).content.decode()
+
+    assert "Отправить тестовое" in body
+    assert "Отключить" in body
+    # Через formaction, а не вложенной формой: форма настроек одна на весь экран.
+    assert f'formaction="{reverse("channel-probe")}"' in body
+    assert f'formaction="{reverse("channel-disconnect")}"' in body
+
+
+def test_disconnect_button_clears_the_recipient(client: Client, admin: Member) -> None:
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id="-1001234567890")
+    client.force_login(admin)
+
+    client.post(reverse("channel-disconnect"), follow=True)
+
+    assert GlobalSettings.objects.get().telegram_chat_id == ""
+
+
+def test_29_observer_cannot_touch_the_channel(client: Client, observer: Member) -> None:
+    """Критерий 29: наблюдатель настройки не меняет, и каналы — тоже настройки."""
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id="-1001234567890")
+    client.force_login(observer)
+
+    assert client.post(reverse("channel-probe")).status_code == 403
+    assert client.post(reverse("channel-disconnect")).status_code == 403
+    assert GlobalSettings.objects.get().telegram_chat_id == "-1001234567890"

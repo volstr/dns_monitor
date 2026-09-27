@@ -109,7 +109,26 @@
               {% endcomment %}
               <div class="row">
                 <div class="k">Telegram<div class="d">Идентификатор чата. Токен бота задаётся в окружении.</div></div>
-                <div><input class="inp mono" style="max-width:280px" name="telegram_chat_id" value="{{ page.telegram_chat_id }}"></div>
+                <div>
+                  <input class="inp mono" style="max-width:280px" name="telegram_chat_id" value="{{ page.telegram_chat_id }}">
+                  <div class="hint" style="margin:6px 0 0">
+                    Число, у групп и каналов отрицательное. Как его узнать — в README, раздел
+                    «Куда Telegram отправляет сообщения».
+                  </div>
+                  {% comment %}
+                  Кнопки из макета (блок «Каналы доставки»). `formaction` вместо отдельной формы:
+                  форма настроек одна на весь экран, а вкладывать одну в другую нельзя. Отправка
+                  проверяет то, что в поле, — кнопка стоит рядом с ним, и «проверить» означает
+                  «проверить вот это». `formnovalidate` нужен, чтобы проверка браузером остальных
+                  полей формы не мешала диагностике одного канала.
+                  {% endcomment %}
+                  <div style="display:flex;gap:8px;margin-top:10px">
+                    <button class="btn" type="submit" formnovalidate
+                            formaction="{% url 'channel-probe' %}">Отправить тестовое</button>
+                    <button class="btn btn-danger" type="submit" formnovalidate
+                            formaction="{% url 'channel-disconnect' %}">Отключить</button>
+                  </div>
+                </div>
               </div>
               <div class="row">
                 <div class="k">Почта<div class="d">По адресу в строке. Сервер и учётные данные задаются в окружении.</div></div>

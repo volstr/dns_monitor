@@ -6,6 +6,8 @@ from django.urls import URLPattern, path
 
 from apps.catalog.views import (
     AllowlistCheck,
+    ChannelDisconnect,
+    ChannelProbe,
     DomainCheckNow,
     DomainCreate,
     DomainDelete,
@@ -62,4 +64,8 @@ urlpatterns: list[URLPattern] = [
     path("events/export.csv", JournalCsv.as_view(), name="event-export"),
     path("settings/", GlobalSettingsScreen.as_view(), name="settings"),
     path("settings/save/", GlobalSettingsSave.as_view(), name="settings-save"),
+    # Кнопки блока «Каналы доставки» из макета. Отправка идёт мимо очереди: кнопка обязана
+    # ответить сразу, а очередь ждёт окна слияния.
+    path("settings/channel/probe/", ChannelProbe.as_view(), name="channel-probe"),
+    path("settings/channel/disconnect/", ChannelDisconnect.as_view(), name="channel-disconnect"),
 ]

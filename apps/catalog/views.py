@@ -70,8 +70,10 @@ from apps.monitoring.services.manual_check import (
     request_domain_check,
     request_group_check,
 )
+from apps.notifications.services.probe import ProbeRefused, disconnect_telegram, send_probe
 from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
+from core.adapters.telegram import TelegramChannel
 from core.text import plural
 
 
@@ -511,6 +513,50 @@ class GlobalSettingsSave(AdminView):
         for warning in result.warnings:
             messages.warning(request, warning)
         messages.success(request, "Сохранено.")
+        return redirect("settings")
+
+
+class ChannelProbe(AdminView):
+    """
+    «Отправить тестовое» — макет, блок «Каналы доставки».
+
+    Отправка идёт напрямую, минуя очередь: смысл кнопки — немедленный ответ. Текст отказа от
+    канала показывается как есть, без пересказа: именно он называет причину.
+    """
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        result = send_probe(
+            channel=TelegramChannel(settings.ENV.telegram_bot_token),
+            typed_recipient=request.POST.get("telegram_chat_id", ""),
+        )
+
+        if isinstance(result, ProbeRefused):
+            messages.error(
+                request,
+                f"Тестовое сообщение не отправлено. Telegram ответил: {result.reason}"
+                if result.from_channel
+                else result.reason,
+            )
+        else:
+            messages.success(
+                request,
+                f"Тестовое сообщение отправлено в чат {result.recipient}."
+                + (" Значение ещё не сохранено — нажмите «Сохранить»." if result.unsaved else ""),
+            )
+        return redirect("settings")
+
+
+class ChannelDisconnect(AdminView):
+    """«Отключить» — макет, блок «Каналы доставки»."""
+
+    def post(self, request: HttpRequest) -> HttpResponse:
+        disconnect_telegram()
+        messages.info(
+            request,
+            "Telegram отключён: идентификатор чата удалён, уведомления больше не уходят. "
+            "Токен бота остался в окружении — из интерфейса он не меняется (ТЗ 8.3). Чтобы "
+            "отозвать доступ бота, сделайте это в @BotFather.",
+        )
         return redirect("settings")
 
 
