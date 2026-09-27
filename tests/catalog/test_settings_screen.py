@@ -245,12 +245,16 @@ def test_4_1_admin_saves_through_the_form(client: Client, admin: Member) -> None
 
 
 def test_11_9_overview_lists_open_incidents_oldest_first() -> None:
+    # Оба домена должны иметь **настоящее** расхождение: блок показывает нерешённые адреса, а
+    # не открытые записи в таблице (Q-D39). Список задан у обоих, и отданный адрес в него не
+    # входит — без списка адрес получил бы статус «не проверяется» (Q-D25).
     old = Domain.objects.create(name="old.contoso.ru")
     new = Domain.objects.create(name="new.contoso.ru")
-    AllowlistEntry.objects.create(domain=old, entry="10.20.0.0/22", raw="10.20.0.0/22")
-    AddressRegistryEntry.objects.create(
-        domain=old, address="185.44.9.201", first_seen_at=MOMENT, last_seen_at=MOMENT
-    )
+    for domain, address in ((old, "185.44.9.201"), (new, "185.44.9.202")):
+        AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+        AddressRegistryEntry.objects.create(
+            domain=domain, address=address, first_seen_at=MOMENT, last_seen_at=MOMENT
+        )
     Incident.objects.create(domain=old, opened_at=MOMENT - timedelta(hours=3, minutes=12))
     Incident.objects.create(domain=new, opened_at=MOMENT - timedelta(minutes=5))
 

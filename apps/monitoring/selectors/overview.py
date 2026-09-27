@@ -71,6 +71,10 @@ class Overview:
     open_items: tuple[OpenDiscrepancy, ...]
     #: Когда закрылся последний инцидент. Нужен строке «Открытых расхождений нет» (11.9).
     last_closed_at: datetime | None
+    #: Сколько инцидентов уже исправлено, но формально ещё открыто: нерешённых адресов у них
+    #: не осталось, а запись закроет проверка по Q-13.2 — после трёх ответов подряд без адреса.
+    #: Нужен честной строке вместо «расхождений нет»: расхождения правда нет, но запись жива.
+    awaiting_close: int
     #: Четыре карточки верхней сводки. Готовы целиком: шаблон ничего не считает.
     stats: tuple[Stat, ...]
     last_check_at: datetime | None
@@ -89,23 +93,32 @@ def overview(*, at: datetime) -> Overview:
         last=Max("last_successful_check_at"), following=Min("next_check_at")
     )
 
+    # Открытая запись инцидента и расхождение **сейчас** — не одно и то же. Администратор мог
+    # только что разрешить адрес: вхождение считается на лету, и расхождения уже нет, а запись
+    # закроет проверка по Q-13.2, после трёх ответов подряд. Блок 11.9 называется «Открытые
+    # расхождения», и показывать в нём запись, у которой не осталось ни одного нерешённого
+    # адреса, — значит показывать расхождение, не умея назвать ни одного адреса.
+    items = _items(incidents, at, global_settings)
+    current = tuple(item for item in items if item.addresses)
+
     return Overview(
-        open_items=_items(incidents, at, global_settings),
+        open_items=current,
         last_closed_at=(
             Incident.objects.filter(closed_at__isnull=False).aggregate(last=Max("closed_at"))[
                 "last"
             ]
-            if not incidents
+            if not items
             else None
         ),
-        stats=_stats(incidents, at, global_settings),
+        awaiting_close=len(items) - len(current),
+        stats=_stats(current, at, global_settings),
         last_check_at=schedule["last"],
         next_check_at=schedule["following"],
     )
 
 
 def _stats(
-    incidents: list[Incident], at: datetime, global_settings: GlobalSettings
+    current: tuple[OpenDiscrepancy, ...], at: datetime, global_settings: GlobalSettings
 ) -> tuple[Stat, ...]:
     """
     Четыре карточки сводки — разметка прототипа, строки 738–743.
@@ -140,9 +153,9 @@ def _stats(
         ),
         Stat(
             label="Не решены",
-            value=len(incidents),
-            note=_unresolved_note(incidents),
-            tone="s-breach" if incidents else "",
+            value=len(current),
+            note=_unresolved_note(current),
+            tone="s-breach" if current else "",
         ),
         Stat(
             label="Адреса изменились",
@@ -163,18 +176,18 @@ def _stats(
     )
 
 
-def _unresolved_note(incidents: list[Incident]) -> str:
+def _unresolved_note(current: tuple[OpenDiscrepancy, ...]) -> str:
     """
     Под числом — имя домена, как в прототипе. Счётчик без имени 11.9 называет недостаточным.
 
-    Инциденты отсортированы по возрасту, поэтому назван самый старый: если разбирать, то с него.
+    Расхождения отсортированы по возрасту, поэтому назван самый старый: если разбирать, то с него.
     """
-    if not incidents:
+    if not current:
         return "расхождений нет"
-    first = incidents[0].domain.name
-    if len(incidents) == 1:
+    first = current[0].domain_name
+    if len(current) == 1:
         return first
-    return f"{first} и ещё {len(incidents) - 1}"
+    return f"{first} и ещё {len(current) - 1}"
 
 
 def _items(

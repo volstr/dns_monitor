@@ -282,20 +282,25 @@ def test_a_broken_host_name_is_named(env: dict[str, str]) -> None:
     assert {error.variable for error in raised.value.errors} == {"ALLOWED_HOSTS"}
 
 
-def test_env_example_is_a_working_environment() -> None:
+def test_env_example_values_are_well_formed() -> None:
     """
-    `.env.example` обязан заводиться копированием: README велит начинать именно с этого.
+    Значения в `.env.example` обязаны быть рабочими: README велит начинать с копирования файла.
 
-    Проверка дешёвая, а ломается такое молча. На момент написания теста файл не стартовал вовсе:
-    `DATABASE_URL` был обрезан до `postgresql://dns_monitoring:dns_monitoring`, без хоста и базы,
-    а `SESSION_SECRET` не дотягивал до пятидесяти символов.
+    `SESSION_SECRET` подставляется здесь намеренно: в примере он оставлен пустым, чтобы никто не
+    увёз заполнитель в бой, и заполнить его человек обязан сам — так написано и в файле, и в
+    README. Проверяется всё остальное.
+
+    Ломается такое молча. На момент написания теста `DATABASE_URL` был обрезан до
+    `postgresql://dns_monitoring:dns_monitoring` — без хоста и базы, — и установка не поднималась
+    вовсе, хотя копирование файла названо первым шагом.
     """
-    source = {}
+    source = {"SESSION_SECRET": "x" * 60}
     for raw in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if line and not line.startswith("#") and "=" in line:
             name, _, value = line.partition("=")
-            source[name.strip()] = value.strip()
+            if value.strip():
+                source[name.strip()] = value.strip()
 
     result = parse_env(source)
 
