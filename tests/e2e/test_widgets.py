@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -19,7 +18,7 @@ from apps.monitoring.models import (
     Check,
 )
 from core.types.checking import CheckOutcome
-from tests.e2e.conftest import EMAIL, PASSWORD
+from tests.e2e.conftest import EMAIL, MOMENT, PASSWORD
 
 pytestmark = pytest.mark.e2e
 
@@ -279,10 +278,9 @@ def test_d36_normal_check_is_green_and_distinct_from_an_empty_mark(
     единиц яркости и на полоске 3×9px не различались вовсе, хотя 11.5 требует различать:
     «пустая отметка не означает „всё хорошо"».
     """
-    moment = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
-    domain = Domain.objects.create(name="pay-gw.contoso.ru", last_successful_check_at=moment)
+    domain = Domain.objects.create(name="pay-gw.contoso.ru", last_successful_check_at=MOMENT)
     Check.objects.create(
-        domain=domain, checked_at=moment, outcome=CheckOutcome.NORMAL, answered_by="1.1.1.1"
+        domain=domain, checked_at=MOMENT, outcome=CheckOutcome.NORMAL, answered_by="1.1.1.1"
     )
     page = signed_in
     page.goto(f"{live_server.url}/domains/")
@@ -305,10 +303,9 @@ def test_d37_a_domain_without_an_allowlist_is_not_painted_green(
     Проверяется вычисленный цвет: зелёная отметка здесь означала бы, что экран утверждает
     «проверено и в порядке» про домен, который не с чем сравнивать.
     """
-    moment = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
-    bare = Domain.objects.create(name="github.com", last_successful_check_at=moment)
+    bare = Domain.objects.create(name="github.com", last_successful_check_at=MOMENT)
     Check.objects.create(
-        domain=bare, checked_at=moment, outcome=CheckOutcome.NOT_CONFIRMED, answered_by="1.1.1.1"
+        domain=bare, checked_at=MOMENT, outcome=CheckOutcome.NOT_CONFIRMED, answered_by="1.1.1.1"
     )
     page = signed_in
     page.goto(f"{live_server.url}/domains/")
@@ -371,20 +368,20 @@ def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> 
     """
     domain = Domain.objects.create(
         name="github.com",
-        last_successful_check_at=datetime(2026, 9, 26, 14, 38, tzinfo=UTC),
+        last_successful_check_at=MOMENT,
         next_check_at=None,
     )
     AddressRegistryEntry.objects.create(
         domain=domain,
         address="140.82.121.3",
-        first_seen_at=datetime(2026, 9, 26, 14, 38, tzinfo=UTC),
-        last_seen_at=datetime(2026, 9, 26, 14, 38, tzinfo=UTC),
+        first_seen_at=MOMENT,
+        last_seen_at=MOMENT,
     )
     AddressObservationBucket.objects.create(
         domain=domain,
         address="140.82.121.3",
         bucket_size=BucketSize.DAY.value,
-        bucket_start=datetime(2026, 9, 26, tzinfo=UTC),
+        bucket_start=MOMENT,
     )
     page = signed_in
     page.goto(f"{live_server.url}/domains/{domain.pk}/")

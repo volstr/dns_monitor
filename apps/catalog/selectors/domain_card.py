@@ -141,6 +141,11 @@ class AllowlistLine:
     #: Q-13.5: сколько дней под запись не приходило ни одного адреса. `None` — приходило недавно
     #: либо не приходило никогда, и тогда говорить о «устаревании» нечего.
     stale_days: int | None
+    #: Под запись не попал ни один адрес, **и домен при этом успешно отвечал** (Q-D38). Отдельно
+    #: от `stale_days`: та говорит «перестало приходить», эта — «не приходило ни разу». Второе
+    #: подозрительнее: чаще всего это опечатка в подсети или запись, скопированная с чужого
+    #: домена. У непроверенного домена ложным не бывает — там просто нечему было попасть.
+    never_matched: bool
     #: Данные линейки подсети (11.4) для виджета. `None` у записи без маски: шкалу рисовать не
     #: из чего, совпадение там проверяется точным сравнением.
     ruler: RulerData | None
@@ -234,7 +239,9 @@ def domain_card(
         summary_label=_summary_label(statuses),
         summary_tone=_summary_tone(statuses),
         settings=_settings(effective),
-        allowlist=_allowlist(entries, statuses, at),
+        allowlist=_allowlist(
+            entries, statuses, at, answered=domain.last_successful_check_at is not None
+        ),
         unmatched=tuple(
             line
             for line, view in zip(lines, ordered, strict=True)
@@ -367,14 +374,22 @@ def _settings(effective: EffectiveSettings) -> tuple[SettingLine, ...]:
 
 
 def _allowlist(
-    entries: tuple[AllowlistEntry, ...], statuses: tuple[AddressStatusView, ...], at: datetime
+    entries: tuple[AllowlistEntry, ...],
+    statuses: tuple[AddressStatusView, ...],
+    at: datetime,
+    *,
+    answered: bool,
 ) -> tuple[AllowlistLine, ...]:
     """Записи списка вместе с адресами, которые в них попали."""
-    return tuple(_allowlist_line(entry, statuses, at) for entry in entries)
+    return tuple(_allowlist_line(entry, statuses, at, answered=answered) for entry in entries)
 
 
 def _allowlist_line(
-    entry: AllowlistEntry, statuses: tuple[AddressStatusView, ...], at: datetime
+    entry: AllowlistEntry,
+    statuses: tuple[AddressStatusView, ...],
+    at: datetime,
+    *,
+    answered: bool,
 ) -> AllowlistLine:
     inside = tuple(
         view for view in statuses if view.match is not None and view.match.entry == entry.raw
@@ -389,6 +404,7 @@ def _allowlist_line(
         range_text=_range_text(entry) if is_network else "",
         inside=tuple(str(view.address) for view in inside),
         stale_days=_stale_days(last_seen, at),
+        never_matched=answered and not inside,
         ruler=_ruler(entry, inside) if is_network else None,
     )
 

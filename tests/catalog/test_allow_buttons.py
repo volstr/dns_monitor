@@ -5,11 +5,12 @@
 префикса, которую ТЗ не задаёт.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.models import Member, Role
 from apps.catalog.models import AllowlistEntry, Domain
@@ -31,10 +32,18 @@ def admin() -> Member:
 
 @pytest.fixture
 def domain() -> Domain:
-    domain = Domain.objects.create(name="pay-gw.contoso.ru", last_successful_check_at=MOMENT)
+    """Адрес должен быть **актуальным**, иначе его статус — «не актуален», а не «не решён».
+
+    Отметки времени здесь привязаны к настоящему моменту, а не к фиксированному `MOMENT`, и это
+    не небрежность. Тест идёт через обработчик, а тот берёт время у `SystemClock` — свежесть
+    считается от реальных часов. С константой тест жил ровно сутки: 2026-09-27 в 14:38 адрес
+    пересёк порог актуальности, статус сменился на `STALE`, и кнопки честно исчезли.
+    """
+    seen = timezone.now() - timedelta(minutes=5)
+    domain = Domain.objects.create(name="pay-gw.contoso.ru", last_successful_check_at=seen)
     AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
     AddressRegistryEntry.objects.create(
-        domain=domain, address=OUTSIDER, first_seen_at=MOMENT, last_seen_at=MOMENT
+        domain=domain, address=OUTSIDER, first_seen_at=seen, last_seen_at=seen
     )
     return domain
 
@@ -119,3 +128,52 @@ def test_c15_garbage_in_the_parameter_is_ignored(
 
     assert response.status_code == 200
     assert "ещё не сохранена" not in response.content.decode()
+
+
+def test_d38_an_entry_nothing_ever_matched_is_highlighted(
+    client: Client, admin: Member, domain: Domain
+) -> None:
+    """Q-D38: под запись не пришло ни одного адреса, хотя домен отвечал.
+
+    Это подозрительнее устаревания: там адреса были и перестали приходить, а тут их не было ни
+    разу — чаще всего опечатка в подсети или запись, скопированная с чужого домена. Раньше
+    строка была самой бледной на экране.
+    """
+    AllowlistEntry.objects.create(domain=domain, entry="192.0.2.0/24", raw="192.0.2.0/24")
+    client.force_login(admin)
+
+    body = client.get(reverse("domain-detail", args=[domain.pk])).content.decode()
+
+    assert '<span class="state change" title="Домен отвечал' in body
+    assert "не опечатка ли в ней" in body
+
+
+def test_d38_an_unchecked_domain_is_not_accused(client: Client, admin: Member) -> None:
+    """У домена, который ещё ни разу не ответил, попадать было нечему.
+
+    Подсвечивать тут нечего: запись не виновата, что проверок не было. Иначе каждый только что
+    добавленный домен встречал бы человека жёлтой строкой.
+    """
+    fresh = Domain.objects.create(name="new.contoso.ru")
+    AllowlistEntry.objects.create(domain=fresh, entry="192.0.2.0/24", raw="192.0.2.0/24")
+    client.force_login(admin)
+
+    body = client.get(reverse("domain-detail", args=[fresh.pk])).content.decode()
+
+    assert '<span class="sub">пусто</span>' in body
+    assert "не опечатка ли в ней" not in body
+
+
+def test_d38_an_entry_with_addresses_stays_green(
+    client: Client, admin: Member, domain: Domain
+) -> None:
+    """Обратная сторона: запись, которая делает свою работу, остаётся зелёной."""
+    seen = timezone.now() - timedelta(minutes=5)
+    AddressRegistryEntry.objects.create(
+        domain=domain, address="10.20.1.14", first_seen_at=seen, last_seen_at=seen
+    )
+    client.force_login(admin)
+
+    body = client.get(reverse("domain-detail", args=[domain.pk])).content.decode()
+
+    assert '<span class="state ok">1 внутри</span>' in body

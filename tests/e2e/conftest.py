@@ -19,10 +19,11 @@ import os
 # обработчики — те работают в потоке живого сервера. Разрешение выставляется до импорта Django.
 os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "1")
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import pytest
+from django.utils import timezone
 
 from apps.accounts.models import Member, Role
 from apps.catalog.models import AllowlistEntry, Domain
@@ -32,7 +33,17 @@ from apps.monitoring.models import (
     BucketSize,
 )
 
-MOMENT = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
+#: Момент, от которого строятся данные браузерных тестов. **Привязан к настоящему времени, а не
+#: к константе**, и это не небрежность.
+#:
+#: Браузерный тест идёт через обработчик, а тот берёт время у `SystemClock` — подменить его
+#: нечем, порта в этом месте нет. Значит данные с фиксированной датой живут ровно до порога
+#: актуальности: через сутки адрес становится «не актуален», статусы меняются, и тесты начинают
+#: падать сами по себе, без единой правки в коде. Так и случилось 2026-09-27 в 14:38.
+#:
+#: В остальных тестах момент по-прежнему передаётся явно и фиксирован: там его принимает сам
+#: селектор, и настоящие часы ни при чём.
+MOMENT = timezone.now() - timedelta(minutes=5)
 PASSWORD = "e2e-parol-dlya-vhoda"
 EMAIL = "e2e@contoso.ru"
 
