@@ -116,7 +116,8 @@ def test_10_2_empty_list_is_a_legitimate_save(domain: Domain) -> None:
 
 
 def test_4_3_domain_without_a_record_type_is_refused_not_crashed(domain: Domain) -> None:
-    """Снятые галочки — ошибка ввода, а не пятисотая.
+    """
+    Снятые галочки — ошибка ввода, а не пятисотая.
 
     Инвариант держит ограничение `domain_has_record_type` в базе, но до него дело доходить не
     должно: отказ обязан быть штатным исходом с причиной (`CLAUDE.md`).

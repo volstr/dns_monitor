@@ -1,4 +1,5 @@
-"""Виджеты и видимость страницы — ТЗ 9.2, 10.4, 11.4; этап 7.
+"""
+Виджеты и видимость страницы — ТЗ 9.2, 10.4, 11.4; этап 7.
 
 Проверяется отрисованная страница. Два первых теста существуют потому, что ровно эти две ошибки
 обычные тесты пропустили, а нашёл их разработчик глазами.
@@ -24,7 +25,8 @@ pytestmark = pytest.mark.e2e
 
 
 def test_11_4_application_frame_is_actually_visible(signed_in: Any, live_server: Any) -> None:
-    """`.app` в CSS прототипа скрыт, показывает его только `.app.on`.
+    """
+    `.app` в CSS прототипа скрыт, показывает его только `.app.on`.
 
     Страница может прийти целиком и не отобразиться. Содержимое ответа об этом молчит.
     """
@@ -36,7 +38,8 @@ def test_11_4_application_frame_is_actually_visible(signed_in: Any, live_server:
 
 
 def test_11_4_menu_items_are_styled_not_bare_links(signed_in: Any, live_server: Any) -> None:
-    """Оформление меню навешано на `.nav button`, а пункты — ссылки.
+    """
+    Оформление меню навешано на `.nav button`, а пункты — ссылки.
 
     Без правки селекторов они остаются голыми: проверяем вычисленный стиль, а не разметку.
     """
@@ -137,7 +140,8 @@ def test_9_2_scale_switch_narrows_the_axis(
 def test_c20_all_three_font_families_actually_load(
     signed_in: Any, live_server: Any, sample_domain: Domain
 ) -> None:
-    """Q-C20: шрифты лежат файлами в `static/`, а не грузятся с Google Fonts.
+    """
+    Q-C20: шрифты лежат файлами в `static/`, а не грузятся с Google Fonts.
 
     Пропажа шрифта ничем себя не выдаёт: в `@font-face` первым источником стоит `local()`, за
     именем семейства идёт цепочка запасных, и страница выглядит разумно даже когда не загрузился
@@ -166,7 +170,8 @@ def test_c20_all_three_font_families_actually_load(
 def test_10_2_allowlist_is_checked_line_by_line_while_typing(
     signed_in: Any, live_server: Any, sample_domain: Domain
 ) -> None:
-    """10.2: построчная проверка во время ввода, задержка около 250 мс.
+    """
+    10.2: построчная проверка во время ввода, задержка около 250 мс.
 
     Проверка откладывалась с самого начала (Q-C20): без `htmx.min.js` её нечем было запустить в
     браузере. Разбор при этом один и тот же, что и при сохранении, — дублировать его в JS
@@ -191,7 +196,8 @@ def test_10_2_allowlist_is_checked_line_by_line_while_typing(
 def test_10_2_a_pasted_list_is_checked_too(
     signed_in: Any, live_server: Any, sample_domain: Domain
 ) -> None:
-    """Список адресов чаще вставляют, чем набирают.
+    """
+    Список адресов чаще вставляют, чем набирают.
 
     Триггером был `keyup`, а вставка правой или средней кнопкой мыши клавиатурных событий не
     порождает: замечания не появлялись бы до первого нажатия клавиши. `fill` в Playwright ведёт
@@ -223,7 +229,8 @@ def test_10_2_a_correct_line_leaves_no_complaint(
 def test_10_2_the_page_is_not_reloaded_while_checking(
     signed_in: Any, live_server: Any, sample_domain: Domain
 ) -> None:
-    """Проверка идёт запросом, а не отправкой формы: введённое не должно потеряться.
+    """
+    Проверка идёт запросом, а не отправкой формы: введённое не должно потеряться.
 
     Перезагрузка стёрла бы и комментарий, и типы записей — всё, что человек уже наменял.
     """
@@ -255,7 +262,8 @@ def test_10_4_group_combo_filters_by_search(signed_in: Any, live_server: Any) ->
 def test_10_4_combo_writes_into_the_select_that_is_submitted(
     signed_in: Any, live_server: Any
 ) -> None:
-    """Значение обязано лежать в том поле, которое уходит на сервер.
+    """
+    Значение обязано лежать в том поле, которое уходит на сервер.
 
     Иначе показанное и отправленное однажды разойдутся.
     """
@@ -272,7 +280,8 @@ def test_10_4_combo_writes_into_the_select_that_is_submitted(
 def test_d36_normal_check_is_green_and_distinct_from_an_empty_mark(
     signed_in: Any, live_server: Any
 ) -> None:
-    """Q-D36: норма зелёная, пустая отметка — серая, и это разные цвета.
+    """
+    Q-D36: норма зелёная, пустая отметка — серая, и это разные цвета.
 
     Проверяется вычисленный цвет, а не класс. Прежние два серых отличались на четырнадцать
     единиц яркости и на полоске 3×9px не различались вовсе, хотя 11.5 требует различать:
@@ -298,7 +307,8 @@ def test_d36_normal_check_is_green_and_distinct_from_an_empty_mark(
 def test_d37_a_domain_without_an_allowlist_is_not_painted_green(
     signed_in: Any, live_server: Any
 ) -> None:
-    """Q-D37: «ничего не задано» обязано привлекать внимание, а не выглядеть нормой.
+    """
+    Q-D37: «ничего не задано» обязано привлекать внимание, а не выглядеть нормой.
 
     Проверяется вычисленный цвет: зелёная отметка здесь означала бы, что экран утверждает
     «проверено и в порядке» про домен, который не с чем сравнивать.
@@ -319,7 +329,8 @@ def test_d37_a_domain_without_an_allowlist_is_not_painted_green(
 
 
 def test_10_4_combo_offers_to_create_the_typed_group(signed_in: Any, live_server: Any) -> None:
-    """10.4: «при отсутствии совпадений предлагается создать группу с введённым названием».
+    """
+    10.4: «при отсутствии совпадений предлагается создать группу с введённым названием».
 
     Предложение появляется только когда не нашлось ничего: пока совпадения есть, человек выбирает
     из них, и кнопка создания сбивала бы с толку.
@@ -347,7 +358,8 @@ def test_10_4_combo_offers_to_create_the_typed_group(signed_in: Any, live_server
 def test_10_4_combo_does_not_create_the_group_by_itself(
     signed_in: Any, live_server: Any
 ) -> None:
-    """Группу создаёт сервис при подтверждении, а не виджет: брошенный экран не должен
+    """
+    Группу создаёт сервис при подтверждении, а не виджет: брошенный экран не должен
     оставлять за собой пустую группу."""
     domain = Domain.objects.create(name="pay-gw.contoso.ru")
     page = signed_in
@@ -361,7 +373,8 @@ def test_10_4_combo_does_not_create_the_group_by_itself(
 
 
 def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> None:
-    """Q-D25: адрес без белого списка не красится цветом решённого.
+    """
+    Q-D25: адрес без белого списка не красится цветом решённого.
 
     Проверяется вычисленный цвет, а не класс: подмена класса на зелёный прошла бы мимо обычных
     тестов — ровно так эта ошибка и возникла.
@@ -403,7 +416,8 @@ def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> 
 def test_11_4_message_strip_lines_up_with_the_page_content(
     signed_in: Any, live_server: Any, sample_domain: Domain
 ) -> None:
-    """Полоса сообщений стоит по сетке страницы, а не враспор по всей ширине.
+    """
+    Полоса сообщений стоит по сетке страницы, а не враспор по всей ширине.
 
     Сравнивается настоящее положение на отрисованной странице: в разметке отступ задан классом,
     и по ней не видно, совпал он с содержимым или нет.
@@ -427,7 +441,8 @@ def test_11_4_message_strip_lines_up_with_the_page_content(
 def test_page_works_with_javascript_disabled(
     browser: Any, live_server: Any, sample_domain: Domain
 ) -> None:
-    """Виджеты — надстройка, а не условие работы.
+    """
+    Виджеты — надстройка, а не условие работы.
 
     Браузер с выключенным JavaScript: вход проходит обычной формой, список адресов и реестр
     читаются, оформление на месте. Ломаться без трёх файлов приложению нельзя.

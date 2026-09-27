@@ -36,7 +36,9 @@ target-version = "py312"
 extend-exclude = ["guide", "apps/*/migrations"]
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "B", "UP", "DJ", "S", "SIM", "PT", "RUF"]
+# D213 — единственное правило из pydocstyle, которое нам нужно: многострочный docstring
+# начинается с новой строки после кавычек. Остальные D-правила не включены намеренно.
+select = ["E", "W", "F", "I", "B", "UP", "DJ", "S", "SIM", "PT", "RUF", "D213"]
 # RUF001–RUF003: кириллица в строках и комментариях — норма для русского интерфейса.
 ignore = ["RUF001", "RUF002", "RUF003"]
 

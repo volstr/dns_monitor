@@ -101,7 +101,8 @@ def test_10_1_bad_input_is_explained_in_words(name: str, fragment: str) -> None:
 
 
 def test_e2_new_domain_is_scheduled_at_once() -> None:
-    """Q-E2: один добавленный домен идёт в ближайший тик.
+    """
+    Q-E2: один добавленный домен идёт в ближайший тик.
 
     Домен с пустым `next_check_at` планировщик не заберёт никогда — он молча не проверялся бы.
     """

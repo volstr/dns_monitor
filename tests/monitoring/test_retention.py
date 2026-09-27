@@ -1,4 +1,5 @@
-"""Сроки хранения — ТЗ 11.3, plan.md этап 8.
+"""
+Сроки хранения — ТЗ 11.3, plan.md этап 8.
 
 11.3 называет два срока и одно значение по умолчанию, которого легко не заметить: реестр
 адресов хранится **бессрочно**. Поэтому половина проверок здесь о том, что уборка чего-то
@@ -154,7 +155,8 @@ def test_11_3_registry_term_deletes_what_stopped_being_answered(domain: Domain) 
 
 
 def test_11_3_an_address_still_answered_survives_any_term(domain: Domain) -> None:
-    """Отбор по `last_seen_at`: у адреса, который отдаётся третий год, стара только дата
+    """
+    Отбор по `last_seen_at`: у адреса, который отдаётся третий год, стара только дата
     появления."""
     GlobalSettings.objects.filter(pk=1).update(registry_retention_seconds=30 * 24 * 60 * 60)
     registry(domain, "10.20.3.7", NOW)

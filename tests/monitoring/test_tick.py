@@ -141,7 +141,8 @@ def test_8_1_check_without_notifications_queues_nothing(
 
 
 def test_8_3_broken_channel_does_not_stop_checks(domain: Domain, store: FakeStateStore) -> None:
-    """Условие сдачи этапа 5: падение канала не мешает проверкам идти.
+    """
+    Условие сдачи этапа 5: падение канала не мешает проверкам идти.
 
     Архитектурно это обеспечено разделением процессов — постановка лишь пишет строку в очередь,
     а канала касается только `run_notifier`. Здесь это закреплено проверкой, а не рассуждением.
@@ -199,7 +200,8 @@ def test_tick_claims_no_more_than_the_limit(store: FakeStateStore) -> None:
 
 @pytest.mark.django_db(transaction=True)
 def test_11_1_pool_checks_domains_in_parallel(global_settings: object) -> None:
-    """Путь через ThreadPoolExecutor: у каждого потока своё соединение с БД.
+    """
+    Путь через ThreadPoolExecutor: у каждого потока своё соединение с БД.
 
     Общие настройки запрашиваются фикстурой: транзакционный тест вычищает таблицы, и строка,
     созданную миграцией, приходится восстанавливать.
