@@ -235,6 +235,13 @@ def test_d25_not_checked_mark_is_not_green(signed_in: Any, live_server: Any) -> 
     assert mark.evaluate("node => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
     assert page.locator("[data-trace-row] i.a").count() == 0
 
+    # Образец в легенде рисуется тем же контуром. Правило для него сначала забыли, и рядом с
+    # подписью стоял невидимый квадрат: подпись есть, объяснять нечего. Прозрачный фон отметку
+    # не выдаёт — видимой её делает именно `box-shadow`, поэтому проверяется он.
+    swatch = page.locator(".reg-legend i.n").first
+    assert swatch.count() > 0
+    assert swatch.evaluate("node => getComputedStyle(node).boxShadow") != "none"
+
 
 def test_11_4_message_strip_lines_up_with_the_page_content(
     signed_in: Any, live_server: Any, sample_domain: Domain
