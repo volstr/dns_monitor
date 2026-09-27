@@ -38,7 +38,13 @@
       — там все примерные строки заполнены на все двадцать отметок, пустых нет ни одной.
    9. Добавлена отметка `.tape i.e-unconfirmed` — «совпадений нет» (Q-D37). Прототип такого
       исхода не знает: в нём у каждого домена список заполнен и всё совпадает. Контур, как у
-      `.trace i.n` в реестре — одно понятие, один вид отметки на весь продукт. */
+      `.trace i.n` в реестре — одно понятие, один вид отметки на весь продукт.
+  10. Ссылки без подчёркивания: `a{text-decoration:none}`. Не вкусовое — следствие правок 3 и 5.
+      В прототипе подчёркнутых ссылок нет вовсе, потому что там каждый интерактивный элемент
+      кнопка; подчёркивание встречается дважды и задано инлайном. Здесь меню, сегменты и
+      действия стали ссылками, и браузер начал подчёркивать их сам. Имя домена внутри текста
+      (`.dn`, `.mono[href]`) получило ту же нижнюю границу по наведению, которой прототип
+      показывает кликабельность у `.dn button`. */
 
 /* IBM Plex Sans — переменный шрифт: одно объявление на все насыщенности вместо трёх.
    `font-weight` здесь диапазон, а не значение: так браузер берёт ровно 500 и 600, а не
@@ -97,7 +103,11 @@ body::before{
 code,.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0}
-a{color:inherit}
+/* Правка переноса 10: ссылки без подчёркивания. В прототипе подчёркнутых ссылок нет вовсе —
+   там каждый интерактивный элемент кнопка, а подчёркивание встречается ровно дважды и задано
+   инлайном. Здесь меню, сегменты и действия стали ссылками (правки 3 и 5), и браузер начал
+   подчёркивать их по умолчанию. */
+a{color:inherit;text-decoration:none}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
 
 .eyebrow{
@@ -282,6 +292,12 @@ tbody tr.sel{box-shadow:inset 3px 0 0 var(--mark)}
 .dn{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:13px;font-weight:500}
 .dn button{font:inherit;text-align:left;border-bottom:1px solid transparent}
 .dn button:hover{border-bottom-color:var(--ink)}
+/* Правка переноса 10: то же для ссылок. Имя домена внутри текста — единственное место, где
+   кликабельность надо чем-то показать, и прототип показывает её нижней границей по наведению,
+   а не подчёркиванием. `.mono[href]` — только ссылки: у обычного моноширинного текста границы
+   быть не должно. */
+.dn a,.mono[href]{border-bottom:1px solid transparent}
+.dn a:hover,.mono[href]:hover{border-bottom-color:var(--ink)}
 .sub{font-size:12px;color:var(--ink-faint);margin-top:3px}
 .ips{display:flex;flex-wrap:wrap;gap:4px;max-width:280px}
 
