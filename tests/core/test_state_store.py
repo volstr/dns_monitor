@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import redis
+from django.conf import settings as django_settings
 
 from core.adapters.fake_clock import FakeClock
 from core.adapters.fake_state_store import FakeStateStore, StateStoreUnavailable
@@ -24,7 +25,10 @@ from core.ports.state_store import (
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
 REDIS_URL = "redis://redis:6379"
-STATE_DB = 0
+#: Логическая база берётся из настроек теста, а не пишется числом. Числом здесь стоял ноль —
+#: то есть рабочая база запущенного приложения: тесты ходили в неё, и `flushdb` в проверке
+#: критерия 55 стирал бы живые сессии и блокировки разработчика.
+STATE_DB = django_settings.ENV.redis_db_state
 
 
 @pytest.fixture
@@ -189,3 +193,49 @@ def test_real_redis_ping_fails_when_unreachable() -> None:
 
     with pytest.raises(redis.exceptions.ConnectionError):
         store.ping()
+
+
+@pytest.mark.django_db
+def test_55_a_full_redis_wipe_costs_counters_but_not_data(
+    redis_store: RedisStateStore, redis_inspector: redis.Redis
+) -> None:
+    """
+    Критерий 55: полная очистка Redis → домены, события, реестр и участники целы; счётчики,
+    кулдауны и блокировки сброшены.
+
+    Это первое правило 11.11, проверенное с двух сторон сразу. «Redis не источник истины» —
+    утверждение не о намерении, а о размещении: всё, что обязано пережить перезапуск, лежит в
+    PostgreSQL. Обратная половина не менее важна и записана в том же пункте: потеря **не**
+    безобидна, она сбрасывает счётчики, кулдауны и блокировки и требует разбора. Поэтому тест
+    проверяет и то, что данные целы, и то, что состояние действительно потеряно: «ничего не
+    изменилось» означало бы, что состояние где-то продублировано.
+    """
+    from apps.accounts.models import Member
+    from apps.catalog.models import Domain
+    from apps.monitoring.models import AddressRegistryEntry, Event, EventType
+
+    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    Event.objects.create(
+        domain=domain, occurred_at=MOMENT, event_type=EventType.WATCH_STARTED, payload={}
+    )
+    AddressRegistryEntry.objects.create(
+        domain=domain, address="10.20.1.14", first_seen_at=MOMENT, last_seen_at=MOMENT
+    )
+    member = Member.objects.create_member(
+        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT
+    )
+
+    lock = scheduler_lock(domain.pk)
+    cooldown = domain_cooldown(domain.pk)
+    redis_store.acquire(lock)
+    redis_store.acquire(cooldown)
+    assert redis_store.is_held(lock) is True
+
+    redis_inspector.flushdb()
+
+    assert Domain.objects.filter(pk=domain.pk).exists()
+    assert Event.objects.filter(domain=domain).count() == 1
+    assert AddressRegistryEntry.objects.filter(domain=domain).count() == 1
+    assert Member.objects.filter(pk=member.pk).exists()
+    assert redis_store.is_held(lock) is False
+    assert redis_store.is_held(cooldown) is False
