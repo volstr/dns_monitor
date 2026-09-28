@@ -7,7 +7,7 @@ import pytest
 from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings, NotificationMode
 from apps.monitoring.models import Event, EventType, Incident
 from apps.monitoring.services.tick import tick
-from apps.notifications.models import DeliveryStatus, Notification
+from apps.notifications.models import ChannelKind, DeliveryStatus, Notification
 from apps.notifications.services.dispatch import dispatch_event
 from apps.notifications.services.notifier import deliver_due
 from apps.notifications.services.outbox import MAX_ATTEMPTS
@@ -61,7 +61,15 @@ def queue_events(store: FakeStateStore, count: int, *, with_incident: bool = Fal
 def test_8_6_nothing_is_sent_before_the_window_closes(store: FakeStateStore) -> None:
     queue_events(store, 2)
 
-    run = deliver_due(at=MOMENT, channel=FakeChannel(), state_store=store)
+    run = deliver_due(
+
+        at=MOMENT,
+
+        channels={ChannelKind.TELEGRAM.value: FakeChannel()},
+
+        state_store=store,
+
+    )
 
     assert run.sent == 0
     assert Notification.objects.filter(status=DeliveryStatus.PENDING).count() == 2
@@ -71,7 +79,15 @@ def test_8_6_below_the_threshold_messages_go_separately(store: FakeStateStore) -
     queue_events(store, 3)  # порог по умолчанию 5
     channel = FakeChannel()
 
-    run = deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    run = deliver_due(
+
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: channel},
+
+        state_store=store,
+
+    )
 
     assert (run.sent, run.merged) == (3, 0)
     assert len(channel.messages) == 3
@@ -83,7 +99,15 @@ def test_39_six_events_in_one_window_become_one_summary(store: FakeStateStore) -
     queue_events(store, 6)
     channel = FakeChannel()
 
-    run = deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    run = deliver_due(
+
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: channel},
+
+        state_store=store,
+
+    )
 
     assert (run.sent, run.merged) == (1, 6)
     assert len(channel.messages) == 1
@@ -99,17 +123,44 @@ def test_d9_summary_id_reaches_every_incident_it_covered(store: FakeStateStore) 
     queue_events(store, 6, with_incident=True)
     channel = FakeChannel()
 
-    deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    deliver_due(
 
-    ids = set(Incident.objects.values_list("channel_message_id", flat=True))
-    assert ids == {"1"}, "иначе о закрытии двенадцати инцидентов никто не узнает"
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: channel},
+
+        state_store=store,
+
+    )
+
+    # Открывающее сообщение инцидента находится по связи «событие ↔ уведомление», а не полем
+    # инцидента: у каждого канала своя ветка (Q-D11). Сводка накрывает все шесть инцидентов.
+    covered = {
+        incident.pk: set(
+            Notification.objects.filter(
+                events__incident_id=incident.pk, status=DeliveryStatus.SENT
+            ).values_list("channel_message_id", flat=True)
+        )
+        for incident in Incident.objects.all()
+    }
+    assert list(covered.values()) == [{"1"}] * 6, (
+        "иначе о закрытии двенадцати инцидентов никто не узнает"
+    )
 
 
 def test_8_6_summary_lists_up_to_ten_names(store: FakeStateStore) -> None:
     queue_events(store, 12)
     channel = FakeChannel()
 
-    deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    deliver_due(
+
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: channel},
+
+        state_store=store,
+
+    )
 
     text = channel.messages[0].text
     assert "Затронуто доменов: 12" in text
@@ -138,7 +189,11 @@ def test_38_baseline_violation_is_delivered_inside_a_summary(store: FakeStateSto
     assert Event.objects.filter(event_type=EventType.ADDRESS_APPEARED).count() == 0
 
     channel = FakeChannel()
-    run = deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    run = deliver_due(
+        at=AFTER_WINDOW,
+        channels={ChannelKind.TELEGRAM.value: channel},
+        state_store=store,
+    )
 
     # Одно сводное сообщение вместо шести отдельных.
     assert (run.sent, run.merged) == (1, 6)
@@ -150,7 +205,15 @@ def test_8_3_retryable_failure_stays_in_the_queue(store: FakeStateStore) -> None
     queue_events(store, 1)
     channel = FakeChannel(results=[NotSent(error="429 Too Many Requests", retryable=True)])
 
-    run = deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    run = deliver_due(
+
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: channel},
+
+        state_store=store,
+
+    )
 
     assert (run.failed, run.gave_up) == (1, 0)
     notification = Notification.objects.get()
@@ -163,7 +226,15 @@ def test_8_3_permanent_failure_gives_up_at_once(store: FakeStateStore) -> None:
     queue_events(store, 1)
     channel = FakeChannel(results=[NotSent(error="chat not found", retryable=False)])
 
-    run = deliver_due(at=AFTER_WINDOW, channel=channel, state_store=store)
+    run = deliver_due(
+
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: channel},
+
+        state_store=store,
+
+    )
 
     assert (run.failed, run.gave_up) == (0, 1)
     notification = Notification.objects.get()
@@ -175,15 +246,26 @@ def test_8_3_permanent_failure_gives_up_at_once(store: FakeStateStore) -> None:
 def test_8_3_delivery_result_is_recorded_next_to_the_event(store: FakeStateStore) -> None:
     queue_events(store, 1)
 
-    deliver_due(at=AFTER_WINDOW, channel=FakeChannel(), state_store=store)
+    deliver_due(
 
-    event = Event.objects.get()
-    assert event.notification is not None
-    assert event.notification.status == DeliveryStatus.SENT
-    assert event.notification.channel_message_id == "1"
+        at=AFTER_WINDOW,
+
+        channels={ChannelKind.TELEGRAM.value: FakeChannel()},
+
+        state_store=store,
+
+    )
+
+    notification = Event.objects.get().notifications.get()
+    assert notification.status == DeliveryStatus.SENT
+    assert notification.channel_message_id == "1"
 
 
 def test_empty_queue_does_nothing(store: FakeStateStore) -> None:
-    run = deliver_due(at=AFTER_WINDOW, channel=FakeChannel(), state_store=store)
+    run = deliver_due(
+        at=AFTER_WINDOW,
+        channels={ChannelKind.TELEGRAM.value: FakeChannel()},
+        state_store=store,
+    )
 
     assert (run.sent, run.merged, run.failed, run.gave_up) == (0, 0, 0, 0)

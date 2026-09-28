@@ -11,7 +11,7 @@ from apps.catalog.models import (
     Group,
     NotificationMode,
 )
-from apps.monitoring.models import AddressRegistryEntry, Incident
+from apps.monitoring.models import AddressRegistryEntry, Event, EventType, Incident
 from apps.notifications.models import Notification
 from apps.notifications.services.reminders import queue_due_reminders
 from core.adapters.fake_clock import FakeClock
@@ -40,7 +40,7 @@ def incident() -> Incident:
     AddressRegistryEntry.objects.create(
         domain=domain, address="185.44.9.201", first_seen_at=MOMENT, last_seen_at=MOMENT
     )
-    Notification.objects.create(
+    opening = Notification.objects.create(
         channel="telegram",
         recipient=CHAT,
         text="Адрес вне разрешённых",
@@ -49,9 +49,18 @@ def incident() -> Incident:
         channel_message_id=OPENING_ID,
         status="sent",
     )
-    return Incident.objects.create(
-        domain=domain, opened_at=MOMENT, channel_message_id=OPENING_ID
+    incident = Incident.objects.create(domain=domain, opened_at=MOMENT)
+    # Открывающее сообщение находится по связи «событие ↔ уведомление» с отбором по каналу:
+    # у инцидента столько веток, сколько каналов (Q-D11). Поэтому событие обязательно.
+    event = Event.objects.create(
+        domain=domain,
+        event_type=EventType.NOT_ALLOWED,
+        occurred_at=MOMENT,
+        payload={"addresses": ["185.44.9.201"]},
+        incident=incident,
     )
+    event.notifications.add(opening)
+    return incident
 
 
 def reminders(at: datetime, store: FakeStateStore) -> int:
@@ -116,8 +125,9 @@ def test_43_closed_incident_stops_reminders(incident: Incident, store: FakeState
 def test_d7_no_opening_message_means_no_reminders(
     incident: Incident, store: FakeStateStore
 ) -> None:
-    # Продолжение существует только при наличии открывающего сообщения.
-    Incident.objects.filter(pk=incident.pk).update(channel_message_id="")
+    # Продолжение существует только при наличии открывающего сообщения. «Нет открывающего» —
+    # это теперь отсутствие доставленного уведомления по инциденту, а не пустая строка в поле.
+    Notification.objects.update(channel_message_id="")
 
     assert reminders(MOMENT + timedelta(hours=7), store) == 0
 

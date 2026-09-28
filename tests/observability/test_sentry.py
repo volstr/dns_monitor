@@ -363,9 +363,6 @@ def test_78_mail_failure_reaches_sentry_only_after_the_retries_are_spent(
     GlobalSettings.objects.filter(pk=1).update(
         notification_mode=NotificationMode.NOT_ALLOWED,
         email_recipients=["duty@contoso.ru"],
-        # Адресат Telegram нужен потому, что строку ставит нынешний `dispatch`, знающий только
-        # его (Q-D11). Ниже канал строки переключается на почту.
-        telegram_chat_id="-1001234567890",
     )
     store = FakeStateStore(clock)
     domain = Domain.objects.create(name="pay-gw.contoso.ru")
@@ -377,17 +374,18 @@ def test_78_mail_failure_reaches_sentry_only_after_the_retries_are_spent(
         incident=Incident.objects.create(domain=domain, opened_at=MOMENT),
     )
     dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
-    # Строка ставится настоящим путём, а канал переключается на почту: маршрутизации в почту
-    # ещё нет, она ждёт решения Q-D11. Проверяется доставка, а не выбор канала.
-    Notification.objects.update(channel=ChannelKind.EMAIL, recipient="duty@contoso.ru")
+    # Строка ставится настоящим путём. Телеграм тут не нужен — проверяется почта, — поэтому
+    # его строка убирается: остаётся ровно одна, почтовая (Q-D11).
+    Notification.objects.filter(channel=ChannelKind.TELEGRAM).delete()
 
     # Порт заведомо закрыт: сервер задан, но недоступен — ровно формулировка критерия.
     channel = SmtpChannel(host="127.0.0.1", sender="robot@contoso.ru", port=1, tls="none")
+    channels = {ChannelKind.EMAIL.value: channel}
 
     # Первая попытка — не раньше закрытия окна слияния (8.6), его назначил dispatch.
     at = Notification.objects.get().next_attempt_at
     for attempt in range(MAX_ATTEMPTS):
-        run = deliver_due(at=at, channel=channel, state_store=store)
+        run = deliver_due(at=at, channels=channels, state_store=store)
         if attempt < MAX_ATTEMPTS - 1:
             assert (run.failed, run.gave_up) == (1, 0)
             assert sentry.events == [], "отдельная неудачная попытка — не ошибка приложения"

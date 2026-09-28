@@ -25,7 +25,7 @@ from django.utils.timezone import localtime
 from apps.accounts.models import AuditAction, AuditRecord
 from apps.catalog.models import NotificationMode
 from apps.monitoring.models import Event, EventType
-from apps.notifications.models import DeliveryStatus
+from apps.notifications.models import DeliveryStatus, Notification
 
 #: Сколько строк показывает экран. Выгрузка не ограничена этим числом.
 PAGE_SIZE = 100
@@ -36,6 +36,10 @@ EXPORT_LIMIT = 100_000
 #: 11.7: «UTF-8 с BOM, разделитель — точка с запятой» — сочетание, которое Excel открывает сам.
 CSV_DELIMITER = ";"
 BOM = "﻿"
+
+#: Чем разделяются каналы внутри одной ячейки выгрузки (Q-D11). Не точкой с запятой: она уже
+#: разделяет колонки, и значение пришлось бы брать в кавычки.
+DELIVERY_SEPARATOR = " | "
 
 EVENT_TONES = {
     EventType.ADDRESS_APPEARED: "change",
@@ -76,6 +80,14 @@ PERIOD_LENGTH = {
 
 
 @dataclass(frozen=True, slots=True)
+class Delivery:
+    """Одна доставка: канал и чем кончилось. Строка журнала несёт их столько, сколько было."""
+
+    channel: str
+    result: str
+
+
+@dataclass(frozen=True, slots=True)
 class JournalRow:
     """Строка журнала. Оба источника приведены к одному виду (Q-D4)."""
 
@@ -87,8 +99,9 @@ class JournalRow:
     group_name: str
     addresses: tuple[str, ...]
     notification_mode: str
-    channel: str
-    delivery: str
+    #: Результат доставки по каждому каналу — Q-D11: событие уходит во все настроенные, и у
+    #: каждого своя судьба. Пусто — уведомлений по событию не было вовсе (4.5).
+    deliveries: tuple[Delivery, ...]
     #: Кто совершил действие. У событий проверки автора нет — их совершает расписание.
     author_name: str
     #: Кого коснулось действие с участником (3.1: «кто, кого, что изменил и когда»). У событий
@@ -201,8 +214,16 @@ def _csv(rows: list[JournalRow]) -> bytes:
                 row.label,
                 " ".join(row.addresses),
                 row.notification_mode,
-                row.channel,
-                row.delivery,
+                # Каналов у события может быть несколько (Q-D11). Колонки 11.7 остаются
+                # двумя, а значения перечисляются **попарно**: третий канал стоит напротив
+                # третьего результата. Разносить событие на несколько строк файла было бы
+                # хуже — сводная таблица по типам событий начала бы считать его дважды.
+                #
+                # Разделитель — вертикальная черта, а не точка с запятой: она же разделитель
+                # колонок, и её пришлось бы экранировать кавычками. Файл остался бы верным, но
+                # читать его глазами и резать простым `split` стало бы нельзя.
+                DELIVERY_SEPARATOR.join(item.channel for item in row.deliveries),
+                DELIVERY_SEPARATOR.join(item.result for item in row.deliveries),
                 row.target_name,
             ]
         )
@@ -212,7 +233,9 @@ def _csv(rows: list[JournalRow]) -> bytes:
 def _sources(
     *, at: datetime, search: str, chosen: JournalFilter, period: JournalPeriod
 ) -> tuple[QuerySet[Event], QuerySet[AuditRecord]]:
-    events = Event.objects.select_related("domain", "domain__group", "notification")
+    events = Event.objects.select_related("domain", "domain__group").prefetch_related(
+        "notifications"
+    )
     audit = AuditRecord.objects.all()
 
     since = _since(at, period)
@@ -277,18 +300,29 @@ def _event_row(event: Event) -> JournalRow:
         group_name=event.domain.group.name if event.domain.group else "",
         addresses=tuple(str(address) for address in payload.get("addresses", ())),
         notification_mode=str(NotificationMode(mode).label) if mode else "",
-        channel=event.notification.get_channel_display() if event.notification else "",
-        delivery=_delivery(event),
+        deliveries=_deliveries(event),
         author_name=event.author_name,
         target_name="",
     )
 
 
-def _delivery(event: Event) -> str:
-    """Результат доставки словами. Пусто — уведомление не отправлялось (4.5)."""
-    notification = event.notification
-    if notification is None:
-        return ""
+def _deliveries(event: Event) -> tuple[Delivery, ...]:
+    """
+    Результат доставки по каждому каналу словами. Пусто — уведомлений не было (4.5).
+
+    Порядок — по идентификатору строки очереди, то есть тот же, в котором `dispatch` их ставил.
+    Сортировать по названию канала было бы хуже: список тасовался бы при переименовании.
+    """
+    return tuple(
+        Delivery(
+            channel=str(notification.get_channel_display()),
+            result=_delivery_result(notification),
+        )
+        for notification in sorted(event.notifications.all(), key=lambda row: row.pk)
+    )
+
+
+def _delivery_result(notification: Notification) -> str:
     if notification.status == DeliveryStatus.SENT:
         if notification.sent_at is None:
             return "доставлено"
@@ -317,8 +351,7 @@ def _audit_row(record: AuditRecord) -> JournalRow:
         group_name="",
         addresses=(),
         notification_mode="",
-        channel="",
-        delivery="",
+        deliveries=(),
         author_name=record.author_name,
         target_name=record.target_name,
     )

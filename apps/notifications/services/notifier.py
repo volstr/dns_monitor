@@ -14,13 +14,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from django.conf import settings
 
 from apps.catalog.models import GlobalSettings
-from apps.monitoring.models import Event, Incident
+from apps.monitoring.models import Event
 from apps.notifications.models import Notification
 from apps.notifications.services.message import compose_summary
 from apps.notifications.services.outbox import GaveUp, due, mark_delivered, mark_failed
@@ -44,10 +45,21 @@ class DeliveryRun:
 def deliver_due(
     *,
     at: datetime,
-    channel: NotificationChannel,
+    channels: Mapping[str, NotificationChannel],
     state_store: StateStore,
     limit: int = 100,
 ) -> DeliveryRun:
+    """
+    Разобрать наступившие строки очереди — по одной реализации на вид канала (Q-D11).
+
+    Раньше сюда приходил **один** канал, и вид строки не спрашивался: получатель был один.
+    Теперь строка сама говорит, чем её отправлять, а отсутствие реализации для её вида — это
+    ошибка маршрутизации, а не молчаливый пропуск: строка появилась, значит кто-то счёл канал
+    готовым (`ready_channels`), и расхождение нужно видеть, а не заметать.
+
+    Группировка по окну слияния при этом не меняется: ключ окна по 8.6 уже содержит вид канала,
+    поэтому сводки собираются по каждому каналу отдельно сами собой.
+    """
     pending = due(at=at, limit=limit)
     if not pending:
         return DeliveryRun()
@@ -62,6 +74,10 @@ def deliver_due(
 
     run = DeliveryRun()
     for merge_key, batch in groups.items():
+        channel = channels.get(batch[0].channel)
+        if channel is None:
+            run = _no_implementation(batch, at, run)
+            continue
         if merge_key and len(batch) > threshold:
             run = _send_summary(batch, merge_key, window, at, channel, state_store, run)
             continue
@@ -71,6 +87,28 @@ def deliver_due(
             # Окно закрыто: накопитель больше не нужен, даже если сводки не было.
             state_store.release(StateKey(merge_key, window))
     return run
+
+
+def _no_implementation(
+    batch: list[Notification], at: datetime, run: DeliveryRun
+) -> DeliveryRun:
+    """
+    Строка есть, а отправлять нечем. Повторять бессмысленно — реализация от повтора не появится.
+
+    Случиться это может ровно одним способом: строки поставил один состав каналов, а разбирает
+    очередь другой — например, `run_notifier` старой версии. Тихо оставить строку в очереди
+    нельзя: она будет браться каждый круг доставки и никогда не уйдёт.
+    """
+    kind = batch[0].channel
+    for notification in batch:
+        mark_failed(
+            notification_id=notification.pk,
+            at=at,
+            error=f"нет реализации канала «{kind}»",
+            retryable=False,
+        )
+    logger.error("нет реализации канала", extra={"component": "notifier", "channel": kind})
+    return _plus(run, gave_up=len(batch))
 
 
 def _send_one(
@@ -85,7 +123,6 @@ def _send_one(
         mark_delivered(
             notification_id=notification.pk, at=at, channel_message_id=result.channel_message_id
         )
-        _remember_for_incidents(notification, result.channel_message_id)
         return _plus(run, sent=1)
 
     outcome = mark_failed(
@@ -147,29 +184,12 @@ def _send_summary(
         mark_delivered(
             notification_id=notification.pk, at=at, channel_message_id=result.channel_message_id
         )
-        _remember_for_incidents(notification, result.channel_message_id)
     return _plus(run, sent=1, merged=len(batch))
 
 
 def _domain_names(batch: list[Notification]) -> tuple[str, ...]:
-    names = Event.objects.filter(notification__in=batch).values_list("domain__name", flat=True)
+    names = Event.objects.filter(notifications__in=batch).values_list("domain__name", flat=True)
     return tuple(sorted(set(names)))
-
-
-def _remember_for_incidents(notification: Notification, channel_message_id: str) -> None:
-    """
-    Открывающее сообщение инцидента — то, по которому потом отвечают (7.3, 8.5, Q-D7).
-
-    Записывается только в пустое поле: у инцидента ветка одна, и повторная доставка её не меняет.
-    """
-    incident_ids = list(
-        Event.objects.filter(notification=notification, incident__isnull=False).values_list(
-            "incident_id", flat=True
-        )
-    )
-    Incident.objects.filter(pk__in=incident_ids, channel_message_id="").update(
-        channel_message_id=channel_message_id
-    )
 
 
 def _reply_to(notification: Notification) -> str | None:

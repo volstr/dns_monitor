@@ -135,19 +135,36 @@ def test_d7_reply_keeps_the_thread() -> None:
     assert closing.reply_to_id == opening.pk
 
 
-def test_4_5_event_points_at_the_notification_it_produced() -> None:
-    # Связь ведёт событие → уведомление: при слиянии (8.6) одно сообщение покрывает много событий.
+def test_4_5_one_notification_covers_many_events() -> None:
+    """Слияние 8.6: одно сообщение покрывает много событий — сторона «многие к одному»."""
     domain = Domain.objects.create(name="pay-gw.contoso.ru")
     notification = put()
     for _ in range(3):
-        Event.objects.create(
+        event = Event.objects.create(
             domain=domain,
             event_type=EventType.NOT_ALLOWED,
             occurred_at=MOMENT,
-            notification=notification,
         )
+        event.notifications.add(notification)
 
     assert notification.events.count() == 3
+
+
+def test_4_5_one_event_goes_to_many_channels() -> None:
+    """
+    Маршрутизация Q-D11: событие уходит во все настроенные каналы — обратная сторона связи.
+
+    Ради неё связь и стала многие-ко-многим: у каждого канала своя строка очереди со своей
+    судьбой доставки, и одиночная ссылка выразить это не могла.
+    """
+    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    event = Event.objects.create(
+        domain=domain, event_type=EventType.NOT_ALLOWED, occurred_at=MOMENT
+    )
+
+    event.notifications.add(put(), put())
+
+    assert event.notifications.count() == 2
 
 
 def test_4_5_event_without_a_notification_is_normal() -> None:
@@ -158,4 +175,4 @@ def test_4_5_event_without_a_notification_is_normal() -> None:
         domain=domain, event_type=EventType.WATCH_STARTED, occurred_at=MOMENT
     )
 
-    assert event.notification is None
+    assert event.notifications.count() == 0

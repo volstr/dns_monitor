@@ -6,7 +6,7 @@ import pytest
 
 from apps.catalog.models import Domain, GlobalSettings, Group, NotificationMode
 from apps.monitoring.models import Event, EventType, Incident
-from apps.notifications.models import Notification
+from apps.notifications.models import ChannelKind, Notification
 from apps.notifications.services.dispatch import NotQueued, Queued, dispatch_event
 from apps.notifications.services.policy import SkipReason
 from core.adapters.fake_clock import FakeClock
@@ -56,7 +56,9 @@ def test_8_6_message_waits_for_the_window_to_close(domain: Domain, store: FakeSt
     assert isinstance(result, Queued)
     # Окно по умолчанию 60 секунд (4.1): раньше сообщение не уйдёт — критерий 39.
     assert result.send_after == MOMENT + timedelta(seconds=60)
-    assert result.in_window == 1
+    # Настроен один канал, значит и строка одна (Q-D11).
+    assert [item.channel for item in result.to] == [ChannelKind.TELEGRAM]
+    assert result.to[0].in_window == 1
 
 
 def test_8_6_window_counts_events_of_the_same_type(domain: Domain, store: FakeStateStore) -> None:
@@ -67,7 +69,7 @@ def test_8_6_window_counts_events_of_the_same_type(domain: Domain, store: FakeSt
 
     assert isinstance(first, Queued)
     assert isinstance(second, Queued)
-    assert (first.in_window, second.in_window) == (1, 2)
+    assert (first.to[0].in_window, second.to[0].in_window) == (1, 2)
 
 
 def test_4_5_event_points_at_its_notification(domain: Domain, store: FakeStateStore) -> None:
@@ -75,9 +77,7 @@ def test_4_5_event_points_at_its_notification(domain: Domain, store: FakeStateSt
 
     dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
 
-    event.refresh_from_db()
-    assert event.notification is not None
-    assert event.notification.recipient == CHAT
+    assert [item.recipient for item in event.notifications.all()] == [CHAT]
 
 
 def test_14_mode_none_queues_nothing(domain: Domain, store: FakeStateStore) -> None:
@@ -88,8 +88,7 @@ def test_14_mode_none_queues_nothing(domain: Domain, store: FakeStateStore) -> N
 
     assert result == NotQueued(reason=SkipReason.MODE)
     assert Notification.objects.count() == 0
-    event.refresh_from_db()
-    assert event.notification is None
+    assert event.notifications.count() == 0
 
 
 def test_15_address_change_mode_ignores_not_allowed(
@@ -126,9 +125,7 @@ def test_8_4_text_carries_the_domain_and_the_comment(
 
 
 def test_17_back_to_normal_carries_the_duration(domain: Domain, store: FakeStateStore) -> None:
-    incident = Incident.objects.create(
-        domain=domain, opened_at=MOMENT - timedelta(minutes=26), channel_message_id="42"
-    )
+    incident = Incident.objects.create(domain=domain, opened_at=MOMENT - timedelta(minutes=26))
     opening = Notification.objects.create(
         channel="telegram",
         recipient=CHAT,
@@ -138,6 +135,9 @@ def test_17_back_to_normal_carries_the_duration(domain: Domain, store: FakeState
         channel_message_id="42",
         status="sent",
     )
+    # Открывающее сообщение теперь находится по связи, а не по полю инцидента (Q-D11).
+    opening_event = make_event(domain, incident=incident)
+    opening_event.notifications.add(opening)
     event = make_event(domain, EventType.BACK_TO_NORMAL, incident=incident, payload={})
 
     dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)

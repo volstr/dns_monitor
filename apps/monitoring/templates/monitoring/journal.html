@@ -78,9 +78,15 @@
                   {% for address in row.addresses %}<span class="chip">{{ address }}</span>{% endfor %}
                 </div>
               {% endif %}
-              {% if row.delivery %}
-                <div class="note">{{ row.channel }}{% if row.channel %} — {% endif %}{{ row.delivery }}.</div>
-              {% endif %}
+              {% comment %}
+              По строке на канал (Q-D11). Не одной строкой через запятую: у каналов разная
+              судьба, и «Telegram — доставлено, Почта — не доставлено: …» в одну строку читается
+              как одно сообщение с двумя исходами. И не как отдельные записи журнала: событие
+              одно, дублировать его в ленте нельзя.
+              {% endcomment %}
+              {% for delivery in row.deliveries %}
+                <div class="note">{{ delivery.channel }} — {{ delivery.result }}.</div>
+              {% endfor %}
               {% if row.author_name %}<div class="note">Выполнил: {{ row.author_name }}.</div>{% endif %}
             </div>
           </li>

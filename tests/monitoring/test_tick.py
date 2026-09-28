@@ -14,7 +14,7 @@ from apps.catalog.models import (
 from apps.monitoring.models import Check
 from apps.monitoring.services.scheduling import RESERVATION, SUCCESSFUL_HISTORY
 from apps.monitoring.services.tick import tick
-from apps.notifications.models import DeliveryStatus, Notification
+from apps.notifications.models import ChannelKind, DeliveryStatus, Notification
 from apps.notifications.services.notifier import deliver_due
 from core.adapters.fake_channel import FakeChannel
 from core.adapters.fake_clock import FakeClock
@@ -155,7 +155,11 @@ def test_8_3_broken_channel_does_not_stop_checks(domain: Domain, store: FakeStat
 
     # Канал лежит: доставка не проходит, строка остаётся в очереди.
     channel = FakeChannel(results=[NotSent(error="канал недоступен", retryable=True)] * 5)
-    deliver_due(at=MOMENT + timedelta(minutes=2), channel=channel, state_store=store)
+    deliver_due(
+        at=MOMENT + timedelta(minutes=2),
+        channels={ChannelKind.TELEGRAM.value: channel},
+        state_store=store,
+    )
     assert Notification.objects.filter(status=DeliveryStatus.PENDING).count() == 1
 
     # Проверки при этом продолжаются как ни в чём не бывало.

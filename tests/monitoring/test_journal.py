@@ -43,12 +43,29 @@ def domain() -> Domain:
 
 def event(domain: Domain, kind: str = EventType.NOT_ALLOWED, **extra: object) -> Event:
     payload = extra.pop("payload", {"addresses": ["185.44.9.201"]})
-    return Event.objects.create(
+    notifications = extra.pop("notifications", ())
+    row = Event.objects.create(
         domain=domain,
         event_type=kind,
         occurred_at=extra.pop("occurred_at", MOMENT),
         payload=payload,
         **extra,
+    )
+    for notification in notifications:
+        row.notifications.add(notification)
+    return row
+
+
+def delivered(channel: ChannelKind, message_id: str = "1") -> Notification:
+    return Notification.objects.create(
+        channel=channel,
+        recipient="кому-нибудь",
+        text="Адрес вне разрешённых",
+        status=DeliveryStatus.SENT,
+        created_at=MOMENT,
+        next_attempt_at=MOMENT,
+        sent_at=MOMENT,
+        channel_message_id=message_id,
     )
 
 
@@ -108,22 +125,42 @@ def test_11_7_search_finds_by_domain_and_by_address(domain: Domain) -> None:
 
 
 def test_4_5_delivery_result_is_shown_next_to_the_event(domain: Domain) -> None:
-    notification = Notification.objects.create(
-        channel=ChannelKind.TELEGRAM,
-        recipient="-1001234567890",
-        text="Адрес вне разрешённых",
-        status=DeliveryStatus.SENT,
-        created_at=MOMENT,
-        next_attempt_at=MOMENT,
-        sent_at=MOMENT,
-    )
-    event(domain, notification=notification)
+    event(domain, notifications=(delivered(ChannelKind.TELEGRAM),))
 
     row = journal_page(at=MOMENT).rows[0]
 
-    assert row.channel == "Telegram"
+    assert [item.channel for item in row.deliveries] == ["Telegram"]
     # 14:38 UTC в поясе установки — 17:38 (ТЗ 4.0).
-    assert row.delivery == "доставлено 17:38:00"
+    assert row.deliveries[0].result == "доставлено 17:38:00"
+
+
+def test_d11_every_channel_gets_its_own_line(domain: Domain) -> None:
+    """
+    Событие уходит во все настроенные каналы, и у каждого своя судьба (Q-D11, вариант 1).
+
+    Показывать это одной строкой нельзя: «Telegram — доставлено, Почта — не доставлено» в одну
+    строку читается как одно сообщение с двумя исходами. Дублировать событие в ленте — тоже:
+    событие одно.
+    """
+    telegram = delivered(ChannelKind.TELEGRAM)
+    email = Notification.objects.create(
+        channel=ChannelKind.EMAIL,
+        recipient="duty@contoso.ru",
+        text="Адрес вне разрешённых",
+        status=DeliveryStatus.FAILED,
+        created_at=MOMENT,
+        next_attempt_at=MOMENT,
+        last_error="сервер не отвечает",
+    )
+    event(domain, notifications=(telegram, email))
+
+    rows = journal_page(at=MOMENT).rows
+
+    assert len(rows) == 1, "событие одно — строка журнала тоже одна"
+    assert [(item.channel, item.result) for item in rows[0].deliveries] == [
+        ("Telegram", "доставлено 17:38:00"),
+        ("Почта", "не доставлено: сервер не отвечает"),
+    ]
 
 
 def test_4_5_event_without_a_notification_says_nothing_about_delivery(domain: Domain) -> None:
@@ -131,7 +168,7 @@ def test_4_5_event_without_a_notification_says_nothing_about_delivery(domain: Do
 
     row = journal_page(at=MOMENT).rows[0]
 
-    assert (row.channel, row.delivery) == ("", "")
+    assert row.deliveries == ()
 
 
 def test_49_export_is_utf8_with_bom_and_semicolons(domain: Domain) -> None:
@@ -321,3 +358,35 @@ def test_d43_export_names_the_member(domain: Domain) -> None:
     # Восемь колонок 11.7 остались на своих местах: доменная строка не сдвинулась.
     domain_row = next(line for line in lines if "pay-gw.contoso.ru" in line)
     assert domain_row.split(CSV_DELIMITER)[1] == "pay-gw.contoso.ru"
+
+
+def test_d11_export_pairs_channels_with_their_results(domain: Domain) -> None:
+    """
+    Колонок 11.7 по-прежнему две, а каналов может быть несколько (Q-D11).
+
+    Значения перечисляются через «; » **попарно**: третий канал напротив третьего результата.
+    Разносить событие на несколько строк файла было бы хуже — сводная таблица по типам событий
+    начала бы считать каждое событие дважды.
+    """
+    telegram = delivered(ChannelKind.TELEGRAM)
+    email = Notification.objects.create(
+        channel=ChannelKind.EMAIL,
+        recipient="duty@contoso.ru",
+        text="Адрес вне разрешённых",
+        status=DeliveryStatus.FAILED,
+        created_at=MOMENT,
+        next_attempt_at=MOMENT,
+        last_error="сервер не отвечает",
+    )
+    event(domain, notifications=(telegram, email))
+
+    result = journal_export(at=MOMENT)
+
+    assert isinstance(result, ExportReady)
+    assert result.rows == 1, "событие одно — строка файла тоже одна"
+    columns = result.content.decode("utf-8").splitlines()[1].split(CSV_DELIMITER)
+    assert columns[6] == "Telegram | Почта"
+    assert columns[7] == "доставлено 17:38:00 | не доставлено: сервер не отвечает"
+    # Ячейку не пришлось брать в кавычки: разделитель каналов не совпадает с разделителем
+    # колонок, и файл режется простым `split`.
+    assert '"' not in result.content.decode("utf-8")

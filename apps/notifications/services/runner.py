@@ -18,10 +18,13 @@ from datetime import datetime
 from django.conf import settings
 from django.utils.timezone import localtime
 
+from apps.notifications.models import ChannelKind
 from apps.notifications.services.notifier import DeliveryRun, deliver_due
 from apps.notifications.services.reminders import queue_due_reminders
+from core.adapters.smtp import SmtpChannel
 from core.adapters.telegram import TelegramChannel
 from core.ports.clock import Clock
+from core.ports.notification_channel import NotificationChannel
 from core.ports.state_store import StateStore
 
 logger = logging.getLogger(__name__)
@@ -37,10 +40,19 @@ class DeliverySkipped:
 def run_one_delivery(
     *, clock: Clock, state_store: StateStore
 ) -> DeliveryRun | DeliverySkipped:
-    """Один проход по очереди исходящих."""
-    channel = TelegramChannel(settings.ENV.telegram_bot_token)
-    if not channel.is_configured:
-        reason = "TELEGRAM_BOT_TOKEN не задан: канал не настроен, отправлять нечем"
+    """
+    Один проход по очереди исходящих.
+
+    Здесь композиционный корень доставки: единственное место, где из переменных окружения
+    собираются сами адаптеры. Ниже по слоям каналы известны только видом (`ChannelKind`), и
+    `smtplib` или HTTP туда не проникают.
+    """
+    channels = build_channels()
+    if not channels:
+        reason = (
+            "ни один канал не настроен: не заданы ни TELEGRAM_BOT_TOKEN, ни SMTP_HOST — "
+            "отправлять нечем"
+        )
         logger.warning(reason)
         return DeliverySkipped(reason=reason)
 
@@ -48,7 +60,32 @@ def run_one_delivery(
     # Напоминания ставятся в ту же очередь и тем же проходом: по 8.5 это обычные сообщения,
     # просто повторные, и по Q-D9 они так же проходят через окно слияния.
     queue_due_reminders(at=at, state_store=state_store)
-    return deliver_due(at=at, channel=channel, state_store=state_store)
+    return deliver_due(at=at, channels=channels, state_store=state_store)
+
+
+def build_channels() -> dict[str, NotificationChannel]:
+    """
+    Реализации каналов по их виду — Q-D11, вариант 1.
+
+    В карту попадает только **настроенный** канал: `is_configured` здесь спрашивается у самой
+    реализации, потому что речь о подключении (токен, почтовый сервер), а оно живёт в окружении
+    (8.3). Заданный в интерфейсе адресат — вторая половина условия, и её проверяет
+    `ready_channels` на стороне постановки в очередь.
+
+    Вебхука нет: `core/adapters/webhook.py` — заглушка по 8.3, и строки для неё не ставятся.
+    """
+    built: dict[str, NotificationChannel] = {
+        ChannelKind.TELEGRAM.value: TelegramChannel(settings.ENV.telegram_bot_token),
+        ChannelKind.EMAIL.value: SmtpChannel(
+            host=settings.ENV.smtp_host,
+            sender=settings.ENV.smtp_from,
+            port=settings.ENV.smtp_port,
+            user=settings.ENV.smtp_user,
+            password=settings.ENV.smtp_password,
+            tls=settings.ENV.smtp_tls.value,
+        ),
+    }
+    return {kind: channel for kind, channel in built.items() if channel.is_configured}
 
 
 def describe(result: DeliveryRun | DeliverySkipped, at: datetime) -> str:

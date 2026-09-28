@@ -26,6 +26,7 @@ from apps.catalog.selectors.settings import effective_settings
 from apps.monitoring.models import Event, EventType, Incident
 from apps.monitoring.selectors.addresses import fresh_set
 from apps.notifications.models import ChannelKind, DeliveryStatus, Notification
+from apps.notifications.selectors.channels import ready_channels
 from apps.notifications.services.message import MessageInput, compose
 from apps.notifications.services.policy import Send, SkipReason, decide
 from core.ports.state_store import StateStore, merge_window
@@ -33,12 +34,24 @@ from core.text import humanize_duration
 
 
 @dataclass(frozen=True, slots=True)
-class Queued:
+class QueuedTo:
+    """Одна строка очереди — один канал. Судьба доставки у каждого своя (Q-D11)."""
+
+    channel: ChannelKind
     notification_id: int
-    #: Момент, когда окно закроется и сообщение можно будет отправить.
-    send_after: datetime
-    #: Сколько событий этого типа уже накопилось в окне — по нему виден порог слияния.
+    #: Сколько событий этого типа уже накопилось в окне **этого канала**: ключ окна слияния по
+    #: 8.6 строится «канал:тип события», и порог считается по каждому каналу отдельно.
     in_window: int
+
+
+@dataclass(frozen=True, slots=True)
+class Queued:
+    #: По строке на каждый готовый канал, в порядке `ChannelKind`. Пустым не бывает: когда
+    #: ставить некуда, возвращается `NotQueued`.
+    to: tuple[QueuedTo, ...]
+    #: Момент, когда окно закроется и сообщения можно будет отправить. Общий: окно у каналов
+    #: одно по длительности и отсчитывается от одного события.
+    send_after: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,76 +75,89 @@ def dispatch_event(
     # где уже разрешён по цепочке наследования, и до любых ранних выходов ниже.
     _remember_mode(event, resolved.notification_mode.value)
 
-    recipient = global_settings.telegram_chat_id
-    if not recipient:
-        # Канал «Не настроен» — нормальный режим (8.3), а не ошибка.
+    ready = ready_channels(global_settings)
+    if not ready:
+        # Ни один канал не настроен — нормальный режим (8.3), а не ошибка.
         return NotQueued(reason=SkipReason.NEVER)
 
-    decision = decide(
-        event_type=event.event_type,
-        mode=resolved.notification_mode.value,
-        notify_back_to_normal=resolved.notify_back_to_normal.value,
-        opening_message_id=_opening_message_id(event),
-    )
-    if not isinstance(decision, Send):
-        return NotQueued(reason=decision.reason)
-
+    # Решение «уведомлять ли вообще» — одно на событие, а не на канал: 8.1 говорит о режиме
+    # уведомлений, а не о способе доставки. Ветка переписки (Q-D7) при этом своя у каждого
+    # канала, поэтому `opening_message_id` спрашивается внутри цикла.
+    text = _text(event, resolved.freshness_threshold.value, at, global_settings)
     window = timedelta(seconds=global_settings.merge_window_seconds)
-    key = merge_window(ChannelKind.TELEGRAM.value, event.event_type)
-    in_window = state_store.accumulate(key, event.domain.name)
+    send_after = at + window
 
-    notification = Notification.objects.create(
-        channel=ChannelKind.TELEGRAM,
-        recipient=recipient,
-        text=_text(event, resolved.freshness_threshold.value, at, global_settings),
-        created_at=at,
-        # Ждём закрытия окна: критерий 39 требует одного сводного сообщения на шесть событий.
-        next_attempt_at=at + window,
-        status=DeliveryStatus.PENDING,
-        reply_to_id=_reply_to_id(decision),
-        merge_key=key.name,
-    )
-    Event.objects.filter(pk=event_id).update(notification=notification)
+    queued: list[QueuedTo] = []
+    skipped: SkipReason | None = None
+    for kind, recipient in ready.items():
+        opening = _opening_notification(event, kind)
+        decision = decide(
+            event_type=event.event_type,
+            mode=resolved.notification_mode.value,
+            notify_back_to_normal=resolved.notify_back_to_normal.value,
+            opening_message_id=opening.channel_message_id if opening else None,
+        )
+        if not isinstance(decision, Send):
+            skipped = decision.reason
+            continue
+
+        key = merge_window(kind.value, event.event_type)
+        in_window = state_store.accumulate(key, event.domain.name)
+        notification = Notification.objects.create(
+            channel=kind,
+            recipient=recipient,
+            text=text,
+            created_at=at,
+            # Ждём закрытия окна: критерий 39 требует одного сводного сообщения на шесть событий.
+            next_attempt_at=send_after,
+            status=DeliveryStatus.PENDING,
+            reply_to=opening if decision.reply_to else None,
+            merge_key=key.name,
+        )
+        event.notifications.add(notification)
+        queued.append(
+            QueuedTo(channel=kind, notification_id=notification.pk, in_window=in_window)
+        )
+
+    if not queued:
+        return NotQueued(reason=skipped or SkipReason.NEVER)
+
     if event.incident_id:
         # 8.5: сообщение о новом несовпавшем адресе засчитывается за напоминание — два подряд
         # не отправляются. Поэтому отсчёт интервала сдвигает любое сообщение по инциденту.
         Incident.objects.filter(pk=event.incident_id).update(last_message_at=at)
 
-    return Queued(
-        notification_id=notification.pk,
-        send_after=notification.next_attempt_at,
-        in_window=in_window,
+    return Queued(to=tuple(queued), send_after=send_after)
+
+
+def _opening_notification(event: Event, kind: ChannelKind) -> Notification | None:
+    """
+    Открывающее сообщение, в ветку которого отвечаем, — правило Q-D7, **в этом канале**.
+
+    Канал здесь обязателен. Идентификатор сообщения выдаёт сам канал: у Telegram это число,
+    у почты — `Message-ID`. Ответить в Telegram на `Message-ID` письма нельзя, и наоборот;
+    пока канал был один, вопроса не возникало.
+
+    Раньше открывающее сообщение инцидента хранилось строкой в `Incident.channel_message_id` —
+    одно на инцидент. Теперь оно ищется по связи: у инцидента столько веток, сколько каналов.
+    """
+    sent = Notification.objects.filter(channel=kind, status=DeliveryStatus.SENT).exclude(
+        channel_message_id=""
     )
-
-
-def _opening_message_id(event: Event) -> str | None:
-    """Сообщение, в ветку которого отвечаем, — правило Q-D7."""
     if event.event_type == EventType.BACK_TO_NORMAL.value:
-        return event.incident.channel_message_id or None if event.incident else None
+        if event.incident_id is None:
+            return None
+        return sent.filter(events__incident_id=event.incident_id).order_by("created_at").first()
     if event.event_type == EventType.RESOLVE_RECOVERED.value:
-        opening = (
-            Notification.objects.filter(
+        return (
+            sent.filter(
                 events__domain_id=event.domain_id,
                 events__event_type=EventType.RESOLVE_FAILED.value,
-                status=DeliveryStatus.SENT,
             )
             .order_by("-created_at")
             .first()
         )
-        return opening.channel_message_id or None if opening else None
     return None
-
-
-def _reply_to_id(decision: Send) -> int | None:
-    """Ветка хранится идентификатором строки очереди, а не текстовым id канала."""
-    if not decision.reply_to:
-        return None
-    opening = (
-        Notification.objects.filter(channel_message_id=decision.reply_to)
-        .order_by("-created_at")
-        .first()
-    )
-    return opening.pk if opening else None
 
 
 def _remember_mode(event: Event, mode: str) -> None:
