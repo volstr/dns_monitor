@@ -60,8 +60,21 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-solid" type="submit" name="way" value="link">Выдать ссылку</button>
           <button class="btn" type="submit" name="way" value="password">Задать пароль</button>
-          <button class="btn" type="button" disabled title="{% if page.email_invites_available %}Канал почты пока не реализован{% else %}SMTP_HOST не задан{% endif %}">Отправить письмом</button>
+          {% comment %}
+          Кнопка недоступна по двум разным причинам, и их нельзя путать. Почта не настроена —
+          причина установки, лечится переменными окружения (критерий 75), и о ней уже говорит
+          баннер выше. Почта настроена — остаётся то, что канал ещё заглушка (TODO ТЗ 8.3), и
+          об этом сказать больше нечем, поэтому строка ниже.
+
+          Подпись видимая, а не только в `title`: всплывающую подсказку у недоступной кнопки
+          показывают не все браузеры, и причина пропала бы вовсе.
+          {% endcomment %}
+          <button class="btn" type="button" disabled
+                  title="{% if page.email_invites_available %}Канал почты пока не реализован (ТЗ 8.3){% else %}Почтовый сервер не настроен: не задана переменная SMTP_HOST{% endif %}">Отправить письмом</button>
         </div>
+        {% if page.email_invites_available %}
+          <div class="sub">Отправка письмом появится вместе с почтовым каналом (ТЗ 8.3).</div>
+        {% endif %}
       </form>
     </div>
 

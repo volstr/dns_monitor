@@ -111,7 +111,8 @@
                 <div class="k">Telegram<div class="d">Идентификатор чата. Токен бота задаётся в окружении.</div></div>
                 <div>
                   <input class="inp mono" style="max-width:280px" name="telegram_chat_id" value="{{ page.telegram_chat_id }}">
-                  <div class="hint" style="margin:6px 0 0">
+                  {# `.sub`, а не `.hint`: `.hint` в CSS прототипа задан только внутри `.field`. #}
+                  <div class="sub" style="margin:6px 0 0">
                     Число, у групп и каналов отрицательное. Как его узнать — в README, раздел
                     «Куда Telegram отправляет сообщения».
                   </div>
