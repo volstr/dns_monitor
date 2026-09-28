@@ -1,13 +1,13 @@
 """
-Заглушки каналов доставки — ТЗ 8.3, plan.md этап 5.
+Заглушка вебхука — ТЗ 8.3, plan.md этап 5.
 
-Проверяется главное: заглушки говорят на том же протоколе, что и Telegram, и отказывают
-**результатом**, а не исключением, — иначе недоступный канал ронял бы процесс доставки.
+Проверяется главное: заглушка говорит на том же протоколе, что и настоящие каналы, и отказывает
+**результатом**, а не исключением, — иначе ненастроенный канал ронял бы процесс доставки.
+
+Почта была здесь же, пока была заглушкой. Теперь она настоящая, и её проверки живут в
+`test_smtp_channel.py`: у неё появился транспорт, которого у заглушки нет.
 """
 
-import pytest
-
-from core.adapters.smtp import SmtpChannel
 from core.adapters.webhook import WebhookChannel
 from core.ports.notification_channel import NotificationChannel, NotSent
 
@@ -15,15 +15,12 @@ RECIPIENT = "duty@contoso.ru"
 URL = "https://hooks.contoso.ru/dns"
 
 
-def test_8_3_stubs_speak_the_same_protocol() -> None:
-    channels: list[NotificationChannel] = [
-        SmtpChannel(host="smtp.contoso.ru", sender="robot@contoso.ru"),
-        WebhookChannel(),
-    ]
+def test_8_3_stub_speaks_the_same_protocol() -> None:
+    channel: NotificationChannel = WebhookChannel()
 
-    for channel in channels:
-        result = channel.send(recipient=RECIPIENT, text="Адрес вне разрешённых")
-        assert isinstance(result, NotSent)
+    result = channel.send(recipient=RECIPIENT, text="Адрес вне разрешённых")
+
+    assert isinstance(result, NotSent)
 
 
 def test_8_3_refusal_is_a_result_not_an_exception() -> None:
@@ -33,22 +30,6 @@ def test_8_3_refusal_is_a_result_not_an_exception() -> None:
     assert isinstance(result, NotSent)
     assert result.retryable is False
     assert "не реализован" in result.error
-
-
-@pytest.mark.parametrize(
-    ("host", "sender", "configured"),
-    [
-        ("smtp.contoso.ru", "robot@contoso.ru", True),
-        ("smtp.contoso.ru", None, False),
-        (None, "robot@contoso.ru", False),
-        (None, None, False),
-    ],
-)
-def test_11_10_mail_is_configured_only_with_host_and_sender(
-    host: str | None, sender: str | None, *, configured: bool
-) -> None:
-    # Пустой SMTP_HOST — нормальный режим работы, а не ошибка конфигурации (критерий 75).
-    assert SmtpChannel(host=host, sender=sender).is_configured is configured
 
 
 def test_8_3_webhook_needs_no_connection_settings() -> None:

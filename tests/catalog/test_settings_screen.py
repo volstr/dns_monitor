@@ -1,8 +1,10 @@
 """Общие настройки и обзор — ТЗ 4.1, 8.3, 11.9; решения Q-13.1, Q-D19, Q-C12; критерий 29."""
 
+import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from django.conf import settings as django_settings
 from django.test import Client
 from django.urls import reverse
 
@@ -355,3 +357,46 @@ def test_29_observer_cannot_touch_the_channel(client: Client, observer: Member) 
     assert client.post(reverse("channel-probe")).status_code == 403
     assert client.post(reverse("channel-disconnect")).status_code == 403
     assert GlobalSettings.objects.get().telegram_chat_id == "-1001234567890"
+
+
+def test_79_connection_settings_of_mail_are_not_part_of_the_api(
+    client: Client, admin: Member
+) -> None:
+    """
+    Критерий 79: попытка изменить параметры подключения почты через API → таких полей нет.
+
+    Разграничение 8.3: адресат задаётся в интерфейсе, **подключение** — в окружении. Иначе
+    администратор приложения получил бы возможность направить исходящую почту через свой
+    сервер, а вместе с ней — чужие учётные данные в поле ввода.
+
+    Проверяется не отказ, а именно отсутствие: поля нет ни в типе, который принимает сервис,
+    ни среди столбцов таблицы. Отказ можно однажды ослабить, поля — нельзя.
+    """
+    client.force_login(admin)
+    forbidden = ("smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from", "smtp_tls")
+
+    fields = {
+        "check_period_minutes": "5",
+        "freshness_threshold_hours": "24",
+        "notification_mode": NotificationMode.NOT_ALLOWED.value,
+        "reminder_interval_hours": "6",
+        "merge_window_seconds": "60",
+        "merge_threshold": "5",
+        "dns_servers": "10.0.0.1",
+        "resolve_failure_threshold": "3",
+        "event_retention_days": "90",
+        "session_lifetime_hours": "168",
+        "login_failure_threshold": "5",
+    }
+
+    client.post(reverse("settings-save"), fields | dict.fromkeys(forbidden, "злоумышленник"))
+
+    row = GlobalSettings.objects.get()
+    columns = {field.name for field in GlobalSettings._meta.get_fields()}
+    input_fields = {field.name for field in dataclasses.fields(SettingsInput)}
+    for name in forbidden:
+        assert name not in columns, f"{name} не должен существовать в общих настройках"
+        assert name not in input_fields, f"{name} не должен приниматься сервисом"
+        assert not hasattr(row, name)
+    # Подключение по-прежнему читается только из окружения.
+    assert django_settings.ENV.smtp_host is None
