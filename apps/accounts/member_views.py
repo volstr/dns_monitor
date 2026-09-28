@@ -17,7 +17,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.timezone import localtime
 
@@ -28,6 +28,7 @@ from apps.accounts.services.members import (
     InvitationIssued,
     PasswordIssued,
     Refused,
+    activate_member,
     deactivate_member,
     delete_member,
     invite_with_link,
@@ -136,7 +137,13 @@ class MemberAction(AdminView):
             return _back(
                 request,
                 deactivate_member(member_id=member_id, author=author, at=at),
-                "Участник отключён.",
+                "Участник отключён. Роль можно вернуть кнопкой «Включить».",
+            )
+        if action == "activate":
+            return _back(
+                request,
+                activate_member(member_id=member_id, author=author, at=at),
+                "Участник включён. Прежние сессии остаются завершёнными: нужно войти заново.",
             )
         if action == "delete":
             return _back(
@@ -156,6 +163,12 @@ class MemberAction(AdminView):
                 unbind_authenticator(member_id=member_id, author=author, at=at),
                 "Аутентификатор отвязан: при следующем входе участник привяжет его заново.",
             )
+
+        # Сброс пароля — последняя ветка, и к ней нужен явный вход. Пока его не было,
+        # сюда проваливалось **любое** нераспознанное действие: адрес вида
+        # `/members/5/wathever/` выдавал участнику новый пароль и завершал его сессии.
+        if action != "password":
+            raise Http404(f"Действия «{action}» нет.")
 
         password = secrets.token_urlsafe(GENERATED_PASSWORD_BYTES)
         result = reset_password(member_id=member_id, password=password, author=author, at=at)

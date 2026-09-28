@@ -11,6 +11,7 @@ from apps.accounts.services.members import (
     PasswordIssued,
     Refused,
     accept_invitation,
+    activate_member,
     deactivate_member,
     delete_member,
     invite_with_link,
@@ -391,3 +392,74 @@ def test_32_own_password_change_does_not_terminate_the_session() -> None:
 
     member.refresh_from_db()
     assert member.session_epoch == epoch
+
+
+# ─────────────── включение обратно — 3.1 «роль можно вернуть», Q-D42 ───────────────
+
+
+def test_3_1_disabled_member_can_be_switched_back_on(admin: Member) -> None:
+    """
+    Без этого отключение было бы удалением под другим именем.
+
+    Разработчик отключил участника и обнаружил, что включить его обратно нечем: обратного
+    хода не существовало ни в интерфейсе, ни в сервисе.
+    """
+    member = make_observer()
+    deactivate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    result = activate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    assert isinstance(result, MemberSaved)
+    member.refresh_from_db()
+    assert member.is_active is True
+
+
+def test_3_1_switching_back_on_is_written_to_the_journal(admin: Member) -> None:
+    """Возврат доступа — такое же действие с доступом, как его прекращение (3.1)."""
+    member = make_observer()
+    deactivate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    activate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    record = AuditRecord.objects.get(action=AuditAction.MEMBER_ACTIVATED)
+    assert record.target_id == member.pk
+    assert record.author_id == admin.pk
+
+
+def test_3_1_switching_back_on_does_not_revive_old_sessions(admin: Member) -> None:
+    """
+    Отзыв доступа не отменяется задним числом: `session_epoch` остаётся поднятым.
+
+    Иначе вкладка, открытая до отключения, ожила бы вместе с участником — а отключение
+    прекращает вход именно через эпоху сессии.
+    """
+    member = make_observer()
+    deactivate_member(member_id=member.pk, author=admin, at=MOMENT)
+    member.refresh_from_db()
+    epoch = member.session_epoch
+
+    activate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    member.refresh_from_db()
+    assert member.session_epoch == epoch
+
+
+def test_3_1_password_survives_the_round_trip(admin: Member) -> None:
+    """Включение возвращает доступ, а не выдаёт новый пароль: для этого есть отдельная кнопка."""
+    member = make_observer(password=PASSWORD)
+    deactivate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    activate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    member.refresh_from_db()
+    assert member.check_password(PASSWORD)
+
+
+def test_3_1_switching_on_an_active_member_is_refused(admin: Member) -> None:
+    """Страница устарела: события не было, и выдумывать запись в журнале нечего."""
+    member = make_observer()
+
+    result = activate_member(member_id=member.pk, author=admin, at=MOMENT)
+
+    assert isinstance(result, Refused)
+    assert AuditRecord.objects.filter(action=AuditAction.MEMBER_ACTIVATED).count() == 0

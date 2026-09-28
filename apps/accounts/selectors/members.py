@@ -43,6 +43,9 @@ class MemberRow:
     state_tone: str
     last_login: datetime | None
     is_self: bool
+    #: Какую из пары кнопок показать — «Отключить» или «Включить» (3.1). Считается здесь,
+    #: а не в шаблоне из подписи состояния: подпись переводима, признак — нет.
+    is_active: bool
     #: Ссылка остаётся копируемой, пока не открыта (ТЗ 3). Пусто — копировать нечего.
     invite_token: str
     invite_expires_at: datetime | None
@@ -104,6 +107,7 @@ def _row(
         state_tone=tone,
         last_login=member.last_login,
         is_self=member.pk == viewer.pk,
+        is_active=member.is_active,
         invite_token=token,
         invite_expires_at=invitation.expires_at if invitation else None,
         authenticator_bound=bool(member.totp_secret),

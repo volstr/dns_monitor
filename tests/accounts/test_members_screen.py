@@ -176,3 +176,40 @@ def test_3_1_terminating_sessions_signs_the_member_out(
     client.post(reverse("member-action", args=[observer.pk, "sessions"]))
 
     assert other.get(reverse("overview")).status_code == 302
+
+
+def test_3_1_the_screen_offers_a_way_back(client: Client, admin: Member, observer: Member) -> None:
+    """
+    Отключённый участник получает кнопку «Включить» вместо «Отключить» — Q-D42.
+
+    Экран был тупиком: отключить можно было, вернуть — нечем.
+    """
+    client.force_login(admin)
+    client.post(reverse("member-action", args=[observer.pk, "deactivate"]))
+
+    page = client.get(reverse("member-list")).content.decode()
+
+    assert reverse("member-action", args=[observer.pk, "activate"]) in page
+
+    client.post(reverse("member-action", args=[observer.pk, "activate"]), follow=True)
+
+    observer.refresh_from_db()
+    assert observer.is_active is True
+
+
+def test_unknown_action_is_not_a_password_reset(
+    client: Client, admin: Member, observer: Member
+) -> None:
+    """
+    Нераспознанное действие проваливалось в последнюю ветку — сброс пароля.
+
+    То есть `/members/<id>/wathever/` выдавал участнику новый пароль и завершал его сессии.
+    """
+    client.force_login(admin)
+    epoch = observer.session_epoch
+
+    response = client.post(reverse("member-action", args=[observer.pk, "wathever"]))
+
+    assert response.status_code == 404
+    observer.refresh_from_db()
+    assert observer.session_epoch == epoch

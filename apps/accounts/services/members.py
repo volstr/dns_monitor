@@ -295,6 +295,38 @@ def deactivate_member(*, member_id: int, author: Member, at: datetime) -> Member
     return MemberSaved(member_id=member_id)
 
 
+def activate_member(*, member_id: int, author: Member, at: datetime) -> MemberResult:
+    """
+    Включить отключённого участника обратно — 3.1: «роль можно вернуть».
+
+    Обратный ход к `deactivate_member`, и без него отключение оказывалось бы удалением под
+    другим именем: администратор отключал участника и больше ничего сделать не мог.
+
+    Чего здесь **нет** и почему:
+
+    - **Сессии не воскрешаются.** `session_epoch` поднят отключением и остаётся поднятым:
+      прежние вкладки участника были отозваны, и возвращать им доступ нельзя — отзыв не
+      должен отменяться задним числом. Участник входит заново своим паролем.
+    - **Пароль не трогается.** Он пережил отключение и продолжает работать. Если нужен
+      новый — рядом есть «Сбросить пароль», отдельным осознанным действием.
+    - **Предохранителей 3.1 не нужно.** Оба запрета (себя, последнего администратора) защищают
+      от потери доступа, а включение доступ только возвращает.
+    """
+    member = Member.objects.filter(pk=member_id).first()
+    if member is None:
+        return Refused(reason="Участник не найден.")
+    if member.is_active:
+        # Экран показывает «Включить» только у отключённых, значит страница устарела. Молча
+        # писать в журнал ещё одно включение неверно: события не было.
+        return Refused(reason="Участник уже включён.")
+
+    with transaction.atomic():
+        Member.objects.filter(pk=member_id).update(is_active=True)
+        _record(AuditAction.MEMBER_ACTIVATED, author, member, at)
+
+    return MemberSaved(member_id=member_id)
+
+
 def delete_member(*, member_id: int, author: Member, at: datetime) -> MemberResult:
     """Удаление — только для тех, кто ни разу не входил (3.1), критерии 85, 86."""
     member = Member.objects.filter(pk=member_id).first()

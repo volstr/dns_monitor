@@ -131,7 +131,17 @@
                       {% if page.two_factor_enabled and row.authenticator_bound %}
                         <form method="post" action="{% url 'member-action' row.id 'authenticator' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Отвязать аутентификатор</button></form>
                       {% endif %}
-                      <form method="post" action="{% url 'member-action' row.id 'deactivate' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Отключить</button></form>
+                      {% comment %}
+                      Пара кнопок, а не одна: по 3.1 отключение обратимо — «роль можно
+                      вернуть». Прототип рисует только «Отключить», потому что показывает
+                      один пример строки; без обратного хода отключение было бы удалением
+                      под другим именем (Q-D42).
+                      {% endcomment %}
+                      {% if row.is_active %}
+                        <form method="post" action="{% url 'member-action' row.id 'deactivate' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Отключить</button></form>
+                      {% else %}
+                        <form method="post" action="{% url 'member-action' row.id 'activate' %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Включить</button></form>
+                      {% endif %}
                       {% if not row.last_login %}
                         <form method="post" action="{% url 'member-action' row.id 'delete' %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit">Удалить</button></form>
                       {% endif %}

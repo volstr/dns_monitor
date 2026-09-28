@@ -179,6 +179,10 @@ class AuditAction(models.TextChoices):
     SESSIONS_TERMINATED = "sessions_terminated", "Сессии завершены"
     AUTHENTICATOR_UNBOUND = "authenticator_unbound", "Аутентификатор отвязан"
     MEMBER_DEACTIVATED = "member_deactivated", "Участник отключён"
+    # Зеркало предыдущего значения, а не новый термин: 3.1 называет отключение обратимым
+    # («роль можно вернуть»), и обратный ход обязан попадать в журнал наравне с прямым —
+    # иначе доступ вернулся бы без следа. Q-D42.
+    MEMBER_ACTIVATED = "member_activated", "Участник включён"
     MEMBER_DELETED = "member_deleted", "Участник удалён"
     CHECKS_STOPPED = "checks_stopped", "Проверки остановлены"
 
