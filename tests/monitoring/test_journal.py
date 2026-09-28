@@ -294,3 +294,30 @@ def test_3_1_search_finds_a_member_record_by_either_name() -> None:
     assert len(journal_page(at=MOMENT, search="test").rows) == 1
     assert len(journal_page(at=MOMENT, search="Кирилова").rows) == 1
     assert len(journal_page(at=MOMENT, search="pay-gw").rows) == 0
+
+
+def test_d43_export_names_the_member(domain: Domain) -> None:
+    """
+    Q-D43: девятая колонка сверх перечня 11.7 — иначе запись об участнике безымянна.
+
+    По выгрузке разбирают инцидент; строка «Участник отключён» без имени для разбора
+    бесполезна, а 3.1 требует от журнала «кто, кого, что изменил и когда».
+    """
+    event(domain)
+    AuditRecord.objects.create(
+        action=AuditAction.MEMBER_DEACTIVATED,
+        occurred_at=MOMENT,
+        author_name="Анна Кирилова",
+        target_name="test",
+    )
+
+    result = journal_export(at=MOMENT)
+
+    assert isinstance(result, ExportReady)
+    lines = result.content.decode("utf-8").splitlines()
+    assert lines[0].split(CSV_DELIMITER)[8] == "Участник"
+    member_row = next(line for line in lines if "Участник отключён" in line)
+    assert member_row.split(CSV_DELIMITER)[8] == "test"
+    # Восемь колонок 11.7 остались на своих местах: доменная строка не сдвинулась.
+    domain_row = next(line for line in lines if "pay-gw.contoso.ru" in line)
+    assert domain_row.split(CSV_DELIMITER)[1] == "pay-gw.contoso.ru"
