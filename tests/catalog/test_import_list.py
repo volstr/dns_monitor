@@ -14,8 +14,20 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import Member, Role
-from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings, Group
+from apps.catalog.models import (
+    AllowlistEntry,
+    Domain,
+    GlobalSettings,
+    Group,
+    NotificationMode,
+)
 from apps.catalog.services.import_list import apply_import, preview_import
+from apps.monitoring.models import Event, EventType
+from apps.monitoring.services.tick import tick
+from apps.notifications.models import Notification
+from core.adapters.fake_clock import FakeClock
+from core.adapters.fake_resolver import FakeResolver, answered
+from core.adapters.fake_state_store import FakeStateStore
 
 pytestmark = pytest.mark.django_db
 
@@ -278,3 +290,43 @@ def test_10_3_observer_cannot_open_the_import(client: Client) -> None:
 
 def _file(text: str) -> SimpleUploadedFile:
     return SimpleUploadedFile("domains.txt", text.encode(), content_type="text/plain")
+
+
+def test_34_two_hundred_domains_checked_at_once_produce_no_change_notifications() -> None:
+    """
+    Критерий 34: импорт 200 доменов с флагом «проверить сразу» → 200 `WATCH_STARTED`, ни одного
+    уведомления об изменении адресов.
+
+    Это тот самый случай, ради которого 7.4 и написано (ТЗ, разбор перед 7.4): при первой в
+    жизни проверке в актуальном наборе нет ничего, поэтому новыми оказываются **все** адреса.
+    Без правила о базовой проверке импорт двухсот доменов породил бы больше двухсот событий и
+    столько же сообщений — «инструмент будет отключён в первый же день».
+
+    Режим уведомлений здесь самый разговорчивый из имеющихся: по умолчанию установка сообщает
+    только о выходе за список разрешённых, и тогда тишина ничего не доказывала бы.
+    """
+    GlobalSettings.objects.filter(pk=1).update(notification_mode=NotificationMode.ADDRESS_CHANGE)
+    names = [f"host-{index:03d}.contoso.ru" for index in range(200)]
+
+    result = apply_import(
+        text="\n".join(names),
+        group_id=None,
+        update_existing=False,
+        check_now=True,
+        at=MOMENT,
+    )
+    assert result.added == 200
+
+    resolver = FakeResolver({name: [answered("10.20.1.14", "10.20.2.60")] for name in names})
+    store = FakeStateStore(FakeClock(MOMENT))
+    report = tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1, limit=200)
+
+    assert report.checked == 200
+    assert Event.objects.filter(event_type=EventType.WATCH_STARTED).count() == 200
+    assert (
+        Event.objects.filter(
+            event_type__in=[EventType.ADDRESS_APPEARED, EventType.ADDRESS_GONE]
+        ).count()
+        == 0
+    )
+    assert Notification.objects.count() == 0

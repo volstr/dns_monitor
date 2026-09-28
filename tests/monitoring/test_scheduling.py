@@ -184,3 +184,28 @@ def test_58_two_instances_do_not_claim_the_same_domain() -> None:
 
     assert set(other_instance) & {item.domain_id for item in ours} == set()
     Domain.objects.all().delete()
+
+
+def test_60_changed_group_period_applies_to_the_next_check() -> None:
+    """
+    Критерий 60: период в группе изменён → следующая проверка идёт по новому.
+
+    Отличие от теста выше существенное: там период группы был задан заранее, здесь он
+    **меняется у уже запланированного домена**. Расписание живёт только в `next_check_at`
+    (`CLAUDE.md`), периодической задачи на домен нет — поэтому новый период не может
+    подхватиться сам, он применяется при следующей записи расписания. Если бы период где-то
+    копировался в домен при создании, этот тест бы и упал.
+    """
+    group = Group.objects.create(name="Внешние подрядчики", check_period_seconds=15 * 60)
+    domain = make_domain("cdn.contoso.ru")
+    domain.group = group
+    domain.save(update_fields=["group"])
+    reschedule_after_check(domain_id=domain.pk, at=MOMENT)
+
+    Group.objects.filter(pk=group.pk).update(check_period_seconds=2 * 60)
+    later = MOMENT + timedelta(minutes=15)
+    next_check_at = reschedule_after_check(domain_id=domain.pk, at=later)
+
+    assert next_check_at == later + timedelta(minutes=2)
+    domain.refresh_from_db()
+    assert domain.next_check_at == later + timedelta(minutes=2)
