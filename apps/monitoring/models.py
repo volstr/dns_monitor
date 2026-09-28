@@ -39,8 +39,9 @@ class AddressRegistryEntry(models.Model):
     address = InetField()
     first_seen_at = models.DateTimeField()
     last_seen_at = models.DateTimeField()
-    # Q-13.2: сколько подряд ответов (только ANSWERED) пришло без этого адреса. При K = 3
-    # инцидент закрывается, не дожидаясь порога актуальности. Обнуляется появлением в ответе.
+    # Сколько подряд ответов (только ANSWERED) пришло без этого адреса. Обнуляется появлением
+    # в ответе. Диагностика: решение о закрытии инцидента поле больше не читает — пересмотр
+    # Q-13.2 от 2026-09-28 вернул закрытие к порогу актуальности (6.4).
     consecutive_misses = models.PositiveIntegerField(default=0)
 
     class Meta:

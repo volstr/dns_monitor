@@ -2,7 +2,7 @@
 События, инциденты и базовая проверка — ТЗ 6.1, 7.1, 7.3, 7.4.
 
 Критерии 2, 3, 10, 11 плюс решения Q-D5 (несостоявшаяся проверка), Q-D6 (базовая проверка),
-Q-13.2 (быстрое закрытие инцидента) и Q-D12 (цель CNAME).
+Q-13.2 (закрытие инцидента по порогу актуальности) и Q-D12 (цель CNAME).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -126,21 +126,40 @@ def test_7_3_second_unmatched_address_reports_without_a_second_incident(domain: 
     assert Incident.objects.filter(domain=domain).count() == 1
 
 
-def test_13_2_incident_closes_after_three_answers_without_the_address(domain: Domain) -> None:
+def test_13_2_incident_holds_while_the_address_is_still_current(domain: Domain) -> None:
+    """
+    Пропал из ответов — ещё не «снова в норме»: адрес остаётся актуальным по 6.4.
+
+    Прежнее правило закрывало инцидент после трёх ответов без адреса, и на домене,
+    чередующем адреса, это давало ложное «Снова в норме» при семи нерешённых адресах на
+    экране. Пересмотр Q-13.2 от 2026-09-28.
+    """
     resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
     check(domain, resolver, START)
     resolver.set(NAME, [answered("10.20.1.14")])
 
     at = START
-    for _ in range(3):
+    for _ in range(5):
         at += PERIOD
         check(domain, resolver, at)
+
+    assert Incident.objects.get(domain=domain).closed_at is None
+    assert events(domain, EventType.BACK_TO_NORMAL) == 0
+
+
+def test_13_2_incident_closes_when_the_address_leaves_the_current_set(domain: Domain) -> None:
+    """Закрытие идёт по тому же порогу актуальности, что и статусы на экране (6.4, 7.3)."""
+    resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
+    check(domain, resolver, START)
+    resolver.set(NAME, [answered("10.20.1.14")])
+
+    # Порог актуальности по умолчанию — 24 часа.
+    at = START + timedelta(hours=24, minutes=5)
+    check(domain, resolver, at)
 
     incident = Incident.objects.get(domain=domain)
     assert incident.closed_at == at
     assert events(domain, EventType.BACK_TO_NORMAL) == 1
-    # Порог актуальности (24 часа) при этом и близко не прошёл — Q-13.2.
-    assert at - START < timedelta(hours=1)
 
 
 def test_10_no_records_below_the_threshold_produces_no_event(domain: Domain) -> None:

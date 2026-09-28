@@ -13,7 +13,8 @@
   `NO_RECORDS` успешной не считается;
 - Q-D5 — несостоявшаяся проверка пишется в историю проверок и в лог, но не в журнал событий;
 - Q-C10 — события до N неудач подряд нет;
-- Q-13.2 — инцидент закрывается, когда несовпавшие адреса отсутствуют в K подряд ответах;
+- Q-13.2 — инцидент держится, пока есть хоть один нерешённый адрес, и закрывается по общему
+  порогу актуальности (6.4), а не отдельным счётчиком пропусков;
 - Q-13.4 — адрес семейства, для которого записей нет, считается несовпавшим по общему правилу 6.3.
 """
 
@@ -43,11 +44,6 @@ from core.types.checking import AddressStatus, AddressStatusView, CheckOutcome
 from core.types.dns import IPAddress, RecordType
 
 logger = logging.getLogger(__name__)
-
-#: K из Q-13.2: столько подряд ответов без адреса закрывают инцидент, не дожидаясь порога
-#: актуальности. Константа, а не настройка продукта — в 4.1 её нет.
-INCIDENT_CLOSING_MISSES = 3
-
 
 @dataclass(frozen=True, slots=True)
 class CheckReport:
@@ -298,16 +294,20 @@ def _incidents(
     statuses: tuple[AddressStatusView, ...],
     before_unmatched: frozenset[IPAddress],
 ) -> tuple[bool, bool, list[EventType], list[int]]:
-    """Инциденты и дедупликация — ТЗ 7.3 с быстрым закрытием из Q-13.2."""
+    """Инциденты и дедупликация — ТЗ 7.3, закрытие по Q-13.2."""
     events: list[EventType] = []
     event_ids: list[int] = []
-    unmatched = _unmatched(statuses)
-    # Адрес, отсутствующий в K подряд ответах, инцидент больше не держит (Q-13.2).
-    holding = {
-        address
-        for address in unmatched
-        if _misses(domain, address) < INCIDENT_CLOSING_MISSES
-    }
+    # Инцидент держит **любой** нерешённый адрес — Q-13.2, пересмотр 2026-09-28.
+    #
+    # Прежнее правило отпускало адрес, пропавший из трёх подряд ответов, и считало это по
+    # каждому адресу отдельно. На домене, который чередует адреса, почти у всех нерешённых в
+    # любой момент накоплено три пропуска: стоило одному ответу состоять только из разрешённых,
+    # как инцидент закрывался, а следующая проверка открывала новый. Получался дребезг —
+    # ровно то, что ТЗ 12 велит решать порогом актуальности, а не вторым механизмом.
+    #
+    # Теперь определение одно на весь продукт: «у домена есть нерешённый адрес» значит то же
+    # самое на экране, в обзоре и здесь (4.6, 6.4).
+    holding = _unmatched(statuses)
     incident = Incident.objects.filter(domain=domain, closed_at__isnull=True).first()
 
     if holding and incident is None:
@@ -341,13 +341,6 @@ def _incidents(
         return False, True, [EventType.BACK_TO_NORMAL], [closed.pk]
 
     return False, False, events, event_ids
-
-
-def _misses(domain: Domain, address: IPAddress) -> int:
-    entry = AddressRegistryEntry.objects.filter(domain=domain, address=address).only(
-        "consecutive_misses"
-    ).first()
-    return 0 if entry is None else entry.consecutive_misses
 
 
 def _texts(addresses: frozenset[IPAddress] | set[IPAddress]) -> list[str]:
