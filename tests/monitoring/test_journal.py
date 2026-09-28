@@ -234,3 +234,63 @@ def test_49_export_keeps_the_filter_from_the_query(
 
     assert "Появился адрес" in body
     assert "Адрес вне разрешённых" not in body
+
+
+# ─────────────── «кто, кого» в записи об участнике — 3.1, Q-D43 ───────────────
+
+
+def test_3_1_a_member_record_names_both_people(client: Client, observer: Member) -> None:
+    """
+    3.1: журнал показывает «кто, кого, что изменил и когда». Имён здесь два, и оба нужны.
+
+    Прежде селектор сводил их к одному через `author_name or target_name`. Автор есть у каждой
+    такой записи, поэтому второе имя не показывалось никогда: строка «Участник отключён»
+    называла администратора и читалась так, будто отключили его.
+    """
+    AuditRecord.objects.create(
+        action=AuditAction.MEMBER_DEACTIVATED,
+        occurred_at=MOMENT,
+        author_name="Анна Кирилова",
+        target_name="test",
+    )
+
+    row = journal_page(at=MOMENT).rows[0]
+
+    assert row.label == "Участник отключён"
+    assert row.target_name == "test"
+    assert row.author_name == "Анна Кирилова"
+
+
+def test_3_1_the_screen_shows_who_was_switched_off(client: Client, observer: Member) -> None:
+    AuditRecord.objects.create(
+        action=AuditAction.MEMBER_DEACTIVATED,
+        occurred_at=MOMENT,
+        author_name="Анна Кирилова",
+        target_name="test",
+    )
+    client.force_login(observer)
+
+    page = client.get(reverse("event-list")).content.decode()
+
+    assert "Участник отключён" in page
+    assert "test" in page
+    assert "Выполнил: Анна Кирилова" in page
+
+
+def test_3_1_search_finds_a_member_record_by_either_name() -> None:
+    """
+    Поиск по записям об участниках отбрасывал их целиком.
+
+    Пока имён на экране не было, искать в них было нечего; теперь они видны, и человек будет
+    искать именно по ним.
+    """
+    AuditRecord.objects.create(
+        action=AuditAction.MEMBER_DEACTIVATED,
+        occurred_at=MOMENT,
+        author_name="Анна Кирилова",
+        target_name="test",
+    )
+
+    assert len(journal_page(at=MOMENT, search="test").rows) == 1
+    assert len(journal_page(at=MOMENT, search="Кирилова").rows) == 1
+    assert len(journal_page(at=MOMENT, search="pay-gw").rows) == 0

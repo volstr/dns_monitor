@@ -65,6 +65,13 @@
               <div class="what">
                 {% if row.tone %}<span class="state {{ row.tone }}">{{ row.label }}</span>{% else %}<span class="sub">{{ row.label }}</span>{% endif %}
                 {% if row.domain_id %} — <a class="mono" href="{% url 'domain-detail' row.domain_id %}">{{ row.domain_name }}</a>{% endif %}
+                {% comment %}
+                У записи об участнике подлежащее — сам участник, и стоит оно там же, где у
+                события стоит домен. Без него строка «Участник отключён» называла только
+                автора и читалась так, будто отключили его (3.1: «кто, кого, что и когда»).
+                Ссылки нет: экран участников — не карточка, вести на него неоткуда.
+                {% endcomment %}
+                {% if row.target_name %} — {{ row.target_name }}{% endif %}
               </div>
               {% if row.addresses %}
                 <div class="det">
@@ -74,7 +81,7 @@
               {% if row.delivery %}
                 <div class="note">{{ row.channel }}{% if row.channel %} — {% endif %}{{ row.delivery }}.</div>
               {% endif %}
-              {% if row.author_name %}<div class="note">{{ row.author_name }}</div>{% endif %}
+              {% if row.author_name %}<div class="note">Выполнил: {{ row.author_name }}.</div>{% endif %}
             </div>
           </li>
         {% empty %}

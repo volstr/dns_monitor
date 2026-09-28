@@ -89,7 +89,11 @@ class JournalRow:
     notification_mode: str
     channel: str
     delivery: str
+    #: Кто совершил действие. У событий проверки автора нет — их совершает расписание.
     author_name: str
+    #: Кого коснулось действие с участником (3.1: «кто, кого, что изменил и когда»). У событий
+    #: роль подлежащего играет домен, и поле пустует.
+    target_name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,8 +225,12 @@ def _sources(
         # Адреса лежат в полезной нагрузке, поэтому поиск по ним идёт по тексту JSON, а не по
         # реестру: журнал показывает, что было, а реестр — что есть сейчас.
         events = events.filter(Q(domain__name__icontains=text) | Q(payload__icontains=text))
-        # Записям об участниках домена и адреса не касаются — по ним поиск не ведётся.
-        audit = audit.none()
+        # По записям об участниках ищем по именам — по тем самым, которые строка и показывает.
+        # Домена и адресов у них нет, но искать «кто» и «кого» человек будет именно здесь: до
+        # того как имена стали видны, искать в них было нечего, и поиск их просто отбрасывал.
+        audit = audit.filter(
+            Q(author_name__icontains=text) | Q(target_name__icontains=text)
+        )
 
     return events, audit
 
@@ -259,6 +267,7 @@ def _event_row(event: Event) -> JournalRow:
         channel=event.notification.get_channel_display() if event.notification else "",
         delivery=_delivery(event),
         author_name=event.author_name,
+        target_name="",
     )
 
 
@@ -277,7 +286,15 @@ def _delivery(event: Event) -> str:
 
 
 def _audit_row(record: AuditRecord) -> JournalRow:
-    """Запись без домена — Q-D4. В интерфейсе она стоит в том же журнале."""
+    """
+    Запись без домена — Q-D4. В интерфейсе она стоит в том же журнале.
+
+    Автор и участник, которого действие коснулось, — **разные** имена, и показывать нужно оба:
+    3.1 требует от журнала «кто, кого, что изменил и когда». Прежде здесь стояло
+    `author_name or target_name`, то есть из двух имён выводилось ровно одно, и, поскольку
+    автор есть у каждой такой записи, второе не показывалось никогда. Строка «Участник
+    отключён» называла администратора — и читалась так, будто отключили его (Q-D43).
+    """
     return JournalRow(
         occurred_at=record.occurred_at,
         label=str(AuditAction(record.action).label),
@@ -289,5 +306,6 @@ def _audit_row(record: AuditRecord) -> JournalRow:
         notification_mode="",
         channel="",
         delivery="",
-        author_name=record.author_name or record.target_name,
+        author_name=record.author_name,
+        target_name=record.target_name,
     )
