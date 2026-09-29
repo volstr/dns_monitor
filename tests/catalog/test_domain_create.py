@@ -262,3 +262,76 @@ def test_the_list_offers_the_button_to_an_admin_only(client: Client, admin: Memb
     )
     client.force_login(observer)
     assert reverse("domain-new") not in client.get(reverse("domain-list")).content.decode()
+
+
+# ─────────────── синтаксис имени, а не только приведение — Q-D48 ───────────────
+
+
+@pytest.mark.parametrize(
+    ("name", "fragment"),
+    [
+        ("https://www.jetbrains.com/", "www.jetbrains.com"),
+        ("http://a.b", "a.b"),
+        ("www.x.com/path", "www.x.com"),
+        ("x.com?q=1", "x.com"),
+        ("a.com:8080", "a.com"),
+        ("user@mail.com", "mail.com"),
+    ],
+)
+def test_d48_a_link_is_refused_and_the_answer_names_the_domain(name: str, fragment: str) -> None:
+    """
+    Разработчик завёл домен `https://www.jetbrains.com/` — и тот попал в расписание.
+
+    Отказ подсказывает, что оставить. Вырезать узел самим нельзя: 10.1 разрешает приводить имя
+    только к нижнему регистру и отбрасывать конечную точку, а ссылку вставляют не глядя —
+    заметить подмену будет негде.
+    """
+    result = add(name)
+
+    assert isinstance(result, DomainNotCreated)
+    assert "Похоже на ссылку" in result.reason
+    assert fragment in result.reason
+    assert Domain.objects.count() == 0
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["-lead.com", "trail-.com", "<script>.com", "пробел\tтаб.com"],
+)
+def test_d48_a_label_with_forbidden_characters_is_refused(name: str) -> None:
+    """
+    Кодек `idna` из стандартной библиотеки синтаксис не проверяет — только длину и нормализацию.
+
+    Поэтому дефис с краю и любой посторонний знак проходили насквозь, а домен потом молча не
+    резолвился: ошибка ввода превращалась в наблюдение за несуществующим именем.
+    """
+    result = add(name)
+
+    assert isinstance(result, DomainNotCreated)
+    assert Domain.objects.count() == 0
+
+
+def test_d48_an_ip_address_is_not_a_domain_name() -> None:
+    """Верхнего уровня из одних цифр в DNS нет: такого домена не существует."""
+    result = add("1.2.3.4")
+
+    assert isinstance(result, DomainNotCreated)
+    assert "IP-адрес" in result.reason
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["www.jetbrains.com", "pay-gw.contoso.ru", "a1.b2.example", "_acme-challenge.example.com"],
+)
+def test_d48_a_correct_name_still_goes_through(name: str) -> None:
+    """
+    Проверка синтаксиса не должна отсечь рабочие случаи.
+
+    `_acme-challenge` здесь не для полноты: подчёркивание запрещено правилом имени узла, но
+    разрешено в самом DNS, и такие имена — обычный CNAME. Запрещать их, когда CNAME есть в
+    списке типов записей (4.3), значило бы запрещать рабочий случай.
+    """
+    result = add(name)
+
+    assert isinstance(result, DomainCreated)
+    assert result.name == name
