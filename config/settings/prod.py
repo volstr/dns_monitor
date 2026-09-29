@@ -20,6 +20,16 @@ if not ALLOWED_HOSTS:
     )
     raise ImproperlyConfigured(message)
 
+# Схему запроса приложение узнаёт от обратного прокси. Без этого Django считает по соединению,
+# а к нему приходит обычный http от nginx: `request.is_secure()` всегда False, перенаправления
+# получаются на http, а защищённые куки не ставятся, даже когда снаружи настоящий TLS.
+#
+# Доверять заголовку можно **только** потому, что выполнены оба условия (`docker-compose.yml`):
+# nginx ставит `X-Forwarded-Proto` сам на каждый запрос, затирая присланный клиентом, и портов
+# наружу у `web` нет — снаружи до gunicorn не дотянуться в обход прокси. Открыть порт web в
+# бою значит сделать этот заголовок подделываемым.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 if ENV.app_base_url.startswith("https://"):
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

@@ -117,6 +117,12 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
+# Куда `collectstatic` складывает всё собранное. В режиме разработчика каталог не нужен —
+# `runserver` отдаёт файлы прямо из `STATICFILES_DIRS`, — а в бою `DEBUG=False`, и Django не
+# отдаёт статику вовсе: это работа веб-сервера. В компоузе каталог смонтирован именованным
+# томом, из которого читает nginx (`docker-compose.yml`, `deploy/nginx.conf`).
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
 # Структурные логи. `json` — боевой формат: три процесса пишут в общий поток, и разбирать их
 # приходится по полям. `plain` остаётся для режима разработчика, где журнал читают глазами.
 LOG_FORMAT = "json"

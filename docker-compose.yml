@@ -1,0 +1,161 @@
+name: dns-monitoring
+
+# Боевая установка. Файл разработчика — `docker-compose-dev.yml`, и они намеренно разные.
+#
+# Чем этот отличается и почему:
+#
+# - **исходники не монтируются**. В dev каталог проекта подложен в контейнер, чтобы правка
+#   сразу подхватывалась. Здесь код берётся из образа: иначе развёрнутое приложение зависит от
+#   того, что лежит на диске машины, и «работает у меня» перестаёт что-либо значить;
+# - **DEPS=prod**: без pytest, mypy, ruff и браузера Playwright. Образ меньше, а инструментов
+#   для запуска чужого кода в бою нет вовсе;
+# - **gunicorn вместо runserver**. `runserver` — сервер для разработки, он однопоточный и сам
+#   об этом предупреждает при старте;
+# - **`restart: unless-stopped`** у всех служб. После перезагрузки машины установка обязана
+#   подняться сама, а `checker` — продолжить проверки;
+# - **портов наружу нет ни у postgres, ни у redis**. В dev их тоже нет, но там это удобство;
+#   здесь — требование: база с паролем по умолчанию, открытая в сеть, живёт до первого скана;
+# - **nginx**: при `DEBUG=False` Django статику не отдаёт;
+# - **ограничение журналов контейнеров**. Без него `docker logs` растёт, пока не кончится
+#   диск, — а `checker` пишет строку на каждый обход.
+#
+# Миграции при старте не применяются — как и в dev, намеренно (`CLAUDE.md`). Порядок
+# развёртывания целиком описан в README, раздел «Боевая установка».
+
+x-app: &app
+  build:
+    context: .
+    args:
+      DEPS: prod
+  image: dns-monitoring:prod
+  env_file: .env
+  environment:
+    # Задаётся здесь, а не берётся из .env: боевой компоуз обязан подниматься в боевом режиме
+    # независимо от того, что осталось в файле окружения после копирования с рабочей машины.
+    # Значение из `environment` перекрывает значение из `env_file`.
+    DJANGO_SETTINGS_MODULE: config.settings.prod
+    TZ: ${TZ:-}
+  init: true
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dns_monitoring}
+      POSTGRES_USER: ${POSTGRES_USER:-dns_monitoring}
+      # Без значения по умолчанию и с ошибкой при пустом: пароль из `.env.example` годится для
+      # разработки и не годится больше нигде. Компоуз не поднимется и скажет, чего не хватает.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env — пароль по умолчанию в бою недопустим}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    # `noeviction` — требование 11.11: вытеснение блокировки планировщика означало бы, что два
+    # экземпляра резолвят один домен. Почему одна политика на весь процесс, а не две — Q-A1.
+    #
+    # Без сохранения на диск, как и в dev: по 11.11 Redis не источник истины. Цена известна и
+    # принята — перезапуск сбрасывает счётчики, кулдауны и **сессии**, то есть все входят
+    # заново. Данные (домены, события, реестр, участники) живут в PostgreSQL и не страдают.
+    command: ["redis-server", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    <<: *app
+    command:
+      - gunicorn
+      - config.wsgi
+      - --bind=0.0.0.0:8000
+      # Рабочих процессов по числу ядер: обычная формула 2×CPU+1 здесь избыточна — нагрузка
+      # упирается в базу, а не в процессор, и лишние процессы только держат соединения.
+      - --workers=${GUNICORN_WORKERS:-3}
+      # Дольше всех отвечает ручная проверка домена (11.6): она ждёт DNS-серверы.
+      - --timeout=120
+      - --access-logfile=-
+      - --error-logfile=-
+    volumes:
+      # Только web пишет сюда `collectstatic`; nginx читает тот же том.
+      - static:/app/staticfiles
+    healthcheck:
+      # Проба ходит на собственный `/health/` (11.13) и обязана назвать себя тем именем, под
+      # которым приложение отвечает: при `DEBUG=False` запрос с чужим `Host` Django отвергает
+      # раньше, чем дело дойдёт до проверки. Имя берётся первым из ALLOWED_HOSTS.
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "import os,urllib.request;
+          h=os.environ['ALLOWED_HOSTS'].split(',')[0].strip();
+          urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/health/',
+          headers={'Host': h}), timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Запас на миграции и прогрев: пока идёт `start_period`, неудачи не считаются падением.
+      start_period: 30s
+
+  checker:
+    <<: *app
+    command: ["python", "manage.py", "run_checker"]
+
+  notifier:
+    <<: *app
+    command: ["python", "manage.py", "run_notifier"]
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - static:/srv/static:ro
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres-data:
+  # Собранная статика. Том, а не каталог на хосте: его наполняет `collectstatic` внутри
+  # контейнера, и права на нём остаются пользователя приложения.
+  static:

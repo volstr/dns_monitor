@@ -6,3 +6,5 @@ guide
 .mypy_cache
 .ruff_cache
 .pytest_cache
+# Собирается внутри образа командой collectstatic; локальная сборка внутрь не попадает.
+staticfiles

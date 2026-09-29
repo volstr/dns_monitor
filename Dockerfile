@@ -31,7 +31,7 @@ COPY --from=uv /uv /usr/local/bin/uv
 # сборка падает на `failed to remove directory: Permission denied`.
 RUN groupadd -g "${APP_GID}" app \
  && useradd -u "${APP_UID}" -g "${APP_GID}" -m app \
- && install -d -o app -g app /app /opt/app
+ && install -d -o app -g app /app /app/staticfiles /opt/app
 
 USER app
 WORKDIR /app
