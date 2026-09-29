@@ -7,7 +7,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import Member, Role
-from apps.catalog.models import AllowlistEntry, Domain
+from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings
 from apps.catalog.selectors.domain_card import HistoryFilter, RegistryFilter, domain_card
 from apps.catalog.services.domains import DomainDeleted, WatchSwitched, delete_domain, switch_watch
 from apps.monitoring.models import AddressRegistryEntry, Check, Event, EventType, Incident
@@ -47,6 +47,18 @@ def card(domain: Domain, **extra: object) -> object:
     result = domain_card(domain_id=domain.pk, at=MOMENT, **extra)  # type: ignore[arg-type]
     assert result is not None
     return result
+
+
+@pytest.fixture(autouse=True)
+def _threshold_of_one_day() -> None:
+    """
+    Порог актуальности прибит к суткам, а не взят из умолчания.
+
+    Умолчание — 14 суток (Q-D47). Тест, который строит неактуальный адрес или показывает
+    порог на экране, обязан называть своё значение сам: иначе он молча меняет смысл вместе с
+    настройкой продукта, а падает совсем в другом месте.
+    """
+    GlobalSettings.objects.filter(pk=1).update(freshness_threshold_seconds=24 * 60 * 60)
 
 
 def test_9_1_registry_segments_narrow_the_list(domain: Domain) -> None:

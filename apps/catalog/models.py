@@ -55,7 +55,13 @@ class GlobalSettings(models.Model):
     """
 
     check_period_seconds = models.PositiveIntegerField(default=5 * 60)
-    freshness_threshold_seconds = models.PositiveIntegerField(default=24 * 60 * 60)
+    # 14 суток, а не сутки — решение заказчика от 2026-09-29, разбор в Q-D47.
+    #
+    # Сутки оказались короче круга адресов у настоящих доменов: `google.com` отдаёт тринадцать
+    # адресов IPv4, и часть из них не появляется в ответах дольше суток. Они становились
+    # «Не актуален», хотя домен их исправно чередует, — то есть порог не выполнял то, ради чего
+    # существует (7.2: «перестановки внутри W событиями не являются»).
+    freshness_threshold_seconds = models.PositiveIntegerField(default=14 * 24 * 60 * 60)
     notification_mode = models.CharField(
         max_length=ENUM_MAX_LENGTH,
         choices=NotificationMode.choices,

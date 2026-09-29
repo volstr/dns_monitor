@@ -41,8 +41,16 @@
               <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="check_period_minutes" value="{{ page.check_period_minutes }}"> <span class="sub">минут</span></div>
             </div>
             <div class="row">
-              <div class="k">Порог актуальности<div class="d">Сколько адрес должен не отдаваться, чтобы стать неактуальным. Должен быть заметно больше периода проверки.</div></div>
-              <div><input class="inp mono" style="max-width:120px" type="number" min="1" name="freshness_threshold_hours" value="{{ page.freshness_threshold_hours }}"> <span class="sub">часов</span></div>
+              <div class="k">Порог актуальности<div class="d">Сколько адрес должен не отдаваться, чтобы стать неактуальным. Должен быть заметно больше не только периода проверки, но и полного круга адресов домена: пока порог не прошёл, перестановки адресов событиями не считаются. От него же зависит, когда закроется инцидент и придёт «Снова в норме».</div></div>
+              {% comment %}
+              Единица — часы, как в макете. В сутках было бы читабельнее, но тогда нельзя
+              задать, скажем, 36 часов, а такие установки бывают. Вместо смены единицы рядом
+              подпись, переводящая введённое число в привычный вид.
+              {% endcomment %}
+              <div>
+                <input class="inp mono" style="max-width:120px" type="number" min="1" name="freshness_threshold_hours" value="{{ page.freshness_threshold_hours }}"> <span class="sub">часов</span>
+                <div class="sub">{{ page.freshness_threshold_text }} · по умолчанию 336 часов, это 14 суток</div>
+              </div>
             </div>
             <div class="row">
               <div class="k">DNS-серверы<div class="d">По одному в строке, в порядке обхода. Первый ответивший определяет результат.</div></div>

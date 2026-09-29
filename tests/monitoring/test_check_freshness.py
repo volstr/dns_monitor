@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from apps.catalog.models import AllowlistEntry, Domain
+from apps.catalog.models import AllowlistEntry, Domain, GlobalSettings
 from apps.monitoring.models import Event, EventType
 from apps.monitoring.selectors.addresses import address_statuses, fresh_set
 from apps.monitoring.services.checking import run_check
@@ -55,6 +55,19 @@ def run_hourly(domain: Domain, resolver: FakeResolver, hours: int, since: dateti
         at += timedelta(hours=1)
         check(domain, resolver, at)
     return at
+
+
+@pytest.fixture(autouse=True)
+def _threshold_of_one_day() -> None:
+    """
+    Порог актуальности прибит к суткам, а не взят из умолчания.
+
+    Умолчание — 14 суток (Q-D47), и тесты про сам порог обязаны называть своё значение сами:
+    иначе они молча меняют смысл вместе с настройкой продукта.
+    """
+    GlobalSettings.objects.filter(pk=1).update(
+        freshness_threshold_seconds=int(THRESHOLD.total_seconds())
+    )
 
 
 def test_6_rotation_inside_the_threshold_produces_no_events(domain: Domain) -> None:

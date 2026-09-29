@@ -67,6 +67,19 @@ def changes(domain: Domain) -> int:
     ).count()
 
 
+@pytest.fixture(autouse=True)
+def _threshold_of_one_day() -> None:
+    """
+    Порог актуальности прибит к суткам, а не взят из умолчания.
+
+    Умолчание — 14 суток (Q-D47), и тесты про сам порог обязаны называть своё значение сами:
+    иначе они молча меняют смысл вместе с настройкой продукта.
+    """
+    GlobalSettings.objects.filter(pk=1).update(
+        freshness_threshold_seconds=int(THRESHOLD.total_seconds())
+    )
+
+
 def test_35_domain_switched_off_longer_than_the_threshold_resumes_with_a_baseline() -> None:
     """
     Критерий 35: пауза дольше порога → проверка базовая, событий изменения нет.

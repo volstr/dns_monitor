@@ -45,6 +45,18 @@ def events(domain: Domain, event_type: EventType) -> int:
     return Event.objects.filter(domain=domain, event_type=event_type).count()
 
 
+@pytest.fixture(autouse=True)
+def _threshold_of_one_day() -> None:
+    """
+    Порог актуальности прибит к суткам, а не взят из умолчания.
+
+    Умолчание — 14 суток (Q-D47). Тест, который строит неактуальный адрес или показывает
+    порог на экране, обязан называть своё значение сам: иначе он молча меняет смысл вместе с
+    настройкой продукта, а падает совсем в другом месте.
+    """
+    GlobalSettings.objects.filter(pk=1).update(freshness_threshold_seconds=24 * 60 * 60)
+
+
 def test_7_4_first_check_is_baseline_and_silent(domain: Domain) -> None:
     resolver = FakeResolver({NAME: [answered("10.20.1.14", "10.20.2.60")]})
 
@@ -153,7 +165,7 @@ def test_13_2_incident_closes_when_the_address_leaves_the_current_set(domain: Do
     check(domain, resolver, START)
     resolver.set(NAME, [answered("10.20.1.14")])
 
-    # Порог актуальности по умолчанию — 24 часа.
+    # Порог прибит фикстурой к суткам: тест про закрытие инцидента, а не про умолчание.
     at = START + timedelta(hours=24, minutes=5)
     check(domain, resolver, at)
 

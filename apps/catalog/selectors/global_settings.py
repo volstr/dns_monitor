@@ -12,8 +12,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from apps.catalog.models import GlobalSettings, NotificationMode
+from core.text import humanize_duration
 
 MINUTE = 60
 HOUR = 60 * 60
@@ -33,6 +35,10 @@ class SettingsPage:
 
     check_period_minutes: int
     freshness_threshold_hours: int
+    #: То же значение словами: «14 суток». Часы читабельны до сотни, а порог по умолчанию
+    #: теперь 336 — число, в котором суток не видно (Q-D47). Считается здесь, а не в шаблоне:
+    #: вычислений в шаблоне быть не должно.
+    freshness_threshold_text: str
     modes: tuple[ModeChoice, ...]
     notify_back_to_normal: bool
     reminder_interval_hours: int
@@ -60,6 +66,9 @@ def settings_page() -> SettingsPage:
     return SettingsPage(
         check_period_minutes=row.check_period_seconds // MINUTE,
         freshness_threshold_hours=row.freshness_threshold_seconds // HOUR,
+        freshness_threshold_text=humanize_duration(
+            timedelta(seconds=row.freshness_threshold_seconds)
+        ),
         modes=tuple(
             ModeChoice(
                 value=mode.value,

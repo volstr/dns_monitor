@@ -49,6 +49,18 @@ def page(**kwargs: object) -> object:
     return domain_list_page(at=MOMENT, **kwargs)  # type: ignore[arg-type]
 
 
+@pytest.fixture(autouse=True)
+def _threshold_of_one_day() -> None:
+    """
+    Порог актуальности прибит к суткам, а не взят из умолчания.
+
+    Умолчание — 14 суток (Q-D47). Тест, который строит неактуальный адрес или показывает
+    порог на экране, обязан называть своё значение сам: иначе он молча меняет смысл вместе с
+    настройкой продукта, а падает совсем в другом месте.
+    """
+    GlobalSettings.objects.filter(pk=1).update(freshness_threshold_seconds=24 * 60 * 60)
+
+
 def test_d15_no_allowlist_filter_shows_every_domain_with_an_empty_list() -> None:
     """
     Q-D15: фильтр по пустому списку, а не по ловушке.

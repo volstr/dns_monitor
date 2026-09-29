@@ -50,6 +50,18 @@ def card(domain: Domain) -> object:
     return result
 
 
+@pytest.fixture(autouse=True)
+def _threshold_of_one_day() -> None:
+    """
+    Порог актуальности прибит к суткам, а не взят из умолчания.
+
+    Умолчание — 14 суток (Q-D47). Тест, который строит неактуальный адрес или показывает
+    порог на экране, обязан называть своё значение сам: иначе он молча меняет смысл вместе с
+    настройкой продукта, а падает совсем в другом месте.
+    """
+    GlobalSettings.objects.filter(pk=1).update(freshness_threshold_seconds=24 * 60 * 60)
+
+
 def test_missing_domain_is_not_an_error(domain: Domain) -> None:
     """Отсутствие домена — это 404 у обработчика, а не исключение в селекторе."""
     assert domain_card(domain_id=domain.pk + 1000, at=MOMENT) is None

@@ -400,3 +400,30 @@ def test_79_connection_settings_of_mail_are_not_part_of_the_api(
         assert not hasattr(row, name)
     # Подключение по-прежнему читается только из окружения.
     assert django_settings.ENV.smtp_host is None
+
+
+def test_d47_default_threshold_is_fourteen_days() -> None:
+    """
+    Порог актуальности по умолчанию — 14 суток, а не сутки (Q-D47).
+
+    Сутки оказались короче круга адресов у настоящих доменов: `google.com` чередует тринадцать
+    адресов IPv4, и часть из них не появляется в ответах дольше суток. Они становились
+    «Не актуален», хотя домен их исправно отдаёт, — то есть порог не делал того, ради чего
+    существует (7.2: «перестановки внутри W событиями не являются»).
+    """
+    assert GlobalSettings.objects.get().freshness_threshold_seconds == 14 * 24 * 60 * 60
+
+
+def test_d47_screen_says_what_the_threshold_means_in_days(client: Client, admin: Member) -> None:
+    """
+    336 часов — число, в котором суток не видно.
+
+    Единица осталась часами, как в макете: в сутках нельзя задать, скажем, 36 часов, а такие
+    установки бывают. Поэтому рядом подпись, переводящая введённое значение в привычный вид.
+    """
+    client.force_login(admin)
+
+    page = client.get(reverse("settings")).content.decode()
+
+    assert "336" in page
+    assert "14 сут" in page
