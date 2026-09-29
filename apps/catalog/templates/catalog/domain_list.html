@@ -31,8 +31,14 @@
     обновляются только строки таблицы. Без файла форма работает переходом по странице —
     своего JS здесь нет ни строки.
     {% endcomment %}
+    {% comment %}
+    `hx-push-url` — не украшение: состояние фильтра обязано уходить в адрес страницы, иначе на
+    выбранный фильтр нельзя сослаться и он теряется при обновлении вкладки. Без него HTMX
+    менял строки молча, а в адресе оставалось «Все».
+    {% endcomment %}
     <form class="filters" method="get" action="{% url 'domain-list' %}"
-          hx-get="{% url 'domain-list' %}" hx-target="#domain-rows" hx-trigger="change, submit">
+          hx-get="{% url 'domain-list' %}" hx-target="#domain-rows" hx-trigger="change, submit"
+          hx-push-url="true">
       <div class="search">
         <span>⌕</span>
         <input class="inp mono" type="search" name="search" value="{{ page.search }}"
@@ -40,15 +46,11 @@
       </div>
 
       {% comment %}
-      Сегменты — кнопки отправки со своим значением: разметка прототипа сохранена дословно,
-      состояние фильтра уходит в адрес страницы, и на него можно сослаться.
+      Сегменты — кнопки отправки со своим значением: разметка прототипа сохранена дословно.
+      Лежат в отдельном файле, потому что HTMX подменяет их вторым куском ответа, и двух
+      экземпляров разметки быть не должно.
       {% endcomment %}
-      <div class="seg">
-        <button type="submit" name="chosen" value="all" class="{% if page.chosen == 'all' %}on{% endif %}">Все</button>
-        <button type="submit" name="chosen" value="discrepancies" class="{% if page.chosen == 'discrepancies' %}on{% endif %}">Расхождения</button>
-        <button type="submit" name="chosen" value="no_allowlist" class="{% if page.chosen == 'no_allowlist' %}on{% endif %}">Без разрешённых</button>
-        <button type="submit" name="chosen" value="disabled" class="{% if page.chosen == 'disabled' %}on{% endif %}">Выключенные</button>
-      </div>
+      {% include "catalog/_domain_segments.html" %}
 
       <div style="min-width:210px">
         {# data-combo включает поле с поиском (10.4). Без combo.js остаётся обычный список. #}

@@ -89,8 +89,10 @@ class DomainList(MemberView):
             chosen=form.selected_filter(),
         )
 
+        # Ответ HTMX — строки таблицы и сегменты фильтра: вторые лежат вне цели обновления
+        # и подменяются отдельным куском, иначе отметка активного фильтра не меняется.
         template = (
-            "catalog/_domain_rows.html"
+            "catalog/_domain_update.html"
             if request.headers.get("HX-Request")
             else "catalog/domain_list.html"
         )

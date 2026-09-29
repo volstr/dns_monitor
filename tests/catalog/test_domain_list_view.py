@@ -5,6 +5,7 @@
 собирается на реальных данных.
 """
 
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -120,3 +121,61 @@ def test_broken_filter_value_is_not_an_error(client: Client, observer: Member) -
 
     assert response.status_code == 200
     assert "pay-gw.contoso.ru" in response.content.decode()
+
+
+# ─────────────── отметка активного фильтра — Q-D49 ───────────────
+
+
+def active_segment(html: str) -> list[str]:
+    """Значения кнопок фильтра, отмеченных активными. Ровно одна — инвариант экрана."""
+    return re.findall(r'name="chosen" value="(\w+)"\s+class="on"', html)
+
+
+@pytest.mark.parametrize(
+    "chosen", ["all", "discrepancies", "no_allowlist", "disabled"]
+)
+def test_d49_chosen_segment_is_marked_on_the_full_page(
+    client: Client, observer: Member, chosen: str
+) -> None:
+    """Полная загрузка страницы отмечала активный сегмент правильно и раньше."""
+    client.force_login(observer)
+
+    page = client.get(reverse("domain-list"), {"chosen": chosen}).content.decode()
+
+    assert active_segment(page) == [chosen]
+
+
+@pytest.mark.parametrize(
+    "chosen", ["all", "discrepancies", "no_allowlist", "disabled"]
+)
+def test_d49_chosen_segment_is_marked_in_the_htmx_answer(
+    client: Client, observer: Member, chosen: str
+) -> None:
+    """
+    Ответ HTMX обязан нести и сегменты — иначе отметка навсегда остаётся на «Все».
+
+    Так и было: `hx-target` указывает на строки таблицы, сегменты лежат вне его, и подменять
+    их было нечем. Фильтр применялся, строки менялись, а экран показывал не то, что применено.
+    """
+    client.force_login(observer)
+
+    answer = client.get(
+        reverse("domain-list"), {"chosen": chosen}, headers={"hx-request": "true"}
+    ).content.decode()
+
+    assert "hx-swap-oob" in answer, "сегменты подменяются вторым куском ответа"
+    assert active_segment(answer) == [chosen]
+
+
+def test_d49_full_page_carries_no_out_of_band_block(client: Client, observer: Member) -> None:
+    """
+    В полной странице куска `hx-swap-oob` быть не должно.
+
+    HTMX выкусил бы его из разметки при первой же загрузке, а до того он отрисовался бы прямо
+    внутри `<tbody>` — там, куда включаются строки.
+    """
+    client.force_login(observer)
+
+    page = client.get(reverse("domain-list")).content.decode()
+
+    assert "hx-swap-oob" not in page

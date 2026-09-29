@@ -45,6 +45,25 @@ class DomainFilter(StrEnum):
     DISABLED = "disabled"
 
 
+#: Подписи сегментов. Здесь, а не в шаблоне: перечень сегментов и их порядок — свойство
+#: фильтра, и шаблон не должен знать его наизусть.
+FILTER_LABELS = {
+    DomainFilter.ALL: "Все",
+    DomainFilter.DISCREPANCIES: "Расхождения",
+    DomainFilter.NO_ALLOWLIST: "Без разрешённых",
+    DomainFilter.DISABLED: "Выключенные",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class Segment:
+    """Одна кнопка фильтра вместе с тем, выбрана ли она. Шаблон ничего не сравнивает."""
+
+    value: str
+    label: str
+    selected: bool
+
+
 @dataclass(frozen=True, slots=True)
 class AddressChip:
     """Адрес в колонке «Адреса». `css` и `glyph` — классы и значки прототипа."""
@@ -105,6 +124,9 @@ class DomainListPage:
     rows: tuple[DomainRow, ...]
     groups: tuple[GroupOption, ...]
     chosen: DomainFilter
+    #: Кнопки фильтра, готовые к отрисовке. Признак «выбрана» считается здесь: сравнение в
+    #: шаблоне — вычисление, которых там быть не должно (`CLAUDE.md`).
+    segments: tuple[Segment, ...]
     search: str
     group_id: int | None
 
@@ -122,6 +144,10 @@ def domain_list_page(
         rows=domain_rows(at=at, search=search, group_id=group_id, chosen=chosen, limit=limit),
         groups=_group_options(),
         chosen=chosen,
+        segments=tuple(
+            Segment(value=value.value, label=label, selected=value == chosen)
+            for value, label in FILTER_LABELS.items()
+        ),
         search=search,
         group_id=group_id,
     )
