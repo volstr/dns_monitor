@@ -26,6 +26,12 @@ def trace_of_domain(
 
     ``statuses`` — текущий статус каждого адреса: по 9.2 цвет отметки берётся из **текущего**
     статуса, а не из того, каким он был в тот день.
+
+    Адрес, которого в ``statuses`` нет, в след не попадает. Это не мелочь: при снятом общем
+    флаге IPv6 такие адреса «не существуют» (Q-D27), и в реестре их нет. В корзинах наблюдений
+    они при этом остаются — их записали, пока флаг был поднят, — и без этого отбора уезжали бы
+    в разметку строками без статуса. Виджет на неизвестный статус подставляет зелёный, то есть
+    «адрес решён»: цвет, означающий ровно противоположное тому, что произошло.
     """
     rows = (
         AddressObservationBucket.objects.filter(
@@ -37,7 +43,10 @@ def trace_of_domain(
 
     seen: dict[str, list[date]] = {}
     for address, bucket_start in rows:
-        seen.setdefault(str(address), []).append(bucket_start.date())
+        name = str(address)
+        if name not in statuses:
+            continue
+        seen.setdefault(name, []).append(bucket_start.date())
 
     if not seen:
         return TraceData(start=at.date().isoformat(), days=1, rows=[])
@@ -51,7 +60,7 @@ def trace_of_domain(
         rows=[
             TraceRow(
                 address=address,
-                status=statuses.get(address, ""),
+                status=statuses[address],
                 days=sorted({(day - first).days for day in days}),
             )
             for address, days in seen.items()
