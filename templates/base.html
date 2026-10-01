@@ -7,12 +7,10 @@
 {% endcomment %}
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}DNS monitoring{% endblock %}</title>
 {% load static %}
-<link rel="stylesheet" href="{% static 'css/app.css' %}">
+<head>
+<title>{% block title %}DNS monitoring{% endblock %}</title>
+{% include "_head.html" %}
 {% comment %}
 Файл кладёт разработчик, см. static/README.md. Без него страницы работают обычными переходами:
 HTMX нужен валидации белого списка (10.2) и выбору группы (10.4).
