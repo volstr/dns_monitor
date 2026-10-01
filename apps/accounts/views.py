@@ -50,9 +50,29 @@ def _store() -> RedisStateStore:
     return RedisStateStore.from_url(settings.ENV.redis_url, db=settings.ENV.redis_db_state)
 
 
+#: Заголовок, в котором обратный прокси передаёт адрес клиента. Доверять ему можно **только**
+#: потому, что `deploy/nginx.conf` перезаписывает его на каждом запросе, а порта наружу у `web`
+#: нет: присланное клиентом значение до приложения не доходит. Открыть порт `web` в бою значит
+#: сделать заголовок подделываемым — вместе с `X-Forwarded-Proto` из `config/settings/prod.py`.
+FORWARDED_FOR_HEADER = "HTTP_X_REAL_IP"
+
+
 def _client_ip(request: HttpRequest) -> str:
-    """Счёт неудач идёт по паре «логин + IP» (11.11)."""
-    return request.META.get("REMOTE_ADDR") or "unknown"
+    """
+    Счёт неудач идёт по паре «логин + IP» (11.11).
+
+    `REMOTE_ADDR` за обратным прокси — адрес **прокси**, один на всех. Пара вырождается в
+    «логин», и счётчик начинает работать не так, как задумано: любой желающий блокирует чужую
+    учётную запись, перебирая её пароль откуда угодно, а владелец не входит и со своего адреса.
+    Проверено на стенде: в ключе стоял адрес контейнера nginx.
+
+    Без прокси — в режиме разработчика — заголовка нет, и берётся `REMOTE_ADDR`, как раньше.
+    """
+    return (
+        request.META.get(FORWARDED_FOR_HEADER)
+        or request.META.get("REMOTE_ADDR")
+        or "unknown"
+    )
 
 
 class Login(PublicView):
