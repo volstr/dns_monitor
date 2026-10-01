@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -23,7 +24,7 @@ from apps.monitoring.services.health import check_health, record_checks_stopped
 from apps.monitoring.services.retention import purge_due
 from apps.monitoring.services.tick import TickReport, tick
 from apps.notifications.services.outage import send_outage_alert
-from core.adapters.dns_resolver import DnsResolver
+from core.adapters.dns_resolver import DnsResolver, system_servers
 from core.adapters.telegram import TelegramChannel
 from core.observability.report import Failure, report
 from core.ports.clock import Clock
@@ -43,10 +44,19 @@ class TickSkipped:
 
 
 def run_one_tick(
-    *, clock: Clock, state_store: StateStore, previously_healthy: bool = True
+    *,
+    clock: Clock,
+    state_store: StateStore,
+    previously_healthy: bool = True,
+    servers_of_system: Callable[[], tuple[str, ...]] = system_servers,
 ) -> TickReport | TickSkipped:
     """
     Один обход. Возвращает отчёт либо причину, по которой обход не состоялся.
+
+    ``servers_of_system`` передаётся параметром, а не берётся из модуля: он читает
+    `/etc/resolv.conf` настоящей машины, и тесту нужно уметь сказать «серверов у системы нет».
+    Подмена по пути импорта в проекте запрещена (`CLAUDE.md`), а зависимость тут ровно та же,
+    что у часов или резолвера, — внешний мир.
 
     ``previously_healthy`` держит процесс-вызыватель: факт остановки проверок пишется в журнал
     один раз на аварию, а не каждые пять секунд. Перезапуск процесса посреди аварии даст ещё одну
@@ -87,11 +97,18 @@ def run_one_tick(
     _purge(clock.now())
 
     global_settings = GlobalSettings.objects.get()
-    servers = list(global_settings.dns_servers)
+    # Пустой список в настройках означает «спрашивать у системы» (Q-D51). Подставляются
+    # серверы из `/etc/resolv.conf`, и дальше всё идёт как обычно: тот же обход по порядку,
+    # та же запись о том, кто ответил. Читаются они здесь, а не при старте, — адрес от DHCP
+    # меняется, а команда живёт долго.
+    servers = list(global_settings.dns_servers) or list(servers_of_system())
     if not servers:
-        # На свежей установке список пуст (4.1 значения по умолчанию не задаёт). Падать каждые
-        # пять секунд бессмысленно: жалуемся понятно и ждём, пока администратор его заполнит.
-        reason = "список DNS-серверов пуст: проверки невозможны, заполните его в настройках"
+        # Ни в настройках, ни у системы. Падать каждые пять секунд бессмысленно: жалуемся
+        # понятно и ждём, пока появится хоть один.
+        reason = (
+            "ни в настройках, ни у системы нет ни одного DNS-сервера: проверки невозможны. "
+            "Укажите серверы в настройках или проверьте /etc/resolv.conf"
+        )
         logger.warning(reason)
         return TickSkipped(reason=reason)
 

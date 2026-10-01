@@ -16,9 +16,11 @@ DNS-серверов: спрашивать некого, и `run_checker` каж
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from apps.catalog.models import Domain, GlobalSettings
+from core.adapters.dns_resolver import system_servers
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,17 +32,31 @@ class InstallWarning:
     url_name: str
 
 
-def install_warnings() -> tuple[InstallWarning, ...]:
-    """Что мешает установке делать своё дело прямо сейчас."""
+def install_warnings(
+    servers_of_system: Callable[[], tuple[str, ...]] = system_servers,
+) -> tuple[InstallWarning, ...]:
+    """
+    Что мешает установке делать своё дело прямо сейчас.
+
+    ``servers_of_system`` параметром по той же причине, что и в `run_one_tick`: он читает
+    настоящий `/etc/resolv.conf`, а тесту нужно уметь сказать «у системы серверов нет».
+    """
     settings_row = GlobalSettings.objects.get()
     collected: list[InstallWarning] = []
 
-    if not settings_row.dns_servers:
+    # Пустой список больше не беда: берутся серверы системы (Q-D51). Предупреждаем, только
+    # когда их нет и у системы — тогда спрашивать действительно некого.
+    #
+    # Импорт адаптера в селекторе — осознанное исключение. Речь не о резолве, а о том, что
+    # прописано у хоста; узнать это можно только там, где живёт `import dns`. Альтернатива —
+    # молчать на экране и оставить причину в логе `checker`, то есть ровно там, где её не ищут.
+    if not settings_row.dns_servers and not servers_of_system():
         collected.append(
             InstallWarning(
                 text=(
-                    "Список DNS-серверов пуст — проверки не идут. Спрашивать некого, поэтому "
-                    "реестр адресов и журнал останутся пустыми, сколько ни ждать."
+                    "Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не "
+                    "идут. Спрашивать некого, поэтому реестр адресов и журнал останутся "
+                    "пустыми, сколько ни ждать."
                 ),
                 action="Заполнить в настройках",
                 url_name="settings",
@@ -50,9 +66,11 @@ def install_warnings() -> tuple[InstallWarning, ...]:
     return tuple(collected)
 
 
-def checks_are_possible() -> bool:
+def checks_are_possible(
+    servers_of_system: Callable[[], tuple[str, ...]] = system_servers,
+) -> bool:
     """Может ли установка вообще проверять домены. Нужно карточке домена."""
-    return bool(GlobalSettings.objects.get().dns_servers)
+    return bool(GlobalSettings.objects.get().dns_servers) or bool(servers_of_system())
 
 
 def waiting_domains() -> int:

@@ -82,11 +82,18 @@ def test_11_1_period_below_a_minute_is_refused() -> None:
     assert GlobalSettings.objects.get().check_period_seconds == 5 * 60
 
 
-def test_4_1_at_least_one_dns_server_is_required() -> None:
+def test_d51_empty_dns_list_is_saved_and_means_the_system_resolver() -> None:
+    """
+    Пустой список — рабочий режим, а не ошибка ввода (Q-D51).
+
+    Раньше сохранение отвергалось, и установку нельзя было сдвинуть с места, не выяснив сперва
+    адрес хоть одного резолвера, — хотя система его уже знает. Что именно подставляется,
+    решает `run_one_tick`; здесь проверяется только то, что пустое поле принимается.
+    """
     result = save_global_settings(values(dns_servers=()))
 
-    assert isinstance(result, SettingsNotSaved)
-    assert "хотя бы один DNS-сервер" in result.reasons[0]
+    assert isinstance(result, SettingsSaved)
+    assert GlobalSettings.objects.get().dns_servers == []
 
 
 def test_4_1_dns_server_must_be_an_address() -> None:

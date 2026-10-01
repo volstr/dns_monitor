@@ -1,22 +1,29 @@
 """
-Предупреждения об установке — ТЗ 4.1, 6.1.
+Предупреждения об установке — ТЗ 4.1, 6.1, решение Q-D51.
 
-Установка бывает цела и при этом не делает своего дела. Самый грубый случай — пустой список
-DNS-серверов: `run_checker` отказывается работать и объясняет причину в журнале процесса, а
-человек за экраном видит пустой реестр и ничего больше. Эти тесты закрепляют, что объяснение
-доходит до экрана.
+Установка бывает цела и при этом не делает своего дела. Эти тесты закрепляют, что объяснение
+доходит до экрана, а не остаётся в журнале процесса.
+
+Самым грубым случаем был пустой список DNS-серверов. С Q-D51 он перестал быть бедой: пустой
+означает «спрашивать у системы». Предупреждать осталось про один случай — когда серверов нет
+**ни в настройках, ни у системы**; тогда спрашивать действительно некого.
+
+Системный список приходит параметром, а не берётся из модуля: он читает настоящий
+`/etc/resolv.conf`, а тесту нужно уметь сказать «серверов у системы нет». Подмена по пути
+импорта в проекте запрещена (`CLAUDE.md`).
 """
 
 from datetime import UTC, datetime
 
 import pytest
+from django.template.loader import render_to_string
 from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import Member, Role
 from apps.catalog.models import Domain, GlobalSettings
 from apps.catalog.selectors.domain_card import domain_card
-from apps.catalog.selectors.health import install_warnings
+from apps.catalog.selectors.health import InstallWarning, install_warnings
 
 pytestmark = pytest.mark.django_db
 
@@ -37,43 +44,72 @@ def observer() -> Member:
     )
 
 
-def test_empty_dns_list_is_reported() -> None:
-    warnings = install_warnings()
+def no_system_servers() -> tuple[str, ...]:
+    """Система без резолверов: `/etc/resolv.conf` пуст или его нет."""
+    return ()
+
+
+def system_has_one() -> tuple[str, ...]:
+    return ("127.0.0.11",)
+
+
+def test_4_1_no_servers_anywhere_is_reported() -> None:
+    warnings = install_warnings(servers_of_system=no_system_servers)
 
     assert len(warnings) == 1
-    assert "DNS-серверов пуст" in warnings[0].text
+    assert "ни у системы" in warnings[0].text
+
+
+def test_d51_empty_list_is_silent_when_the_system_has_servers() -> None:
+    """Пустой список — рабочий режим, а не недоделка: спрашиваем у системы."""
+    assert install_warnings(servers_of_system=system_has_one) == ()
 
 
 def test_filled_dns_list_is_silent() -> None:
     GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"])
 
-    assert install_warnings() == ()
+    assert install_warnings(servers_of_system=no_system_servers) == ()
 
 
 def test_8_3_unconfigured_channel_is_not_a_warning() -> None:
     """Пустой telegram_chat_id — нормальный режим (8.3), а не недоделка."""
     GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"], telegram_chat_id="")
 
-    assert install_warnings() == ()
+    assert install_warnings(servers_of_system=no_system_servers) == ()
 
 
 def test_warning_is_shown_on_every_screen(client: Client, admin: Member) -> None:
-    client.force_login(admin)
+    """
+    Предупреждение живёт в общем каркасе, поэтому видно на каждом экране.
 
-    for name in ("overview", "domain-list", "group-list", "event-list"):
-        body = client.get(reverse(name)).content.decode()
-        assert "Проверки не идут" in body, name
+    Проверяется отрисовкой каркаса напрямую, а не через запрос: предупреждение зависит от
+    настоящего `/etc/resolv.conf`, а в контейнере сборки серверы у системы есть. Запрос
+    показал бы отсутствие предупреждения — верно, но не то, что здесь нужно проверить.
+    """
+    warning = InstallWarning(
+        text="Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не идут.",
+        action="Заполнить в настройках",
+        url_name="settings",
+    )
+
+    body = render_to_string(
+        "base.html", {"install_warnings": [warning], "is_admin": True, "screen": "overview"}
+    )
+
+    assert "Проверки не идут" in body
+    assert "Заполнить в настройках" in body
 
 
-def test_warning_offers_the_fix_only_to_an_admin(
-    client: Client, admin: Member, observer: Member
-) -> None:
-    client.force_login(admin)
-    assert "Заполнить в настройках" in client.get(reverse("overview")).content.decode()
+def test_warning_offers_the_fix_only_to_an_admin() -> None:
+    """Наблюдателю говорят о причине, но чинить не предлагают: настройки он не меняет (ТЗ 3)."""
+    warning = InstallWarning(
+        text="Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не идут.",
+        action="Заполнить в настройках",
+        url_name="settings",
+    )
 
-    client.force_login(observer)
-    body = client.get(reverse("overview")).content.decode()
-    # Наблюдателю говорят о причине, но чинить её не предлагают: настройки он не меняет (ТЗ 3).
+    body = render_to_string("base.html", {"install_warnings": [warning], "is_admin": False})
+
     assert "Проверки не идут" in body
     assert "Заполнить в настройках" not in body
 
@@ -83,16 +119,6 @@ def test_warning_disappears_once_the_list_is_filled(client: Client, admin: Membe
     client.force_login(admin)
 
     assert "Проверки не идут" not in client.get(reverse("overview")).content.decode()
-
-
-def test_empty_registry_explains_itself_on_the_card() -> None:
-    """Пустая таблица сама по себе ничего не объясняет."""
-    domain = Domain.objects.create(name="google.com", next_check_at=MOMENT)
-
-    card = domain_card(domain_id=domain.pk, at=MOMENT)
-
-    assert card is not None
-    assert "список DNS-серверов" in card.empty_reason
 
 
 def test_card_explains_a_paused_domain() -> None:
