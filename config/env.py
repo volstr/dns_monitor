@@ -29,6 +29,9 @@ ZONEINFO_MARKER: Final = "zoneinfo/"
 #: Имена, означающие тот же пояс, что и `UTC`.
 UTC_ALIASES: Final = frozenset({"Etc/UTC", "Etc/GMT", "Etc/Universal", "Universal", "Zulu"})
 REDIS_DB_MAX: Final = 15
+#: Учётная запись, которую компоуз создаёт в сервисе `postgres`, и чем она названа в
+#: `DATABASE_URL`. Значения обязаны совпадать: первые создают базу, вторая к ней подключается.
+POSTGRES_ACCOUNT: Final = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
 
 _SENTRY_DSN: Final = re.compile(r"https?://[^:@/\s]+(?::[^@/\s]*)?@[^/\s]+/(?:[^/\s]+/)*\d+")
 _TELEGRAM_BOT_TOKEN: Final = re.compile(r"\d+:[A-Za-z0-9_-]{30,}")
@@ -112,6 +115,8 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
     read = _Reader(source)
 
     database_url = read.required("DATABASE_URL", _database_url_problem)
+    if not read.failed("DATABASE_URL"):
+        _check_postgres_account(read, database_url)
     redis_url = read.required("REDIS_URL", _redis_url_problem)
     redis_db_state = read.integer("REDIS_DB_STATE", default=0, minimum=0, maximum=REDIS_DB_MAX)
     redis_db_cache = read.integer("REDIS_DB_CACHE", default=1, minimum=0, maximum=REDIS_DB_MAX)
@@ -314,6 +319,32 @@ def _database_url_problem(value: str) -> str | None:
     ):
         return "ожидается адрес вида postgresql://пользователь:пароль@хост:порт/база"
     return None
+
+
+def _check_postgres_account(read: _Reader, database_url: str) -> None:
+    """
+    `POSTGRES_*` и `DATABASE_URL` описывают одну учётную запись.
+
+    Иначе приложение стартует и падает на первом запросе с `password authentication failed`,
+    не говоря, какая из двух строк неверна. Чаще всего пароль сменили в `POSTGRES_PASSWORD`, а в
+    `DATABASE_URL` остался пример.
+
+    Незаданная переменная не проверяется: при внешней базе `POSTGRES_*` не нужны вовсе.
+    """
+    parts = urlsplit(database_url)
+    in_url = {
+        "POSTGRES_USER": unquote(parts.username or ""),
+        "POSTGRES_PASSWORD": unquote(parts.password or ""),
+        "POSTGRES_DB": unquote(parts.path.lstrip("/")),
+    }
+    for variable in POSTGRES_ACCOUNT:
+        declared = read.optional(variable)
+        if declared is None or declared == in_url[variable]:
+            continue
+        reason = "не совпадает с тем, что записано в DATABASE_URL"
+        if variable == "POSTGRES_PASSWORD":
+            reason += "; спецсимволы пароля в DATABASE_URL экранируются: @ → %40, : → %3A, / → %2F"
+        read.fail(variable, reason)
 
 
 def _redis_url_problem(value: str) -> str | None:

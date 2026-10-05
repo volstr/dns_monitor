@@ -108,6 +108,53 @@ def test_env_valid_sentry_dsn_is_accepted(env: dict[str, str], dsn: str) -> None
     assert failed_variables(env) == set()
 
 
+POSTGRES_MATCHING_URL = {
+    "POSTGRES_USER": "dns_monitoring",
+    "POSTGRES_PASSWORD": "secret",
+    "POSTGRES_DB": "dns_monitoring",
+}
+
+
+def test_env_postgres_account_matching_url_is_accepted(env: dict[str, str]) -> None:
+    env |= POSTGRES_MATCHING_URL
+
+    assert failed_variables(env) == set()
+
+
+@pytest.mark.parametrize("variable", ["POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"])
+def test_env_postgres_account_differing_from_url_is_named(
+    env: dict[str, str], variable: str
+) -> None:
+    env |= POSTGRES_MATCHING_URL | {variable: "other"}
+
+    with pytest.raises(EnvironmentConfigError, match=variable) as raised:
+        load_env(env)
+    assert failed_variables(env) == {variable}
+    # Тексты ошибок не содержат значений: здесь это пароли.
+    assert "other" not in str(raised.value)
+    assert "secret" not in str(raised.value)
+
+
+def test_env_postgres_password_is_compared_after_unescaping(env: dict[str, str]) -> None:
+    env["DATABASE_URL"] = "postgresql://dns_monitoring:p%40ss%3Aw%2Frd@postgres:5432/dns_monitoring"
+    env["POSTGRES_PASSWORD"] = "p@ss:w/rd"
+
+    assert failed_variables(env) == set()
+
+
+def test_env_postgres_account_is_not_checked_when_absent(env: dict[str, str]) -> None:
+    # Внешняя база: POSTGRES_* нужны только сервису postgres из компоуза.
+    assert "POSTGRES_PASSWORD" not in env
+
+    assert failed_variables(env) == set()
+
+
+def test_env_postgres_account_is_not_checked_against_invalid_url(env: dict[str, str]) -> None:
+    env |= POSTGRES_MATCHING_URL | {"DATABASE_URL": "mysql://x"}
+
+    assert failed_variables(env) == {"DATABASE_URL"}
+
+
 def test_77_smtp_user_without_password_is_named(env: dict[str, str]) -> None:
     env |= SMTP | {"SMTP_USER": "robot"}
 
