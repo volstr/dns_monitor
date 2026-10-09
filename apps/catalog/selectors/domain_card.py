@@ -53,40 +53,40 @@ EVENT_LIMIT = 20
 
 #: Статус адреса → подпись и класс `.state`. Слова согласованы с Q-13.8.
 STATUS_LABELS = {
-    AddressStatus.MATCHED: ("Решён", "ok"),
-    AddressStatus.UNMATCHED: ("Не решён", "breach"),
-    AddressStatus.STALE: ("Не актуален", "stale"),
-    AddressStatus.NOT_CHECKED: ("Не проверяется", ""),
+    AddressStatus.MATCHED: ('Решён', 'ok'),
+    AddressStatus.UNMATCHED: ('Не решён', 'breach'),
+    AddressStatus.STALE: ('Не актуален', 'stale'),
+    AddressStatus.NOT_CHECKED: ('Не проверяется', ''),
 }
 
 #: Тип события → класс `.state`. Названия берутся из самой модели: они утверждены в Q-C11.
 EVENT_TONES = {
-    EventType.ADDRESS_APPEARED: "change",
-    EventType.ADDRESS_GONE: "change",
-    EventType.NOT_ALLOWED: "breach",
-    EventType.BACK_TO_NORMAL: "ok",
-    EventType.RESOLVE_FAILED: "fail",
-    EventType.RESOLVE_RECOVERED: "ok",
-    EventType.WATCH_STARTED: "ok",
+    EventType.ADDRESS_APPEARED: 'change',
+    EventType.ADDRESS_GONE: 'change',
+    EventType.NOT_ALLOWED: 'breach',
+    EventType.BACK_TO_NORMAL: 'ok',
+    EventType.RESOLVE_FAILED: 'fail',
+    EventType.RESOLVE_RECOVERED: 'ok',
+    EventType.WATCH_STARTED: 'ok',
 }
 
 
 class RegistryFilter(StrEnum):
     """Сегменты фильтра реестра из макета."""
 
-    ALL = "all"
-    MATCHED = "matched"
-    UNMATCHED = "unmatched"
-    STALE = "stale"
+    ALL = 'all'
+    MATCHED = 'matched'
+    UNMATCHED = 'unmatched'
+    STALE = 'stale'
 
 
 class HistoryFilter(StrEnum):
     """Сегменты фильтра истории из макета. Названия групп — те же, что в журнале (Q-C11)."""
 
-    ALL = "all"
-    CHANGES = "changes"
-    NOT_ALLOWED = "not_allowed"
-    RESOLVE_ERRORS = "resolve_errors"
+    ALL = 'all'
+    CHANGES = 'changes'
+    NOT_ALLOWED = 'not_allowed'
+    RESOLVE_ERRORS = 'resolve_errors'
 
 
 #: Какие статусы показывает сегмент. `NOT_CHECKED` не попадает ни в один: он не «решён» и не
@@ -212,7 +212,7 @@ def domain_card(
     всему реестру: «1 из 3 адресов не решён» обязано означать одно и то же независимо от того,
     какой сегмент выбран.
     """
-    domain = Domain.objects.select_related("group").filter(pk=domain_id).first()
+    domain = Domain.objects.select_related('group').filter(pk=domain_id).first()
     if domain is None:
         return None
 
@@ -223,20 +223,20 @@ def domain_card(
     statuses = address_statuses(
         domain.pk, at, effective.freshness_threshold.value, skip_ipv6=skip_ipv6
     )
-    entries = tuple(AllowlistEntry.objects.filter(domain=domain).order_by("entry"))
+    entries = tuple(AllowlistEntry.objects.filter(domain=domain).order_by('entry'))
     ordered = _sorted(statuses)
     lines = tuple(_registry_line(view, at) for view in ordered)
 
     return DomainCard(
         id=domain.pk,
         name=domain.name,
-        group_name=domain.group.name if domain.group else "",
+        group_name=domain.group.name if domain.group else '',
         group_id=domain.group_id,
         comment=domain.comment,
         watch_enabled=domain.watch_enabled,
         record_types=tuple(domain.record_types),
         record_type_choices=tuple((value, str(label)) for value, label in RECORD_TYPE_CHOICES),
-        allowlist_text="\n".join(entry.raw for entry in entries),
+        allowlist_text='\n'.join(entry.raw for entry in entries),
         headline=_headline(domain, effective),
         summary_label=_summary_label(statuses),
         summary_tone=_summary_tone(statuses),
@@ -267,17 +267,17 @@ def domain_card(
 def _empty_reason(domain: Domain, statuses: tuple[AddressStatusView, ...]) -> str:
     """Почему в реестре пусто. Пустая таблица сама по себе ничего не объясняет."""
     if statuses:
-        return ""
+        return ''
     if not checks_are_possible():
         return (
-            "Проверки не идут: в общих настройках пуст список DNS-серверов. Пока он пуст, "
-            "спрашивать некого, и реестр останется пустым."
+            'Проверки не идут: в общих настройках пуст список DNS-серверов. Пока он пуст, '
+            'спрашивать некого, и реестр останется пустым.'
         )
     if not domain.watch_enabled:
-        return "Наблюдение приостановлено, поэтому домен не проверяется."
+        return 'Наблюдение приостановлено, поэтому домен не проверяется.'
     if domain.next_check_at is None:
-        return "Время проверки не назначено. Нажмите «Проверить сейчас»."
-    return "Домен ещё не проверялся. Первая проверка пройдёт в ближайшие секунды."
+        return 'Время проверки не назначено. Нажмите «Проверить сейчас».'
+    return 'Домен ещё не проверялся. Первая проверка пройдёт в ближайшие секунды.'
 
 
 def _filtered_registry(
@@ -308,39 +308,39 @@ def _sorted(statuses: tuple[AddressStatusView, ...]) -> tuple[AddressStatusView,
 
 def _headline(domain: Domain, effective: EffectiveSettings) -> str:
     """Подзаголовок карточки. Формулировка прототипа, значения — настоящие."""
-    group = f"Группа «{domain.group.name}»" if domain.group else "Без группы"
-    period = f"проверка раз в {humanize_duration(effective.check_period.value)}"
+    group = f'Группа «{domain.group.name}»' if domain.group else 'Без группы'
+    period = f'проверка раз в {humanize_duration(effective.check_period.value)}'
     if domain.last_successful_check_at is None:
-        return f"{group} · {period} · ответов ещё не было"
+        return f'{group} · {period} · ответов ещё не было'
     # localtime: ТЗ 4.0 требует показывать в часовом поясе установки, а форматирование в
     # Python идёт мимо перевода, который Django делает в шаблоне.
     answered_at = localtime(domain.last_successful_check_at)
-    return f"{group} · {period} · последний ответ в {answered_at:%H:%M}"
+    return f'{group} · {period} · последний ответ в {answered_at:%H:%M}'
 
 
 def _summary_label(statuses: tuple[AddressStatusView, ...]) -> str:
     """«1 из 3 адресов не решён» — заголовок панели разрешённых адресов."""
     fresh = [view for view in statuses if view.status != AddressStatus.STALE]
     if not fresh:
-        return "Актуальных адресов нет"
+        return 'Актуальных адресов нет'
     unmatched = sum(1 for view in fresh if view.status == AddressStatus.UNMATCHED)
-    word = plural(len(fresh), "адреса", "адресов", "адресов")
+    word = plural(len(fresh), 'адреса', 'адресов', 'адресов')
     if unmatched:
-        return f"{unmatched} из {len(fresh)} {word} не решён"
+        return f'{unmatched} из {len(fresh)} {word} не решён'
     if fresh[0].status == AddressStatus.NOT_CHECKED:
-        return "Разрешённые адреса не заданы — сравнивать не с чем"
-    return f"Все {len(fresh)} {word} решены" if len(fresh) > 1 else "Адрес решён"
+        return 'Разрешённые адреса не заданы — сравнивать не с чем'
+    return f'Все {len(fresh)} {word} решены' if len(fresh) > 1 else 'Адрес решён'
 
 
 def _summary_tone(statuses: tuple[AddressStatusView, ...]) -> str:
     fresh = [view for view in statuses if view.status != AddressStatus.STALE]
     if any(view.status == AddressStatus.UNMATCHED for view in fresh):
-        return "breach"
+        return 'breach'
     if fresh and fresh[0].status == AddressStatus.NOT_CHECKED:
         # Не «решено» и не «сломано», а «требует внимания»: домен под наблюдением, а сравнивать
         # его адреса не с чем (уточнение Q-D15). Зелёным это красить нельзя, серым — мало.
-        return "change"
-    return "ok" if fresh else ""
+        return 'change'
+    return 'ok' if fresh else ''
 
 
 def _settings(effective: EffectiveSettings) -> tuple[SettingLine, ...]:
@@ -348,28 +348,28 @@ def _settings(effective: EffectiveSettings) -> tuple[SettingLine, ...]:
     reminder = effective.reminder_interval.value
     return (
         SettingLine(
-            label="Проверка",
-            value=f"раз в {humanize_duration(effective.check_period.value)}",
+            label='Проверка',
+            value=f'раз в {humanize_duration(effective.check_period.value)}',
             origin=effective.check_period.origin,
         ),
         SettingLine(
-            label="Считать пропавшим",
-            value=f"через {humanize_duration(effective.freshness_threshold.value)}",
+            label='Считать пропавшим',
+            value=f'через {humanize_duration(effective.freshness_threshold.value)}',
             origin=effective.freshness_threshold.origin,
         ),
         SettingLine(
-            label="Уведомлять",
+            label='Уведомлять',
             value=str(NotificationMode(effective.notification_mode.value).label),
             origin=effective.notification_mode.origin,
         ),
         SettingLine(
-            label="Сообщать о возврате в норму",
-            value="да" if effective.notify_back_to_normal.value else "нет",
+            label='Сообщать о возврате в норму',
+            value='да' if effective.notify_back_to_normal.value else 'нет',
             origin=effective.notify_back_to_normal.origin,
         ),
         SettingLine(
-            label="Напоминать",
-            value=f"раз в {humanize_duration(reminder)}" if reminder else "не напоминать",
+            label='Напоминать',
+            value=f'раз в {humanize_duration(reminder)}' if reminder else 'не напоминать',
             origin=effective.reminder_interval.origin,
         ),
     )
@@ -403,7 +403,7 @@ def _allowlist_line(
     return AllowlistLine(
         raw=entry.raw,
         is_network=is_network,
-        range_text=_range_text(entry) if is_network else "",
+        range_text=_range_text(entry) if is_network else '',
         inside=tuple(str(view.address) for view in inside),
         stale_days=_stale_days(last_seen, at),
         never_matched=answered and not inside,
@@ -446,15 +446,15 @@ def _network_of(entry: AllowlistEntry) -> IPNetwork:
     Необязательность приходит из объявления поля, которое в общем случае допускает `NULL`, а не
     из схемы — ровно как в селекторе статусов адресов.
     """
-    return cast("IPNetwork", entry.entry)
+    return cast('IPNetwork', entry.entry)
 
 
 def _range_text(entry: AllowlistEntry) -> str:
     """«10.20.0.0 — 10.20.3.255 · 1024 адреса» — подпись линейки из прототипа."""
     network = _network_of(entry)
     size = network.num_addresses
-    word = plural(size, "адрес", "адреса", "адресов")
-    return f"{network[0]} — {network[-1]} · {size} {word}"
+    word = plural(size, 'адрес', 'адреса', 'адресов')
+    return f'{network[0]} — {network[-1]} · {size} {word}'
 
 
 def _stale_days(last_seen: datetime | None, at: datetime) -> int | None:
@@ -491,18 +491,18 @@ def _match_text(view: AddressStatusView) -> str:
     У записи без маски — «точное совпадение с …», и формулировка «входит в» там запрещена.
     """
     if view.status == AddressStatus.NOT_CHECKED:
-        return "список не задан"
+        return 'список не задан'
     if view.match is None:
-        return "нет совпадений"
+        return 'нет совпадений'
     if view.match.is_network:
-        return f"входит в {view.match.entry}"
-    return f"точное совпадение с {view.match.entry}"
+        return f'входит в {view.match.entry}'
+    return f'точное совпадение с {view.match.entry}'
 
 
 def _chip_css(status: AddressStatus) -> str:
     if status == AddressStatus.STALE:
-        return "gone"
-    return "out" if status == AddressStatus.UNMATCHED else ""
+        return 'gone'
+    return 'out' if status == AddressStatus.UNMATCHED else ''
 
 
 def _age_text(view: AddressStatusView, at: datetime) -> str:
@@ -511,8 +511,8 @@ def _age_text(view: AddressStatusView, at: datetime) -> str:
         days = (at - view.last_seen_at).days
         return f"не отдаётся {days} {plural(days, 'день', 'дня', 'дней')}"
     if view.first_seen_at == view.last_seen_at:
-        return "появился впервые за всё время"
-    return f"отдавался {humanize_duration(at - view.last_seen_at)} назад"
+        return 'появился впервые за всё время'
+    return f'отдавался {humanize_duration(at - view.last_seen_at)} назад'
 
 
 def _events(domain: Domain, chosen: HistoryFilter) -> tuple[EventLine, ...]:
@@ -523,16 +523,16 @@ def _events(domain: Domain, chosen: HistoryFilter) -> tuple[EventLine, ...]:
         selected = selected.filter(event_type__in=[item.value for item in types])
 
     events = (
-        selected.order_by("-occurred_at")[:EVENT_LIMIT]
-        .values("event_type", "occurred_at", "payload", "author_name")
+        selected.order_by('-occurred_at')[:EVENT_LIMIT]
+        .values('event_type', 'occurred_at', 'payload', 'author_name')
     )
     return tuple(
         EventLine(
-            occurred_at=row["occurred_at"],
-            label=str(EventType(row["event_type"]).label),
-            tone=EVENT_TONES[EventType(row["event_type"])],
-            addresses=tuple(str(item) for item in (row["payload"] or {}).get("addresses", ())),
-            author_name=row["author_name"],
+            occurred_at=row['occurred_at'],
+            label=str(EventType(row['event_type']).label),
+            tone=EVENT_TONES[EventType(row['event_type'])],
+            addresses=tuple(str(item) for item in (row['payload'] or {}).get('addresses', ())),
+            author_name=row['author_name'],
         )
         for row in events
     )

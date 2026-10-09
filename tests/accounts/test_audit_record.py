@@ -16,8 +16,8 @@ def make_member(email: str, name: str) -> Member:
 
 
 def test_82_unbinding_the_authenticator_is_recorded_with_its_author() -> None:
-    admin = make_member("a.kirilova@contoso.ru", "Анна Кирилова")
-    target = make_member("d.osipov@contoso.ru", "Дмитрий Осипов")
+    admin = make_member('a.kirilova@contoso.ru', 'Анна Кирилова')
+    target = make_member('d.osipov@contoso.ru', 'Дмитрий Осипов')
 
     AuditRecord.objects.create(
         action=AuditAction.AUTHENTICATOR_UNBOUND,
@@ -30,13 +30,13 @@ def test_82_unbinding_the_authenticator_is_recorded_with_its_author() -> None:
 
     record = AuditRecord.objects.get()
     assert record.action == AuditAction.AUTHENTICATOR_UNBOUND
-    assert record.author_name == "Анна Кирилова"
+    assert record.author_name == 'Анна Кирилова'
 
 
 def test_d17_deleting_a_member_keeps_the_name_snapshot() -> None:
     # Удалять можно только тех, кто ни разу не входил (3.1). История при этом не теряет авторства.
-    admin = make_member("a.kirilova@contoso.ru", "Анна Кирилова")
-    target = make_member("s.gavrilov@contoso.ru", "Сергей Гаврилов")
+    admin = make_member('a.kirilova@contoso.ru', 'Анна Кирилова')
+    target = make_member('s.gavrilov@contoso.ru', 'Сергей Гаврилов')
     AuditRecord.objects.create(
         action=AuditAction.MEMBER_INVITED,
         occurred_at=MOMENT,
@@ -50,7 +50,7 @@ def test_d17_deleting_a_member_keeps_the_name_snapshot() -> None:
 
     record = AuditRecord.objects.get()
     assert record.target is None
-    assert record.target_name == "Сергей Гаврилов"
+    assert record.target_name == 'Сергей Гаврилов'
     assert record.author == admin
 
 
@@ -59,4 +59,4 @@ def test_11_13_stopping_checks_is_recorded_without_an_author() -> None:
 
     record = AuditRecord.objects.get()
     assert record.author is None
-    assert record.author_name == ""
+    assert record.author_name == ''

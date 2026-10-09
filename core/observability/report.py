@@ -56,7 +56,7 @@ def report(failure: Failure) -> None:
     except Exception:
         # Сюда попадают только аварии самого клиента: доставка асинхронная и свои ошибки
         # глотает сама. Пишем в журнал и продолжаем работать (11.14, критерий 73).
-        logger.warning("не удалось отправить отказ в Sentry", extra={"cause": failure.cause})
+        logger.warning('не удалось отправить отказ в Sentry', extra={'cause': failure.cause})
 
 
 def _send(failure: Failure) -> None:
@@ -65,11 +65,11 @@ def _send(failure: Failure) -> None:
         # и пятьсот доменов с чуть разными сообщениями об ошибке снова разъехались бы по разным
         # событиям — ровно то, что запрещает критерий 72.
         scope.fingerprint = [failure.cause]
-        scope.set_tag("cause", failure.cause)
-        scope.set_context("affected", {"count": failure.affected})
+        scope.set_tag('cause', failure.cause)
+        scope.set_context('affected', {'count': failure.affected})
         for name, value in failure.tags.items():
             scope.set_tag(name, value)
         if failure.error is not None:
             sentry_sdk.capture_exception(failure.error)
         else:
-            sentry_sdk.capture_message(failure.message, level="error")
+            sentry_sdk.capture_message(failure.message, level='error')

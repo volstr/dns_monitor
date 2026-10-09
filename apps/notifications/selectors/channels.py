@@ -29,9 +29,9 @@ IMPLEMENTED = frozenset({ChannelKind.TELEGRAM, ChannelKind.EMAIL})
 
 #: Где лежит адресат каждого канала — поля общих настроек (Q-D11: адресат один на вид канала).
 RECIPIENT_FIELD = {
-    ChannelKind.TELEGRAM: "telegram_chat_id",
-    ChannelKind.EMAIL: "email_recipients",
-    ChannelKind.WEBHOOK: "webhook_url",
+    ChannelKind.TELEGRAM: 'telegram_chat_id',
+    ChannelKind.EMAIL: 'email_recipients',
+    ChannelKind.WEBHOOK: 'webhook_url',
 }
 
 
@@ -58,5 +58,5 @@ def _recipient(global_settings: GlobalSettings, kind: ChannelKind) -> str:
     if isinstance(value, list):
         # Перечень почтовых адресов хранится списком, а каналу уходит строкой: по адресу в
         # строке — так же, как его вводят на экране (8.3).
-        return "\n".join(str(item).strip() for item in value if str(item).strip())
+        return '\n'.join(str(item).strip() for item in value if str(item).strip())
     return str(value).strip()

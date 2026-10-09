@@ -19,15 +19,15 @@ from apps.accounts.services.bootstrap import (
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 24, 14, 38, tzinfo=UTC)
-PASSWORD = "tuman-9-krisa-vody"
+PASSWORD = 'tuman-9-krisa-vody'
 
 
 def create(**extra: object) -> object:
     fields: dict[str, object] = {
-        "email": "a.kirilova@contoso.ru",
-        "name": "Анна Кирилова",
-        "password": PASSWORD,
-        "at": MOMENT,
+        'email': 'a.kirilova@contoso.ru',
+        'name': 'Анна Кирилова',
+        'password': PASSWORD,
+        'at': MOMENT,
     }
     fields.update(extra)
     return create_first_admin(**fields)  # type: ignore[arg-type]
@@ -48,10 +48,10 @@ def test_3_second_admin_is_not_created_this_way() -> None:
     """Это начальная установка, а не обходной путь мимо предохранителей 3.1."""
     create()
 
-    result = create(email="other@contoso.ru")
+    result = create(email='other@contoso.ru')
 
     assert isinstance(result, AdminNotCreated)
-    assert "уже есть администратор" in result.reason
+    assert 'уже есть администратор' in result.reason
     assert Member.objects.count() == 1
 
 
@@ -61,27 +61,27 @@ def test_3_disabled_admin_does_not_block_the_bootstrap() -> None:
     assert isinstance(first, AdminCreated)
     Member.objects.filter(pk=first.member_id).update(is_active=False)
 
-    result = create(email="rescue@contoso.ru")
+    result = create(email='rescue@contoso.ru')
 
     assert isinstance(result, AdminCreated)
 
 
 def test_3_short_password_is_refused() -> None:
-    result = create(password="короткий")
+    result = create(password='короткий')
 
     assert isinstance(result, AdminNotCreated)
-    assert "короче" in result.reason
+    assert 'короче' in result.reason
 
 
 def test_3_duplicate_email_is_refused() -> None:
     Member.objects.create_member(
-        email="a.kirilova@contoso.ru", name="Анна", created_at=MOMENT, role=Role.OBSERVER
+        email='a.kirilova@contoso.ru', name='Анна', created_at=MOMENT, role=Role.OBSERVER
     )
 
     result = create()
 
     assert isinstance(result, AdminNotCreated)
-    assert "уже есть" in result.reason
+    assert 'уже есть' in result.reason
 
 
 def test_3_createsuperuser_creates_an_administrator() -> None:
@@ -92,7 +92,7 @@ def test_3_createsuperuser_creates_an_administrator() -> None:
     по тем же правилам, что и `create_admin`.
     """
     member = Member.objects.create_superuser(
-        email="a.kirilova@contoso.ru", name="Анна Кирилова", password=PASSWORD
+        email='a.kirilova@contoso.ru', name='Анна Кирилова', password=PASSWORD
     )
 
     assert member.role == Role.ADMIN
@@ -101,17 +101,17 @@ def test_3_createsuperuser_creates_an_administrator() -> None:
 
 def test_3_createsuperuser_refuses_a_second_administrator() -> None:
     Member.objects.create_superuser(
-        email="a.kirilova@contoso.ru", name="Анна Кирилова", password=PASSWORD
+        email='a.kirilova@contoso.ru', name='Анна Кирилова', password=PASSWORD
     )
 
-    with pytest.raises(ValueError, match="уже есть администратор"):
+    with pytest.raises(ValueError, match='уже есть администратор'):
         Member.objects.create_superuser(
-            email="second@contoso.ru", name="Второй", password=PASSWORD
+            email='second@contoso.ru', name='Второй', password=PASSWORD
         )
 
 
 def test_email_is_normalised() -> None:
-    result = create(email="  A.Kirilova@Contoso.ru  ")
+    result = create(email='  A.Kirilova@Contoso.ru  ')
 
     assert isinstance(result, AdminCreated)
-    assert result.email == "a.kirilova@contoso.ru"
+    assert result.email == 'a.kirilova@contoso.ru'

@@ -34,7 +34,7 @@ def store(clock: FakeClock) -> FakeStateStore:
 
 @pytest.fixture
 def group() -> Group:
-    return Group.objects.create(name="Платёжный контур")
+    return Group.objects.create(name='Платёжный контур')
 
 
 def make_domain(name: str, *, group: Group | None = None, enabled: bool = True) -> Domain:
@@ -44,7 +44,7 @@ def make_domain(name: str, *, group: Group | None = None, enabled: bool = True) 
 
 
 def test_48_manual_check_moves_the_next_scheduled_check(store: FakeStateStore) -> None:
-    domain = make_domain("pay-gw.contoso.ru")
+    domain = make_domain('pay-gw.contoso.ru')
 
     result = request_domain_check(domain_id=domain.pk, at=MOMENT, state_store=store)
 
@@ -55,7 +55,7 @@ def test_48_manual_check_moves_the_next_scheduled_check(store: FakeStateStore) -
 
 
 def test_47_second_domain_check_is_rejected_by_cooldown(store: FakeStateStore) -> None:
-    domain = make_domain("pay-gw.contoso.ru")
+    domain = make_domain('pay-gw.contoso.ru')
     request_domain_check(domain_id=domain.pk, at=MOMENT, state_store=store)
 
     result = request_domain_check(domain_id=domain.pk, at=MOMENT, state_store=store)
@@ -66,7 +66,7 @@ def test_47_second_domain_check_is_rejected_by_cooldown(store: FakeStateStore) -
 def test_47_domain_cooldown_lasts_thirty_seconds(
     store: FakeStateStore, clock: FakeClock
 ) -> None:
-    domain = make_domain("pay-gw.contoso.ru")
+    domain = make_domain('pay-gw.contoso.ru')
     request_domain_check(domain_id=domain.pk, at=MOMENT, state_store=store)
 
     clock.advance(timedelta(seconds=31))
@@ -76,7 +76,7 @@ def test_47_domain_cooldown_lasts_thirty_seconds(
 
 
 def test_11_1_disabled_domain_is_not_queued(store: FakeStateStore) -> None:
-    domain = make_domain("status.contoso.ru", enabled=False)
+    domain = make_domain('status.contoso.ru', enabled=False)
 
     result = request_domain_check(domain_id=domain.pk, at=MOMENT, state_store=store)
 
@@ -89,8 +89,8 @@ def test_11_6_group_check_queues_every_enabled_domain(
     store: FakeStateStore, group: Group
 ) -> None:
     for index in range(3):
-        make_domain(f"domain-{index}.contoso.ru", group=group)
-    make_domain("disabled.contoso.ru", group=group, enabled=False)
+        make_domain(f'domain-{index}.contoso.ru', group=group)
+    make_domain('disabled.contoso.ru', group=group, enabled=False)
 
     result = request_group_check(group_id=group.pk, at=MOMENT, state_store=store)
 
@@ -101,7 +101,7 @@ def test_11_6_group_check_queues_every_enabled_domain(
 def test_47_second_group_check_is_rejected_by_cooldown(
     store: FakeStateStore, group: Group
 ) -> None:
-    make_domain("pay-gw.contoso.ru", group=group)
+    make_domain('pay-gw.contoso.ru', group=group)
     request_group_check(group_id=group.pk, at=MOMENT, state_store=store)
 
     result = request_group_check(group_id=group.pk, at=MOMENT, state_store=store)
@@ -112,7 +112,7 @@ def test_47_second_group_check_is_rejected_by_cooldown(
 def test_47_group_cooldown_lasts_a_minute(
     store: FakeStateStore, clock: FakeClock, group: Group
 ) -> None:
-    make_domain("pay-gw.contoso.ru", group=group)
+    make_domain('pay-gw.contoso.ru', group=group)
     request_group_check(group_id=group.pk, at=MOMENT, state_store=store)
 
     clock.advance(timedelta(seconds=31))
@@ -127,7 +127,7 @@ def test_47_group_cooldown_lasts_a_minute(
 
 def test_11_6_large_group_needs_confirmation(store: FakeStateStore, group: Group) -> None:
     Domain.objects.bulk_create(
-        Domain(name=f"domain-{index}.contoso.ru", group=group, next_check_at=LATER)
+        Domain(name=f'domain-{index}.contoso.ru', group=group, next_check_at=LATER)
         for index in range(CONFIRMATION_THRESHOLD + 1)
     )
 
@@ -142,7 +142,7 @@ def test_11_6_large_group_needs_confirmation(store: FakeStateStore, group: Group
 
 def test_11_6_confirmed_large_group_is_queued(store: FakeStateStore, group: Group) -> None:
     Domain.objects.bulk_create(
-        Domain(name=f"domain-{index}.contoso.ru", group=group, next_check_at=LATER)
+        Domain(name=f'domain-{index}.contoso.ru', group=group, next_check_at=LATER)
         for index in range(CONFIRMATION_THRESHOLD + 1)
     )
 

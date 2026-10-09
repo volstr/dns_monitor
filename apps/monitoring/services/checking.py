@@ -95,12 +95,12 @@ def run_check(*, domain_id: int, at: datetime, resolver: Resolver) -> CheckRepor
 
 def _not_performed(domain: Domain, at: datetime, result: ResolveResult) -> CheckReport:
     """Ни один сервер не ответил — 6.1: реестр и статусы не меняются, событий нет."""
-    error = result.error or "ни один сервер не ответил"
+    error = result.error or 'ни один сервер не ответил'
     Check.objects.create(
         domain=domain, checked_at=at, outcome=CheckOutcome.NOT_PERFORMED, error=error
     )
     logger.warning(
-        "проверка не состоялась", extra={"domain_id": domain.pk, "domain": domain.name}
+        'проверка не состоялась', extra={'domain_id': domain.pk, 'domain': domain.name}
     )
     return CheckReport(
         outcome=CheckOutcome.NOT_PERFORMED,
@@ -118,14 +118,14 @@ def _no_records(
     """Домен не резолвится — это наблюдение (6.1). Реестр не трогаем."""
     domain.consecutive_resolve_failures += 1
     _remember_cname(domain, result)
-    domain.save(update_fields=["consecutive_resolve_failures", "cname_target"])
+    domain.save(update_fields=['consecutive_resolve_failures', 'cname_target'])
 
     events: list[EventType] = []
     event_ids: list[int] = []
     # Ровно на N-й неудаче: повторно не порождается, пока не было успешного резолва (7.1).
     # До N событий нет вовсе — Q-C10.
     if domain.consecutive_resolve_failures == failure_threshold:
-        event = _event(domain, at, EventType.RESOLVE_FAILED, {"attempts": failure_threshold})
+        event = _event(domain, at, EventType.RESOLVE_FAILED, {'attempts': failure_threshold})
         events.append(EventType.RESOLVE_FAILED)
         event_ids.append(event.pk)
 
@@ -133,7 +133,7 @@ def _no_records(
         domain=domain,
         checked_at=at,
         outcome=CheckOutcome.RESOLVE_ERROR,
-        answered_by=result.answered_by or "",
+        answered_by=result.answered_by or '',
     )
     return CheckReport(
         outcome=CheckOutcome.RESOLVE_ERROR,
@@ -194,17 +194,17 @@ def _answered(
             domain,
             at,
             EventType.WATCH_STARTED,
-            {"address_count": len(after_set), "unmatched_count": len(_unmatched(statuses))},
+            {'address_count': len(after_set), 'unmatched_count': len(_unmatched(statuses))},
         )
         events.append(EventType.WATCH_STARTED)
         event_ids.append(started.pk)
     else:
         for address in sorted(appeared, key=str):
-            event = _event(domain, at, EventType.ADDRESS_APPEARED, {"addresses": [str(address)]})
+            event = _event(domain, at, EventType.ADDRESS_APPEARED, {'addresses': [str(address)]})
             events.append(EventType.ADDRESS_APPEARED)
             event_ids.append(event.pk)
         for address in sorted(gone, key=str):
-            event = _event(domain, at, EventType.ADDRESS_GONE, {"addresses": [str(address)]})
+            event = _event(domain, at, EventType.ADDRESS_GONE, {'addresses': [str(address)]})
             events.append(EventType.ADDRESS_GONE)
             event_ids.append(event.pk)
 
@@ -218,12 +218,12 @@ def _answered(
     domain.last_successful_check_at = at
     _remember_cname(domain, result)
     domain.save(
-        update_fields=["consecutive_resolve_failures", "last_successful_check_at", "cname_target"]
+        update_fields=['consecutive_resolve_failures', 'last_successful_check_at', 'cname_target']
     )
 
     outcome = _outcome(statuses, changed=bool(appeared or gone))
     Check.objects.create(
-        domain=domain, checked_at=at, outcome=outcome, answered_by=result.answered_by or ""
+        domain=domain, checked_at=at, outcome=outcome, answered_by=result.answered_by or ''
     )
     return CheckReport(
         outcome=outcome,
@@ -248,12 +248,12 @@ def _write_registry(domain: Domain, at: datetime, answer: frozenset[IPAddress]) 
         entry, created = AddressRegistryEntry.objects.get_or_create(
             domain=domain,
             address=address,
-            defaults={"first_seen_at": at, "last_seen_at": at},
+            defaults={'first_seen_at': at, 'last_seen_at': at},
         )
         if not created:
             entry.last_seen_at = at
             entry.consecutive_misses = 0
-            entry.save(update_fields=["last_seen_at", "consecutive_misses"])
+            entry.save(update_fields=['last_seen_at', 'consecutive_misses'])
         for size, start in _buckets(at):
             AddressObservationBucket.objects.get_or_create(
                 domain=domain, address=address, bucket_size=size, bucket_start=start
@@ -262,7 +262,7 @@ def _write_registry(domain: Domain, at: datetime, answer: frozenset[IPAddress]) 
     # Q-13.2: счётчик пропусков растёт у тех, кого в этом ответе не было.
     AddressRegistryEntry.objects.filter(domain=domain).exclude(
         address__in=[str(address) for address in answer]
-    ).update(consecutive_misses=F("consecutive_misses") + 1)
+    ).update(consecutive_misses=F('consecutive_misses') + 1)
 
 
 def _without_ipv6(answer: frozenset[IPAddress]) -> frozenset[IPAddress]:
@@ -313,7 +313,7 @@ def _incidents(
     if holding and incident is None:
         incident = Incident.objects.create(domain=domain, opened_at=at)
         opened = _event(
-            domain, at, EventType.NOT_ALLOWED, {"addresses": _texts(holding)}, incident
+            domain, at, EventType.NOT_ALLOWED, {'addresses': _texts(holding)}, incident
         )
         return True, False, [EventType.NOT_ALLOWED], [opened.pk]
 
@@ -322,7 +322,7 @@ def _incidents(
         appeared = holding - before_unmatched
         if appeared:
             event = _event(
-                domain, at, EventType.NOT_ALLOWED, {"addresses": _texts(appeared)}, incident
+                domain, at, EventType.NOT_ALLOWED, {'addresses': _texts(appeared)}, incident
             )
             events.append(EventType.NOT_ALLOWED)
             event_ids.append(event.pk)
@@ -330,12 +330,12 @@ def _incidents(
 
     if incident is not None:
         incident.closed_at = at
-        incident.save(update_fields=["closed_at"])
+        incident.save(update_fields=['closed_at'])
         closed = _event(
             domain,
             at,
             EventType.BACK_TO_NORMAL,
-            {"duration_seconds": int((at - incident.opened_at).total_seconds())},
+            {'duration_seconds': int((at - incident.opened_at).total_seconds())},
             incident,
         )
         return False, True, [EventType.BACK_TO_NORMAL], [closed.pk]
@@ -373,7 +373,7 @@ def _outcome(statuses: tuple[AddressStatusView, ...], *, changed: bool) -> Check
 def _remember_cname(domain: Domain, result: ResolveResult) -> None:
     """Q-D12: цель CNAME показывается, только если флаг включён. Событий не порождает."""
     if RecordType.CNAME.value in domain.record_types:
-        domain.cname_target = result.canonical_name or ""
+        domain.cname_target = result.canonical_name or ''
 
 
 def _event(

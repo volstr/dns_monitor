@@ -23,12 +23,12 @@ MOMENT = datetime(2026, 9, 27, 14, 38, tzinfo=UTC)
 
 def member(role: str = Role.ADMIN, **extra: object) -> Member:
     return Member.objects.create_member(
-        email=f"{role}@contoso.ru", name="Участник", created_at=MOMENT, role=role, **extra
+        email=f'{role}@contoso.ru', name='Участник', created_at=MOMENT, role=role, **extra
     )
 
 
 def request_from(user: object) -> RequestFactory:
-    request = RequestFactory().get("/admin/")
+    request = RequestFactory().get('/admin/')
     request.user = user  # type: ignore[assignment]
     return request
 
@@ -43,8 +43,8 @@ class Anonymous:
 
 def test_admin_is_absent_outside_the_developer_mode(client: Client) -> None:
     """Подключена только в `config/settings/dev.py`. Тесты идут на настройках без неё."""
-    assert "django.contrib.admin" not in settings.INSTALLED_APPS
-    assert client.get("/admin/").status_code == 404
+    assert 'django.contrib.admin' not in settings.INSTALLED_APPS
+    assert client.get('/admin/').status_code == 404
 
 
 def test_admin_route_appears_only_with_the_application(client: Client) -> None:
@@ -54,7 +54,7 @@ def test_admin_route_appears_only_with_the_application(client: Client) -> None:
     Разница существенная: `DEBUG` — переменная, которую можно случайно включить на боевой
     установке, а приложения там нет вовсе, и включать нечего.
     """
-    assert client.get("/admin/login/").status_code == 404
+    assert client.get('/admin/login/').status_code == 404
 
 
 # ─────────────── доступ решает роль, а не таблица разрешений ───────────────
@@ -117,4 +117,4 @@ def test_4_1_the_settings_row_cannot_be_added_or_deleted() -> None:
 
 def test_password_hash_is_shown_but_not_editable() -> None:
     """Иначе введённое в поле легло бы в базу как есть: паролем стал бы открытый текст."""
-    assert "password" in MemberAdmin.readonly_fields
+    assert 'password' in MemberAdmin.readonly_fields

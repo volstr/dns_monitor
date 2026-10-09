@@ -19,8 +19,8 @@ from core.adapters.fake_state_store import FakeStateStore
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-CHAT = "-1001234567890"
-TOKEN = "123456789:AA-fake-token-for-tests"
+CHAT = '-1001234567890'
+TOKEN = '123456789:AA-fake-token-for-tests'
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def test_8_3_missing_token_skips_the_pass(store: FakeStateStore) -> None:
         result = run_one_delivery(clock=FakeClock(MOMENT), state_store=store)
 
     assert isinstance(result, DeliverySkipped)
-    assert "TELEGRAM_BOT_TOKEN" in result.reason
+    assert 'TELEGRAM_BOT_TOKEN' in result.reason
 
 
 def test_8_3_configured_channel_walks_the_queue(store: FakeStateStore) -> None:
@@ -46,12 +46,12 @@ def test_8_3_configured_channel_walks_the_queue(store: FakeStateStore) -> None:
     GlobalSettings.objects.filter(pk=1).update(
         telegram_chat_id=CHAT, notification_mode=NotificationMode.NOT_ALLOWED
     )
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
     event = Event.objects.create(
         domain=domain,
         event_type=EventType.NOT_ALLOWED,
         occurred_at=MOMENT,
-        payload={"addresses": ["185.44.9.201"]},
+        payload={'addresses': ['185.44.9.201']},
     )
     dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
 
@@ -75,9 +75,9 @@ def test_empty_queue_is_an_empty_pass(store: FakeStateStore) -> None:
 
 
 def test_describe_names_what_happened() -> None:
-    skipped = describe(DeliverySkipped(reason="токен не задан"), MOMENT)
+    skipped = describe(DeliverySkipped(reason='токен не задан'), MOMENT)
     done = describe(DeliveryRun(sent=2, merged=6, failed=1, gave_up=0), MOMENT)
 
-    assert "пропущена" in skipped
-    assert "отправлено 2" in done
-    assert "слито 6" in done
+    assert 'пропущена' in skipped
+    assert 'отправлено 2' in done
+    assert 'слито 6' in done

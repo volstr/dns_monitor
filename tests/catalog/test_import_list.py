@@ -33,12 +33,12 @@ pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
 
-LIST_WITH_A_BAD_LINE = "\n".join(
+LIST_WITH_A_BAD_LINE = '\n'.join(
     [
-        "api-v2.contoso.ru; 10.20.0.0/22; боевой API",
-        "billing.contoso.ru; 10.20.1.0/24 10.20.3.7",
-        "docs.contoso.ru",
-        "cdn-2.contoso.ru; 10.20.999.0/24",
+        'api-v2.contoso.ru; 10.20.0.0/22; боевой API',
+        'billing.contoso.ru; 10.20.1.0/24 10.20.3.7',
+        'docs.contoso.ru',
+        'cdn-2.contoso.ru; 10.20.999.0/24',
     ]
 )
 
@@ -46,7 +46,7 @@ LIST_WITH_A_BAD_LINE = "\n".join(
 @pytest.fixture
 def admin() -> Member:
     return Member.objects.create_member(
-        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT, role=Role.ADMIN
+        email='boss@contoso.ru', name='Анна Кирилова', created_at=MOMENT, role=Role.ADMIN
     )
 
 
@@ -75,13 +75,13 @@ def test_25_good_lines_are_added_and_bad_ones_come_back() -> None:
     )
 
     assert result.added == 3
-    assert sorted(Domain.objects.values_list("name", flat=True)) == [
-        "api-v2.contoso.ru",
-        "billing.contoso.ru",
-        "docs.contoso.ru",
+    assert sorted(Domain.objects.values_list('name', flat=True)) == [
+        'api-v2.contoso.ru',
+        'billing.contoso.ru',
+        'docs.contoso.ru',
     ]
     # Ошибочная строка вернулась целиком, вместе с тем, что человек набрал после точки с запятой.
-    assert result.failed_text == "cdn-2.contoso.ru; 10.20.999.0/24"
+    assert result.failed_text == 'cdn-2.contoso.ru; 10.20.999.0/24'
 
 
 def test_25_error_line_stays_in_the_field_on_the_screen(client: Client, admin: Member) -> None:
@@ -89,24 +89,24 @@ def test_25_error_line_stays_in_the_field_on_the_screen(client: Client, admin: M
     client.force_login(admin)
 
     body = client.post(
-        reverse("domain-import-apply"),
-        {"text": LIST_WITH_A_BAD_LINE, "group": "", "check_now": "yes"},
+        reverse('domain-import-apply'),
+        {'text': LIST_WITH_A_BAD_LINE, 'group': '', 'check_now': 'yes'},
     ).content.decode()
 
-    assert "cdn-2.contoso.ru; 10.20.999.0/24" in body
-    assert "исправьте их и повторите импорт" in body
+    assert 'cdn-2.contoso.ru; 10.20.999.0/24' in body
+    assert 'исправьте их и повторите импорт' in body
 
 
 def test_26_existing_domain_is_skipped_and_untouched() -> None:
     """Критерий 26: флаг обновления выключен — настройки домена не изменились."""
-    group = Group.objects.create(name="Платёжный контур")
+    group = Group.objects.create(name='Платёжный контур')
     existing = Domain.objects.create(
-        name="billing.contoso.ru", group=group, comment="не трогать"
+        name='billing.contoso.ru', group=group, comment='не трогать'
     )
-    AllowlistEntry.objects.create(domain=existing, entry="10.9.9.0/24", raw="10.9.9.0/24")
+    AllowlistEntry.objects.create(domain=existing, entry='10.9.9.0/24', raw='10.9.9.0/24')
 
     result = apply_import(
-        text="billing.contoso.ru; 10.20.1.0/24; переписанный комментарий",
+        text='billing.contoso.ru; 10.20.1.0/24; переписанный комментарий',
         group_id=None,
         update_existing=False,
         check_now=True,
@@ -116,20 +116,20 @@ def test_26_existing_domain_is_skipped_and_untouched() -> None:
     existing.refresh_from_db()
     assert result.skipped == 1
     assert result.added == 0
-    assert existing.comment == "не трогать"
+    assert existing.comment == 'не трогать'
     assert existing.group_id == group.pk
-    assert list(existing.allowlist.values_list("raw", flat=True)) == ["10.9.9.0/24"]
+    assert list(existing.allowlist.values_list('raw', flat=True)) == ['10.9.9.0/24']
 
 
 def test_26_update_flag_replaces_comment_and_allowlist() -> None:
     """Включённый флаг делает ровно то, что обещает, — и только это."""
-    group = Group.objects.create(name="Платёжный контур")
-    existing = Domain.objects.create(name="billing.contoso.ru", group=group, comment="было")
-    AllowlistEntry.objects.create(domain=existing, entry="10.9.9.0/24", raw="10.9.9.0/24")
-    other = Group.objects.create(name="Продакшн-периметр")
+    group = Group.objects.create(name='Платёжный контур')
+    existing = Domain.objects.create(name='billing.contoso.ru', group=group, comment='было')
+    AllowlistEntry.objects.create(domain=existing, entry='10.9.9.0/24', raw='10.9.9.0/24')
+    other = Group.objects.create(name='Продакшн-периметр')
 
     apply_import(
-        text="billing.contoso.ru; 10.20.1.0/24; стало",
+        text='billing.contoso.ru; 10.20.1.0/24; стало',
         group_id=other.pk,
         update_existing=True,
         check_now=True,
@@ -137,19 +137,19 @@ def test_26_update_flag_replaces_comment_and_allowlist() -> None:
     )
 
     existing.refresh_from_db()
-    assert existing.comment == "стало"
-    assert list(existing.allowlist.values_list("raw", flat=True)) == ["10.20.1.0/24"]
+    assert existing.comment == 'стало'
+    assert list(existing.allowlist.values_list('raw', flat=True)) == ['10.20.1.0/24']
     # Группа не меняется даже при обновлении: перенос — отдельная операция со своей сводкой.
     assert existing.group_id == group.pk
 
 
 def test_27_cyrillic_domain_is_shown_in_punycode_before_confirmation() -> None:
     """Критерий 27: молчаливого искажения нет — перевод виден в разборе."""
-    preview = preview_import(text="контосо.рф; 10.20.0.0/22")
+    preview = preview_import(text='контосо.рф; 10.20.0.0/22')
     line = preview.lines[0]
 
-    assert line.converted_from == "контосо.рф"
-    assert line.name == "xn--j1agcbarf.xn--p1ai"
+    assert line.converted_from == 'контосо.рф'
+    assert line.name == 'xn--j1agcbarf.xn--p1ai'
     assert line.error is None
 
 
@@ -157,29 +157,29 @@ def test_27_the_screen_shows_the_punycode(client: Client, admin: Member) -> None
     client.force_login(admin)
 
     body = client.post(
-        reverse("domain-import"), {"text": "контосо.рф; 10.20.0.0/22"}
+        reverse('domain-import'), {'text': 'контосо.рф; 10.20.0.0/22'}
     ).content.decode()
 
-    assert "контосо.рф → xn--j1agcbarf.xn--p1ai" in body
+    assert 'контосо.рф → xn--j1agcbarf.xn--p1ai' in body
 
 
 def test_27_undecodable_name_is_an_error_not_a_silent_mangling() -> None:
     """Перевод невозможен — строка отказана с причиной, а не записана как попало."""
-    preview = preview_import(text="-" * 70 + ".рф")
+    preview = preview_import(text='-' * 70 + '.рф')
 
     assert preview.broken == 1
     assert preview.lines[0].error
 
 
 def test_10_3_domain_without_allowlist_is_accepted_with_a_warning() -> None:
-    preview = preview_import(text="docs.contoso.ru")
+    preview = preview_import(text='docs.contoso.ru')
 
     assert preview.to_add == 1
-    assert "следить получится только за изменением" in preview.lines[0].warning
+    assert 'следить получится только за изменением' in preview.lines[0].warning
 
 
 def test_10_3_summary_counts_three_buckets() -> None:
-    Domain.objects.create(name="docs.contoso.ru")
+    Domain.objects.create(name='docs.contoso.ru')
 
     preview = preview_import(text=LIST_WITH_A_BAD_LINE)
 
@@ -187,54 +187,54 @@ def test_10_3_summary_counts_three_buckets() -> None:
 
 
 def test_10_3_imported_domains_land_in_the_chosen_group() -> None:
-    group = Group.objects.create(name="Продакшн-периметр")
+    group = Group.objects.create(name='Продакшн-периметр')
 
     apply_import(
-        text="docs.contoso.ru",
+        text='docs.contoso.ru',
         group_id=group.pk,
         update_existing=False,
         check_now=True,
         at=MOMENT,
     )
 
-    assert Domain.objects.get(name="docs.contoso.ru").group_id == group.pk
+    assert Domain.objects.get(name='docs.contoso.ru').group_id == group.pk
 
 
 def test_10_4_import_can_create_the_group_it_names() -> None:
     """10.4: «при отсутствии совпадений предлагается создать группу с введённым названием»."""
     result = apply_import(
-        text="docs.contoso.ru",
+        text='docs.contoso.ru',
         group_id=None,
-        new_group_name="Свежая группа",
+        new_group_name='Свежая группа',
         update_existing=False,
         check_now=True,
         at=MOMENT,
     )
 
-    assert result.group_name == "Свежая группа"
-    assert Domain.objects.get(name="docs.contoso.ru").group.name == "Свежая группа"
+    assert result.group_name == 'Свежая группа'
+    assert Domain.objects.get(name='docs.contoso.ru').group.name == 'Свежая группа'
 
 
 def test_10_3_check_now_puts_the_first_check_at_once() -> None:
     apply_import(
-        text="docs.contoso.ru",
+        text='docs.contoso.ru',
         group_id=None,
         update_existing=False,
         check_now=True,
         at=MOMENT,
     )
 
-    assert Domain.objects.get(name="docs.contoso.ru").next_check_at == MOMENT
+    assert Domain.objects.get(name='docs.contoso.ru').next_check_at == MOMENT
 
 
 def test_10_3_without_the_flag_checks_are_spread_inside_the_period() -> None:
     """11.1: двести импортированных доменов не должны уйти в резолв одной пачкой."""
     period = GlobalSettings.objects.get().check_period_seconds
-    names = "\n".join(f"host-{number}.contoso.ru" for number in range(40))
+    names = '\n'.join(f'host-{number}.contoso.ru' for number in range(40))
 
     apply_import(text=names, group_id=None, update_existing=False, check_now=False, at=MOMENT)
 
-    scheduled = set(Domain.objects.values_list("next_check_at", flat=True))
+    scheduled = set(Domain.objects.values_list('next_check_at', flat=True))
     assert len(scheduled) > 1
     assert all(MOMENT <= moment <= MOMENT + timedelta(seconds=period) for moment in scheduled)
 
@@ -242,29 +242,29 @@ def test_10_3_without_the_flag_checks_are_spread_inside_the_period() -> None:
 def test_10_3_file_upload_is_read_as_a_list(client: Client, admin: Member) -> None:
     """10.3: источников два — вставка и файл. Файл побеждает пустую вставку."""
     client.force_login(admin)
-    upload = _file("docs.contoso.ru; 10.20.0.0/22\n")
+    upload = _file('docs.contoso.ru; 10.20.0.0/22\n')
 
-    body = client.post(reverse("domain-import"), {"text": "", "source": upload}).content.decode()
+    body = client.post(reverse('domain-import'), {'text': '', 'source': upload}).content.decode()
 
-    assert "docs.contoso.ru" in body
-    assert "Добавим" in body
+    assert 'docs.contoso.ru' in body
+    assert 'Добавим' in body
 
 
 def test_10_3_first_step_offers_both_sources_and_the_flags(
     client: Client, admin: Member
 ) -> None:
     """Экран вставки: оба источника из 10.3 и флаг проверки, включённый по умолчанию."""
-    Group.objects.create(name="Продакшн-периметр")
+    Group.objects.create(name='Продакшн-периметр')
     client.force_login(admin)
 
-    body = client.get(reverse("domain-import")).content.decode()
+    body = client.get(reverse('domain-import')).content.decode()
 
     assert 'name="text"' in body
     assert 'accept=".txt,.csv' in body
     assert 'name="check_now" value="yes" checked' in body
-    assert "Продакшн-периметр" in body
+    assert 'Продакшн-периметр' in body
     # Многострочные комментарии шаблона не должны утекать в разметку.
-    assert "клиентский код разрешён" not in body
+    assert 'клиентский код разрешён' not in body
 
 
 def test_10_3_confirmation_offers_the_update_flag_switched_off(
@@ -273,23 +273,23 @@ def test_10_3_confirmation_offers_the_update_flag_switched_off(
     """10.3: «перезапись чужих настроек не должна происходить сама собой»."""
     client.force_login(admin)
 
-    body = client.post(reverse("domain-import"), {"text": "docs.contoso.ru"}).content.decode()
+    body = client.post(reverse('domain-import'), {'text': 'docs.contoso.ru'}).content.decode()
 
     assert 'name="update_existing" value="yes">' in body
-    assert "checked>\n          Обновить" not in body
+    assert 'checked>\n          Обновить' not in body
 
 
 def test_10_3_observer_cannot_open_the_import(client: Client) -> None:
     observer = Member.objects.create_member(
-        email="watch@contoso.ru", name="Наблюдатель", created_at=MOMENT, role=Role.OBSERVER
+        email='watch@contoso.ru', name='Наблюдатель', created_at=MOMENT, role=Role.OBSERVER
     )
     client.force_login(observer)
 
-    assert client.get(reverse("domain-import")).status_code == 403
+    assert client.get(reverse('domain-import')).status_code == 403
 
 
 def _file(text: str) -> SimpleUploadedFile:
-    return SimpleUploadedFile("domains.txt", text.encode(), content_type="text/plain")
+    return SimpleUploadedFile('domains.txt', text.encode(), content_type='text/plain')
 
 
 def test_34_two_hundred_domains_checked_at_once_produce_no_change_notifications() -> None:
@@ -306,10 +306,10 @@ def test_34_two_hundred_domains_checked_at_once_produce_no_change_notifications(
     только о выходе за список разрешённых, и тогда тишина ничего не доказывала бы.
     """
     GlobalSettings.objects.filter(pk=1).update(notification_mode=NotificationMode.ADDRESS_CHANGE)
-    names = [f"host-{index:03d}.contoso.ru" for index in range(200)]
+    names = [f'host-{index:03d}.contoso.ru' for index in range(200)]
 
     result = apply_import(
-        text="\n".join(names),
+        text='\n'.join(names),
         group_id=None,
         update_existing=False,
         check_now=True,
@@ -317,7 +317,7 @@ def test_34_two_hundred_domains_checked_at_once_produce_no_change_notifications(
     )
     assert result.added == 200
 
-    resolver = FakeResolver({name: [answered("10.20.1.14", "10.20.2.60")] for name in names})
+    resolver = FakeResolver({name: [answered('10.20.1.14', '10.20.2.60')] for name in names})
     store = FakeStateStore(FakeClock(MOMENT))
     report = tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1, limit=200)
 

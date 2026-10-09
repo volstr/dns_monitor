@@ -17,12 +17,12 @@ import pytest
 from core.adapters.smtp import SmtpChannel, Transport
 from core.ports.notification_channel import NotSent, Sent
 
-SENDER = "robot@contoso.ru"
-HOST = "smtp.contoso.ru"
-RECIPIENT = "duty@contoso.ru"
+SENDER = 'robot@contoso.ru'
+HOST = 'smtp.contoso.ru'
+RECIPIENT = 'duty@contoso.ru'
 MESSAGE = (
-    "<b>Адрес вне разрешённых</b>\n"
-    "<code>pay-gw.contoso.ru</code>\n"
+    '<b>Адрес вне разрешённых</b>\n'
+    '<code>pay-gw.contoso.ru</code>\n'
     'Адрес: <code>185.44.9.201</code>\n<a href="https://dns.example/domains/1/">Открыть домен</a>'
 )
 
@@ -45,7 +45,7 @@ def channel(transport: Transport, *, host: str | None = HOST) -> SmtpChannel:
 
 
 @pytest.mark.parametrize(
-    ("host", "sender", "configured"),
+    ('host', 'sender', 'configured'),
     [
         (HOST, SENDER, True),
         (HOST, None, False),
@@ -65,11 +65,11 @@ def test_8_3_message_goes_to_every_listed_address() -> None:
     recorder = Recorder()
 
     result = channel(recorder).send(
-        recipient="duty@contoso.ru\nnoc@contoso.ru\n", text=MESSAGE
+        recipient='duty@contoso.ru\nnoc@contoso.ru\n', text=MESSAGE
     )
 
     assert isinstance(result, Sent)
-    assert recorder.messages[0]["To"] == "duty@contoso.ru, noc@contoso.ru"
+    assert recorder.messages[0]['To'] == 'duty@contoso.ru, noc@contoso.ru'
 
 
 def test_8_4_subject_is_the_event_heading() -> None:
@@ -83,7 +83,7 @@ def test_8_4_subject_is_the_event_heading() -> None:
 
     channel(recorder).send(recipient=RECIPIENT, text=MESSAGE)
 
-    assert recorder.messages[0]["Subject"] == "Адрес вне разрешённых"
+    assert recorder.messages[0]['Subject'] == 'Адрес вне разрешённых'
 
 
 def test_8_4_letter_carries_both_html_and_plain_text() -> None:
@@ -98,26 +98,26 @@ def test_8_4_letter_carries_both_html_and_plain_text() -> None:
     channel(recorder).send(recipient=RECIPIENT, text=MESSAGE)
     letter = recorder.messages[0]
 
-    assert letter.get_content_type() == "multipart/alternative"
-    plain = letter.get_body(preferencelist=("plain",))
-    html = letter.get_body(preferencelist=("html",))
+    assert letter.get_content_type() == 'multipart/alternative'
+    plain = letter.get_body(preferencelist=('plain',))
+    html = letter.get_body(preferencelist=('html',))
     assert plain is not None
     assert html is not None
-    assert "Адрес вне разрешённых" in plain.get_content()
-    assert "<b>" not in plain.get_content()
-    assert "Открыть домен" in html.get_content()
+    assert 'Адрес вне разрешённых' in plain.get_content()
+    assert '<b>' not in plain.get_content()
+    assert 'Открыть домен' in html.get_content()
 
 
 def test_7_3_reply_goes_into_the_original_thread() -> None:
     """7.3: возврат в норму приходит ответом на исходное сообщение."""
     recorder = Recorder()
 
-    channel(recorder).send(recipient=RECIPIENT, text=MESSAGE, reply_to="<opening@contoso.ru>")
+    channel(recorder).send(recipient=RECIPIENT, text=MESSAGE, reply_to='<opening@contoso.ru>')
     letter = recorder.messages[0]
 
     # Два заголовка сразу: In-Reply-To понимают все клиенты, References — строящие дерево.
-    assert letter["In-Reply-To"] == "<opening@contoso.ru>"
-    assert letter["References"] == "<opening@contoso.ru>"
+    assert letter['In-Reply-To'] == '<opening@contoso.ru>'
+    assert letter['References'] == '<opening@contoso.ru>'
 
 
 def test_7_3_message_id_comes_back_for_threading() -> None:
@@ -127,7 +127,7 @@ def test_7_3_message_id_comes_back_for_threading() -> None:
     result = channel(recorder).send(recipient=RECIPIENT, text=MESSAGE)
 
     assert isinstance(result, Sent)
-    assert result.channel_message_id == recorder.messages[0]["Message-ID"]
+    assert result.channel_message_id == recorder.messages[0]['Message-ID']
 
 
 def test_8_3_unconfigured_channel_refuses_without_trying() -> None:
@@ -143,7 +143,7 @@ def test_8_3_unconfigured_channel_refuses_without_trying() -> None:
 def test_8_3_empty_recipient_list_is_a_refusal_not_a_send() -> None:
     recorder = Recorder()
 
-    result = channel(recorder).send(recipient="   \n  ", text=MESSAGE)
+    result = channel(recorder).send(recipient='   \n  ', text=MESSAGE)
 
     assert isinstance(result, NotSent)
     assert result.retryable is False
@@ -151,7 +151,7 @@ def test_8_3_empty_recipient_list_is_a_refusal_not_a_send() -> None:
 
 def test_8_3_a_wrong_password_is_not_worth_retrying() -> None:
     """Пароль не подойдёт со второй попытки: пять повторов лишь оттянут запись в журнал."""
-    recorder = Recorder(smtplib.SMTPAuthenticationError(535, b"authentication failed"))
+    recorder = Recorder(smtplib.SMTPAuthenticationError(535, b'authentication failed'))
 
     result = channel(recorder).send(recipient=RECIPIENT, text=MESSAGE)
 
@@ -168,7 +168,7 @@ def test_78_an_unreachable_server_is_a_retryable_failure_not_a_crash() -> None:
     Повторять имеет смысл, ради этого повторы и существуют; в Sentry уходит уже исчерпание
     повторов, и это проверяется на стороне доставки.
     """
-    unreachable = SmtpChannel(host="127.0.0.1", sender=SENDER, port=1, tls="none")
+    unreachable = SmtpChannel(host='127.0.0.1', sender=SENDER, port=1, tls='none')
 
     result = unreachable.send(recipient=RECIPIENT, text=MESSAGE)
 

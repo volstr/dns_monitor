@@ -24,9 +24,9 @@ from apps.monitoring.selectors.trace import trace_of_domain
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 22, 14, 38, tzinfo=UTC)
-FRESH = "142.250.180.14"
-GONE = "142.251.39.142"
-IPV6 = "2a00:1450:400e:808::200e"
+FRESH = '142.250.180.14'
+GONE = '142.251.39.142'
+IPV6 = '2a00:1450:400e:808::200e'
 
 
 def observe(domain: Domain, address: str, *days: int) -> None:
@@ -41,7 +41,7 @@ def observe(domain: Domain, address: str, *days: int) -> None:
 
 @pytest.fixture
 def domain() -> Domain:
-    return Domain.objects.create(name="google.com")
+    return Domain.objects.create(name='google.com')
 
 
 def test_9_2_colour_is_the_current_status_and_fill_is_the_past(domain: Domain) -> None:
@@ -55,22 +55,22 @@ def test_9_2_colour_is_the_current_status_and_fill_is_the_past(domain: Domain) -
     """
     observe(domain, GONE, 3, 2, 1)
 
-    trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={GONE: "stale"})
+    trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={GONE: 'stale'})
 
-    row = trace["rows"][0]
-    assert row["status"] == "stale", "цвет — от статуса сейчас, а не от того, что было в тот день"
-    assert len(row["days"]) == 3, "заливка — от того, что было в тот день"
+    row = trace['rows'][0]
+    assert row['status'] == 'stale', 'цвет — от статуса сейчас, а не от того, что было в тот день'
+    assert len(row['days']) == 3, 'заливка — от того, что было в тот день'
 
 
 def test_9_2_a_day_without_an_answer_leaves_no_mark(domain: Domain) -> None:
     """След из отметок, а не сплошная полоса: пропуски обязаны быть видны (9.2)."""
     observe(domain, FRESH, 3, 1)
 
-    trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={FRESH: "matched"})
+    trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={FRESH: 'matched'})
 
     # Ось — четверо суток, отдача была в двух: между ними пропуск, и он не закрашивается.
-    assert trace["days"] == 4
-    assert trace["rows"][0]["days"] == [0, 2]
+    assert trace['days'] == 4
+    assert trace['rows'][0]['days'] == [0, 2]
 
 
 def test_9_2_axis_covers_the_whole_period_of_watching(domain: Domain) -> None:
@@ -84,11 +84,11 @@ def test_9_2_axis_covers_the_whole_period_of_watching(domain: Domain) -> None:
     observe(domain, FRESH, 1)
 
     trace = trace_of_domain(
-        domain_id=domain.pk, at=MOMENT, statuses={GONE: "stale", FRESH: "matched"}
+        domain_id=domain.pk, at=MOMENT, statuses={GONE: 'stale', FRESH: 'matched'}
     )
 
-    assert trace["days"] == 10
-    rows = {row["address"]: row["days"] for row in trace["rows"]}
+    assert trace['days'] == 10
+    rows = {row['address']: row['days'] for row in trace['rows']}
     assert rows[GONE] == [0]
     assert rows[FRESH] == [8]
 
@@ -105,13 +105,13 @@ def test_d27_address_that_does_not_exist_gets_no_row(domain: Domain) -> None:
     observe(domain, FRESH, 1)
     observe(domain, IPV6, 1)
 
-    trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={FRESH: "matched"})
+    trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={FRESH: 'matched'})
 
-    assert [row["address"] for row in trace["rows"]] == [FRESH]
+    assert [row['address'] for row in trace['rows']] == [FRESH]
 
 
 def test_9_2_domain_without_observations_gives_an_empty_trace(domain: Domain) -> None:
     trace = trace_of_domain(domain_id=domain.pk, at=MOMENT, statuses={})
 
-    assert trace["rows"] == []
-    assert trace["days"] == 1
+    assert trace['rows'] == []
+    assert trace['days'] == 1

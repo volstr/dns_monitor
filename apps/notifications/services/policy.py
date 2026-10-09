@@ -35,13 +35,13 @@ _CONTINUATIONS = frozenset({EventType.BACK_TO_NORMAL.value, EventType.RESOLVE_RE
 
 class SkipReason(StrEnum):
     #: Режим группы такие события не отслеживает (8.1).
-    MODE = "mode"
+    MODE = 'mode'
     #: Уведомление по этому типу не отправляется никогда — например, WATCH_STARTED (7.4).
-    NEVER = "never"
+    NEVER = 'never'
     #: Нет открывающего сообщения, отвечать не на что (Q-D7).
-    NO_OPENING_MESSAGE = "no_opening_message"
+    NO_OPENING_MESSAGE = 'no_opening_message'
     #: Флаг «сообщать о возврате в норму» выключен (8.1).
-    BACK_TO_NORMAL_DISABLED = "back_to_normal_disabled"
+    BACK_TO_NORMAL_DISABLED = 'back_to_normal_disabled'
 
 
 @dataclass(frozen=True, slots=True)

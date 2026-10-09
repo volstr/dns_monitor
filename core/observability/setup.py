@@ -36,7 +36,7 @@ def configure_sentry(
     dsn: str | None,
     environment: str,
     traces_sample_rate: float,
-    release: str = "",
+    release: str = '',
     transport: Transport | Callable[[Event], None] | None = None,
 ) -> bool:
     """Подключить Sentry. Возвращает, подключён ли он на самом деле."""
@@ -67,4 +67,4 @@ def _before_send(event: Event, hint: Hint) -> Event | None:
     # `Event` — это `TypedDict` Sentry, а чистка обходит событие как обычный словарь: набор
     # ключей задаётся форматом чужого клиента и меняется от версии к версии, перечислять его
     # у себя означало бы пропустить секрет в поле, о котором мы не знали.
-    return cast("Event", scrub_event(dict(event)))
+    return cast('Event', scrub_event(dict(event)))

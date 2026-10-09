@@ -24,11 +24,11 @@ class ResolveOutcome(StrEnum):
     проверки в колонке «История»."""
 
     #: Есть записи.
-    ANSWERED = "answered"
+    ANSWERED = 'answered'
     #: NXDOMAIN или NOERROR без записей — это результат наблюдения, а не ошибка сети (6.1).
-    NO_RECORDS = "no_records"
+    NO_RECORDS = 'no_records'
     #: Ни один сервер не ответил. Реестр и статусы не трогаются, событий нет (6.1).
-    UNAVAILABLE = "unavailable"
+    UNAVAILABLE = 'unavailable'
 
 
 @dataclass(frozen=True, slots=True)

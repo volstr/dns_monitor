@@ -50,12 +50,12 @@ class GroupNotCreated:
 
 
 def move_domain(
-    *, domain_id: int, group_id: int | None, new_group_name: str = "", at: datetime
+    *, domain_id: int, group_id: int | None, new_group_name: str = '', at: datetime
 ) -> DomainMoved | MoveRefused:
     """Перенести домен — ТЗ 10.4."""
-    domain = Domain.objects.select_related("group").filter(pk=domain_id).first()
+    domain = Domain.objects.select_related('group').filter(pk=domain_id).first()
     if domain is None:
-        return MoveRefused(reason="Домен не найден.")
+        return MoveRefused(reason='Домен не найден.')
 
     target_id = group_id
     if new_group_name.strip():
@@ -68,21 +68,21 @@ def move_domain(
 
     group = Group.objects.filter(pk=target_id).first() if target_id else None
     if target_id and group is None:
-        return MoveRefused(reason="Группа не найдена — возможно, её удалили.")
+        return MoveRefused(reason='Группа не найдена — возможно, её удалили.')
 
     if domain.group_id == (group.pk if group else None):
-        return MoveRefused(reason="Домен уже в этой группе.")
+        return MoveRefused(reason='Домен уже в этой группе.')
 
     period = settings_of_group(group, GlobalSettings.objects.get()).check_period.value
     with transaction.atomic():
         domain.group = group
         domain.next_check_at = _next_check(domain.next_check_at, at + period)
-        domain.save(update_fields=["group", "next_check_at"])
+        domain.save(update_fields=['group', 'next_check_at'])
 
     return DomainMoved(
         domain_id=domain.pk,
         domain_name=domain.name,
-        group_name=group.name if group else "Без группы",
+        group_name=group.name if group else 'Без группы',
     )
 
 
@@ -95,9 +95,9 @@ def create_group(name: str) -> GroupCreated | GroupNotCreated:
     """
     stripped = name.strip()
     if not stripped:
-        return GroupNotCreated(reason="Название группы обязательно.")
+        return GroupNotCreated(reason='Название группы обязательно.')
     if len(stripped) > GROUP_NAME_MAX_LENGTH:
-        return GroupNotCreated(reason=f"Название длиннее {GROUP_NAME_MAX_LENGTH} символов.")
+        return GroupNotCreated(reason=f'Название длиннее {GROUP_NAME_MAX_LENGTH} символов.')
 
     existing = Group.objects.filter(name=stripped).first()
     if existing is not None:

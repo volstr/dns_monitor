@@ -24,7 +24,7 @@ class RedisStateStore(StateStore):
     def acquire(self, key: StateKey) -> bool:
         # SET NX EX — захват и срок жизни одной командой: промежутка, в котором ключ уже есть,
         # а срока у него ещё нет, не существует.
-        return bool(self._client.set(key.name, "1", nx=True, ex=key.ttl))
+        return bool(self._client.set(key.name, '1', nx=True, ex=key.ttl))
 
     def release(self, key: StateKey) -> None:
         self._client.delete(key.name)

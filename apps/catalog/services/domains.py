@@ -161,16 +161,16 @@ def _trap_warning(
 ) -> str:
     """ТЗ 8.2: предупредить, если добавленный домен не пришлёт уведомление никогда."""
     if parsed.entries or not any(line.name for line in lines):
-        return ""
+        return ''
 
     group = Group.objects.filter(pk=group_id).first() if group_id else None
     effective = settings_of_group(group, GlobalSettings.objects.get())
     if effective.notification_mode.value != NotificationMode.NOT_ALLOWED:
-        return ""
+        return ''
     return (
-        "Разрешённые адреса не заданы, а режим уведомлений — «При выходе из разрешённых». "
-        "По такому домену уведомлений не будет никогда: сравнивать не с чем. Задайте список "
-        "на карточке домена."
+        'Разрешённые адреса не заданы, а режим уведомлений — «При выходе из разрешённых». '
+        'По такому домену уведомлений не будет никогда: сравнивать не с чем. Задайте список '
+        'на карточке домена.'
     )
 
 
@@ -190,11 +190,11 @@ def create_domain(
     """
     normalized, reason = normalized_name(name)
     if normalized is None:
-        return DomainNotCreated(reason=reason or "Имя домена не подходит.")
+        return DomainNotCreated(reason=reason or 'Имя домена не подходит.')
 
     if Domain.objects.filter(name=normalized).exists():
         # 10.1: дубликаты внутри установки не допускаются.
-        return DomainNotCreated(reason=f"Домен {normalized} уже есть в списке.")
+        return DomainNotCreated(reason=f'Домен {normalized} уже есть в списке.')
 
     domain = Domain.objects.create(
         name=normalized,
@@ -202,7 +202,7 @@ def create_domain(
         comment=comment.strip(),
         next_check_at=at,
     )
-    stripped = name.strip().rstrip(".")
+    stripped = name.strip().rstrip('.')
     return DomainCreated(
         domain_id=domain.pk,
         name=normalized,
@@ -214,7 +214,7 @@ def create_domain(
 #: может стоять с краю. Подчёркивание добавлено сверх него сознательно: в самом DNS оно
 #: допустимо, а имена вида `_acme-challenge.example.com` — обычный CNAME, и запрещать их,
 #: когда CNAME есть в списке типов записей (4.3), значило бы запрещать рабочий случай.
-_LABEL = re.compile(r"^[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?$")
+_LABEL = re.compile(r'^[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?$')
 
 #: Длина метки. Ограничение самого DNS, не наше.
 LABEL_MAX_LENGTH = 63
@@ -222,7 +222,7 @@ LABEL_MAX_LENGTH = 63
 #: Признаки того, что вместо имени домена вставили ссылку. Проверяются **до** разбора, чтобы
 #: сказать человеку, что именно не так: «недопустимый символ» в такой ситуации бесполезен —
 #: он верен и ничего не объясняет.
-_URL_MARKS = ("://", "/", "?", "#", "@", ":")
+_URL_MARKS = ('://', '/', '?', '#', '@', ':')
 
 
 def normalized_name(name: str) -> tuple[str | None, str | None]:
@@ -235,13 +235,13 @@ def normalized_name(name: str) -> tuple[str | None, str | None]:
     Такой домен заводится, попадает в расписание и потом молча не резолвится — ошибка ввода
     превращается в наблюдение за несуществующим именем (Q-D48).
     """
-    stripped = name.strip().rstrip(".")
+    stripped = name.strip().rstrip('.')
     if not stripped:
-        return None, "Имя домена обязательно."
-    if " " in stripped:
-        return None, "В имени домена не бывает пробелов."
-    if "." not in stripped:
-        return None, "Имя домена состоит хотя бы из двух частей, разделённых точкой."
+        return None, 'Имя домена обязательно.'
+    if ' ' in stripped:
+        return None, 'В имени домена не бывает пробелов.'
+    if '.' not in stripped:
+        return None, 'Имя домена состоит хотя бы из двух частей, разделённых точкой.'
 
     url_hint = _url_refusal(stripped)
     if url_hint:
@@ -252,33 +252,33 @@ def normalized_name(name: str) -> tuple[str | None, str | None]:
     # нарушалось бы дважды: имя не приведено и дубликат не распознан.
     lowered = stripped.lower()
     try:
-        converted = lowered.encode("idna").decode("ascii")
+        converted = lowered.encode('idna').decode('ascii')
     except UnicodeError:
         return None, (
-            f"«{stripped}» не удаётся перевести в punycode. Проверьте, нет ли в имени "
-            f"недопустимых символов и не длиннее ли часть имени 63 знаков."
+            f'«{stripped}» не удаётся перевести в punycode. Проверьте, нет ли в имени '
+            f'недопустимых символов и не длиннее ли часть имени 63 знаков.'
         )
 
 
     if len(converted) > DOMAIN_NAME_MAX_LENGTH:
-        return None, f"Имя домена длиннее {DOMAIN_NAME_MAX_LENGTH} символов."
+        return None, f'Имя домена длиннее {DOMAIN_NAME_MAX_LENGTH} символов.'
 
-    labels = converted.split(".")
+    labels = converted.split('.')
     for label in labels:
         if len(label) > LABEL_MAX_LENGTH:
-            return None, f"Часть имени «{label[:20]}…» длиннее {LABEL_MAX_LENGTH} символов."
+            return None, f'Часть имени «{label[:20]}…» длиннее {LABEL_MAX_LENGTH} символов.'
         if not _LABEL.match(label):
             return None, (
-                f"«{label}» не может быть частью имени домена. Части состоят из букв, цифр и "
-                f"дефиса, и дефис не может стоять первым или последним."
+                f'«{label}» не может быть частью имени домена. Части состоят из букв, цифр и '
+                f'дефиса, и дефис не может стоять первым или последним.'
             )
 
     # Числовая последняя часть означает, что ввели адрес, а не имя. Домен с таким окончанием
     # не существует — верхнего уровня из одних цифр в DNS нет.
     if labels[-1].isdigit():
         return None, (
-            f"«{converted}» похоже на IP-адрес, а не на имя домена. Наблюдение ведётся за "
-            f"именем: адреса — это то, что оно отдаёт."
+            f'«{converted}» похоже на IP-адрес, а не на имя домена. Наблюдение ведётся за '
+            f'именем: адреса — это то, что оно отдаёт.'
         )
 
     return converted, None
@@ -295,11 +295,11 @@ def _url_refusal(value: str) -> str | None:
     """
     if not any(mark in value for mark in _URL_MARKS):
         return None
-    host = value.split("://", 1)[-1].split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
-    host = host.rsplit("@", 1)[-1].split(":", 1)[0]
-    if host and "." in host:
-        return f"Похоже на ссылку или адрес почты. Введите только имя домена: {host.lower()}"
-    return "Похоже на ссылку. Введите только имя домена — без схемы, порта и пути."
+    host = value.split('://', 1)[-1].split('/', 1)[0].split('?', 1)[0].split('#', 1)[0]
+    host = host.rsplit('@', 1)[-1].split(':', 1)[0]
+    if host and '.' in host:
+        return f'Похоже на ссылку или адрес почты. Введите только имя домена: {host.lower()}'
+    return 'Похоже на ссылку. Введите только имя домена — без схемы, порта и пути.'
 
 
 def save_domain(
@@ -345,7 +345,7 @@ def _form_reasons(record_types: tuple[str, ...]) -> tuple[str, ...]:
     просто снял обе галочки, — отказ обязан быть штатным (`CLAUDE.md`).
     """
     if not record_types:
-        return ("Нужен хотя бы один тип записи: иначе домен не о чем спрашивать.",)
+        return ('Нужен хотя бы один тип записи: иначе домен не о чем спрашивать.',)
     return ()
 
 
@@ -373,11 +373,11 @@ def switch_watch(
     """
     domain = Domain.objects.filter(pk=domain_id).first()
     if domain is None:
-        return DomainNotCreated(reason="Домен не найден.")
+        return DomainNotCreated(reason='Домен не найден.')
 
-    fields: dict[str, object] = {"watch_enabled": enabled}
+    fields: dict[str, object] = {'watch_enabled': enabled}
     if enabled and domain.next_check_at is None:
-        fields["next_check_at"] = at
+        fields['next_check_at'] = at
     Domain.objects.filter(pk=domain_id).update(**fields)
 
     return WatchSwitched(domain_id=domain_id, watch_enabled=enabled)
@@ -400,7 +400,7 @@ def delete_domain(*, domain_id: int) -> DomainDeleted | DomainNotCreated:
     """
     domain = Domain.objects.filter(pk=domain_id).first()
     if domain is None:
-        return DomainNotCreated(reason="Домен не найден.")
+        return DomainNotCreated(reason='Домен не найден.')
 
     name = domain.name
     events = domain.events.count()

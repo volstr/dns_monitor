@@ -17,11 +17,11 @@ from apps.accounts.models import Member
 class MemberAccessState(StrEnum):
     """Три состояния из ТЗ 3 плюс «Отключён» из 3.1 (Q-C17)."""
 
-    DISABLED = "disabled"
-    INVITATION_PENDING = "invitation_pending"
+    DISABLED = 'disabled'
+    INVITATION_PENDING = 'invitation_pending'
     # Это состояние доступа «Пароль выдан, не менялся» (ТЗ 3), а не пароль: S105 ложный.
-    PASSWORD_ISSUED = "password_issued"  # noqa: S105
-    ACTIVE = "active"
+    PASSWORD_ISSUED = 'password_issued'  # noqa: S105
+    ACTIVE = 'active'
 
 
 def access_state(member: Member) -> MemberAccessState:

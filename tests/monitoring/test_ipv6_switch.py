@@ -21,14 +21,14 @@ pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
 DAY = timedelta(days=1)
-IPV4 = "216.58.198.46"
-IPV6 = "2a00:1450:400e:809::200e"
+IPV4 = '216.58.198.46'
+IPV6 = '2a00:1450:400e:809::200e'
 
 
 @pytest.fixture
 def domain() -> Domain:
-    domain = Domain.objects.create(name="google.com", next_check_at=MOMENT)
-    AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+    domain = Domain.objects.create(name='google.com', next_check_at=MOMENT)
+    AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
     return domain
 
 
@@ -39,7 +39,7 @@ def disable_ipv6() -> None:
 def resolver_with_both() -> FakeResolver:
     # Один ответ с двумя адресами: список в тестовом резолвере — это ответы на
     # последовательные вызовы, а не содержимое одного ответа.
-    return FakeResolver({"google.com": [answered(IPV4, IPV6)] * 4})
+    return FakeResolver({'google.com': [answered(IPV4, IPV6)] * 4})
 
 
 def test_d27_aaaa_is_not_requested_when_the_flag_is_off(domain: Domain) -> None:
@@ -67,7 +67,7 @@ def test_d27_ipv6_never_reaches_the_registry(domain: Domain) -> None:
 
     run_check(domain_id=domain.pk, at=MOMENT, resolver=resolver_with_both())
 
-    addresses = set(AddressRegistryEntry.objects.values_list("address", flat=True))
+    addresses = set(AddressRegistryEntry.objects.values_list('address', flat=True))
     assert str(IPV4) in {str(item) for item in addresses}
     assert IPV6 not in {str(item) for item in addresses}
 
@@ -112,7 +112,7 @@ def test_d27_row_in_the_registry_stays_but_is_invisible(domain: Domain) -> None:
 
 def test_d27_flag_is_stronger_than_the_domains_own_aaaa(domain: Domain) -> None:
     """Общая настройка главнее типа записи у домена (4.3)."""
-    Domain.objects.filter(pk=domain.pk).update(record_types=["a", "aaaa"])
+    Domain.objects.filter(pk=domain.pk).update(record_types=['a', 'aaaa'])
     disable_ipv6()
     resolver = resolver_with_both()
 
@@ -122,7 +122,7 @@ def test_d27_flag_is_stronger_than_the_domains_own_aaaa(domain: Domain) -> None:
 
 
 def test_d27_ipv4_only_domain_is_unaffected(domain: Domain) -> None:
-    resolver = FakeResolver({"google.com": [answered(IPV4)]})
+    resolver = FakeResolver({'google.com': [answered(IPV4)]})
 
     run_check(domain_id=domain.pk, at=MOMENT, resolver=resolver)
 

@@ -106,9 +106,9 @@ def group_list_page() -> GroupListPage:
     global_settings = GlobalSettings.objects.get()
     groups = (
         Group.objects.annotate(
-            domains_total=Count("domains", distinct=True),
+            domains_total=Count('domains', distinct=True),
             unresolved=Count(
-                "domains",
+                'domains',
                 # Существование инцидента проверяется отдельно и обязательно: у домена без
                 # инцидентов внешнее соединение подставляет NULL, и одно лишь «не закрыт»
                 # посчитало бы такой домен расхождением.
@@ -120,15 +120,15 @@ def group_list_page() -> GroupListPage:
             ),
         )
         .values(
-            "id",
-            "name",
-            "comment",
-            "check_period_seconds",
-            "notification_mode",
-            "domains_total",
-            "unresolved",
+            'id',
+            'name',
+            'comment',
+            'check_period_seconds',
+            'notification_mode',
+            'domains_total',
+            'unresolved',
         )
-        .order_by("name")
+        .order_by('name')
     )
 
     return GroupListPage(
@@ -142,15 +142,15 @@ def group_list_page() -> GroupListPage:
 
 
 def _card(row: dict[str, Any], global_settings: GlobalSettings) -> GroupCard:
-    own_period = row["check_period_seconds"]
-    own_mode = row["notification_mode"]
+    own_period = row['check_period_seconds']
+    own_mode = row['notification_mode']
 
     return GroupCard(
-        id=row["id"],
-        name=row["name"],
-        comment=row["comment"],
-        domain_count=row["domains_total"],
-        unresolved=row["unresolved"],
+        id=row['id'],
+        name=row['name'],
+        comment=row['comment'],
+        domain_count=row['domains_total'],
+        unresolved=row['unresolved'],
         period=humanize_duration(
             timedelta(seconds=own_period or global_settings.check_period_seconds)
         ),
@@ -173,8 +173,8 @@ def group_edit_page(group_id: int | None = None) -> GroupEditPage | None:
 
     return GroupEditPage(
         id=group.pk if group else None,
-        name=group.name if group else "",
-        comment=group.comment if group else "",
+        name=group.name if group else '',
+        comment=group.comment if group else '',
         domain_count=domain_count,
         periods=_duration_choices(
             PERIOD_PRESETS, group.check_period_seconds if group else None
@@ -197,7 +197,7 @@ def group_edit_page(group_id: int | None = None) -> GroupEditPage | None:
 
 def _duration_choices(presets: tuple[int, ...], current: int | None) -> tuple[Choice, ...]:
     """Значения переключателя плюс «По умолчанию» первым пунктом (раздел 5)."""
-    choices = [Choice(value="", label="По умолчанию", selected=current is None)]
+    choices = [Choice(value='', label='По умолчанию', selected=current is None)]
     known = set(presets)
     if current is not None and current not in known:
         # «Своё» значение, введённое руками: оно обязано остаться видимым и выбранным.
@@ -214,7 +214,7 @@ def _duration_choices(presets: tuple[int, ...], current: int | None) -> tuple[Ch
 
 
 def _reminder_choices(current: int | None) -> tuple[Choice, ...]:
-    choices = [Choice(value="", label="По умолчанию", selected=current is None)]
+    choices = [Choice(value='', label='По умолчанию', selected=current is None)]
     known = set(REMINDER_PRESETS)
     if current is not None:
         known.add(current)
@@ -232,12 +232,12 @@ def _reminder_choices(current: int | None) -> tuple[Choice, ...]:
 def _reminder_label(seconds: int) -> str:
     """Ноль — «не напоминать» (8.5), а не «через ноль минут»."""
     if seconds == 0:
-        return "не напоминать"
-    return f"раз в {humanize_duration(timedelta(seconds=seconds))}"
+        return 'не напоминать'
+    return f'раз в {humanize_duration(timedelta(seconds=seconds))}'
 
 
 def _mode_choices(current: str | None) -> tuple[Choice, ...]:
-    choices = [Choice(value="", label="По умолчанию", selected=not current)]
+    choices = [Choice(value='', label='По умолчанию', selected=not current)]
     for mode in NotificationMode:
         choices.append(
             Choice(value=mode.value, label=str(mode.label), selected=current == mode.value)

@@ -24,7 +24,7 @@ from core.observability.setup import configure_sentry
 
 #: Формат настоящий, проект несуществующий. Сеть всё равно не используется: события забирает
 #: приёмник ниже.
-TEST_DSN = "https://publickey@sentry.example/42"
+TEST_DSN = 'https://publickey@sentry.example/42'
 
 
 class Recorder(Transport):
@@ -36,12 +36,12 @@ class Recorder(Transport):
     """
 
     def __init__(self) -> None:
-        super().__init__({"dsn": TEST_DSN})
+        super().__init__({'dsn': TEST_DSN})
         self.events: list[dict[str, Any]] = []
 
     def capture_envelope(self, envelope: Envelope) -> None:
         for item in envelope.items:
-            if item.type == "event":
+            if item.type == 'event':
                 self.events.append(dict(item.payload.json or {}))
 
     def flush(self, timeout: float, callback: Any = None) -> None:
@@ -52,7 +52,7 @@ class Recorder(Transport):
 
     @property
     def last(self) -> dict[str, Any]:
-        assert self.events, "ни одного события не отправлено"
+        assert self.events, 'ни одного события не отправлено'
         return self.events[-1]
 
     def text(self) -> str:
@@ -64,11 +64,11 @@ class RefusingTransport(Transport):
     """Приёмник, который всегда отказывает, — недоступный Sentry (критерий 73)."""
 
     def __init__(self) -> None:
-        super().__init__({"dsn": TEST_DSN})
+        super().__init__({'dsn': TEST_DSN})
 
     def capture_envelope(self, envelope: Envelope) -> None:
         del envelope
-        raise ConnectionError("sentry недоступен")
+        raise ConnectionError('sentry недоступен')
 
     def flush(self, timeout: float, callback: Any = None) -> None:
         del timeout, callback
@@ -81,7 +81,7 @@ class RefusingTransport(Transport):
 def broken_sentry() -> Iterator[None]:
     """Подключённый Sentry, до которого не достучаться."""
     configure_sentry(
-        dsn=TEST_DSN, environment="test", traces_sample_rate=0.0, transport=RefusingTransport()
+        dsn=TEST_DSN, environment='test', traces_sample_rate=0.0, transport=RefusingTransport()
     )
     yield
     sentry_sdk.get_global_scope().set_client(None)
@@ -93,14 +93,14 @@ def sentry() -> Iterator[Recorder]:
     recorder = Recorder()
     configure_sentry(
         dsn=TEST_DSN,
-        environment="test",
+        environment='test',
         traces_sample_rate=0.0,
-        release="0.1.0-test",
+        release='0.1.0-test',
         transport=recorder,
     )
     yield recorder
     sentry_sdk.get_client().flush()
     # Следующий тест не должен получить клиента от предыдущего: критерий 67 проверяет, что при
     # пустом DSN отправки нет вообще, и подключённый клиент сделал бы его ложно зелёным.
-    configure_sentry(dsn=None, environment="test", traces_sample_rate=0.0)
+    configure_sentry(dsn=None, environment='test', traces_sample_rate=0.0)
     sentry_sdk.get_global_scope().set_client(None)

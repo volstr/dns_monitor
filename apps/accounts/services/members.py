@@ -87,7 +87,7 @@ def invite_with_link(
         )
         # Пароля нет: его задаст сам открывший ссылку (ТЗ 3).
         member.set_unusable_password()
-        member.save(update_fields=["password"])
+        member.save(update_fields=['password'])
 
         token = secrets.token_urlsafe(TOKEN_BYTES)
         invitation = Invitation.objects.create(
@@ -139,22 +139,22 @@ def accept_invitation(
         return refusal
 
     invitation = (
-        Invitation.objects.filter(token_hash=_hashed(token)).select_related("member").first()
+        Invitation.objects.filter(token_hash=_hashed(token)).select_related('member').first()
     )
     if invitation is None:
-        return Refused(reason="Ссылка недействительна.")
+        return Refused(reason='Ссылка недействительна.')
     if invitation.opened_at is not None:
         # Критерий 30: ссылка одноразовая.
-        return Refused(reason="Ссылка уже была открыта.")
+        return Refused(reason='Ссылка уже была открыта.')
     if invitation.expires_at <= at:
         # Критерий 31: просроченная ссылка недействительна, участник остаётся непринявшим.
-        return Refused(reason="Срок действия ссылки истёк. Попросите администратора выдать новую.")
+        return Refused(reason='Срок действия ссылки истёк. Попросите администратора выдать новую.')
 
     with transaction.atomic():
         member = invitation.member
         member.set_password(password)
         member.must_change_password = False
-        member.save(update_fields=["password", "must_change_password"])
+        member.save(update_fields=['password', 'must_change_password'])
         Invitation.objects.filter(pk=invitation.pk).update(opened_at=at)
         state_store.release(invitation_token(invitation.pk, timedelta(seconds=1)))
 
@@ -167,7 +167,7 @@ def update_member(
     """Правка имени, почты и роли — ТЗ 3.1, критерии 80, 83, 84, 87."""
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
 
     refusal = (
         _role_refusal(author, role)
@@ -188,7 +188,7 @@ def update_member(
             role=role,
             # Смена почты — чувствительное действие: она же логин, и все сессии завершаются
             # (3.1, критерий 80).
-            session_epoch=F("session_epoch") + 1 if email_changed else F("session_epoch"),
+            session_epoch=F('session_epoch') + 1 if email_changed else F('session_epoch'),
         )
         if email_changed:
             _record(AuditAction.EMAIL_CHANGED, author, member, at)
@@ -206,7 +206,7 @@ def reset_password(
     """Сброс пароля — критерий 81: прежний недействителен немедленно, сессии завершены."""
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
     refusal = _password_refusal(password)
     if refusal:
         return refusal
@@ -215,7 +215,7 @@ def reset_password(
         member.set_password(password)
         member.must_change_password = True
         member.session_epoch += 1
-        member.save(update_fields=["password", "must_change_password", "session_epoch"])
+        member.save(update_fields=['password', 'must_change_password', 'session_epoch'])
         _record(AuditAction.PASSWORD_RESET, author, member, at)
 
     return MemberSaved(member_id=member_id)
@@ -235,7 +235,7 @@ def set_own_password(*, member_id: int, password: str) -> MemberResult:
     """
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
     refusal = _password_refusal(password)
     if refusal:
         return refusal
@@ -243,7 +243,7 @@ def set_own_password(*, member_id: int, password: str) -> MemberResult:
     with transaction.atomic():
         member.set_password(password)
         member.must_change_password = False
-        member.save(update_fields=["password", "must_change_password"])
+        member.save(update_fields=['password', 'must_change_password'])
 
     return MemberSaved(member_id=member_id)
 
@@ -252,10 +252,10 @@ def terminate_sessions(*, member_id: int, author: Member, at: datetime) -> Membe
     """«Завершить все сессии» без смены пароля — 3.1."""
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
 
     with transaction.atomic():
-        Member.objects.filter(pk=member_id).update(session_epoch=F("session_epoch") + 1)
+        Member.objects.filter(pk=member_id).update(session_epoch=F('session_epoch') + 1)
         _record(AuditAction.SESSIONS_TERMINATED, author, member, at)
 
     return MemberSaved(member_id=member_id)
@@ -265,10 +265,10 @@ def unbind_authenticator(*, member_id: int, author: Member, at: datetime) -> Mem
     """Отвязать аутентификатор — критерий 82: при следующем входе участник привяжет заново."""
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
 
     with transaction.atomic():
-        Member.objects.filter(pk=member_id).update(totp_secret="")
+        Member.objects.filter(pk=member_id).update(totp_secret='')
         _record(AuditAction.AUTHENTICATOR_UNBOUND, author, member, at)
 
     return MemberSaved(member_id=member_id)
@@ -278,7 +278,7 @@ def deactivate_member(*, member_id: int, author: Member, at: datetime) -> Member
     """Отключение — основной способ прекратить доступ (3.1), критерии 83, 84."""
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
 
     refusal = _self_refusal(author, member) or _last_admin_refusal(
         member, role=member.role, is_active=False
@@ -288,7 +288,7 @@ def deactivate_member(*, member_id: int, author: Member, at: datetime) -> Member
 
     with transaction.atomic():
         Member.objects.filter(pk=member_id).update(
-            is_active=False, session_epoch=F("session_epoch") + 1
+            is_active=False, session_epoch=F('session_epoch') + 1
         )
         _record(AuditAction.MEMBER_DEACTIVATED, author, member, at)
 
@@ -314,11 +314,11 @@ def activate_member(*, member_id: int, author: Member, at: datetime) -> MemberRe
     """
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
     if member.is_active:
         # Экран показывает «Включить» только у отключённых, значит страница устарела. Молча
         # писать в журнал ещё одно включение неверно: события не было.
-        return Refused(reason="Участник уже включён.")
+        return Refused(reason='Участник уже включён.')
 
     with transaction.atomic():
         Member.objects.filter(pk=member_id).update(is_active=True)
@@ -331,7 +331,7 @@ def delete_member(*, member_id: int, author: Member, at: datetime) -> MemberResu
     """Удаление — только для тех, кто ни разу не входил (3.1), критерии 85, 86."""
     member = Member.objects.filter(pk=member_id).first()
     if member is None:
-        return Refused(reason="Участник не найден.")
+        return Refused(reason='Участник не найден.')
 
     refusal = _self_refusal(author, member)
     if refusal:
@@ -339,8 +339,8 @@ def delete_member(*, member_id: int, author: Member, at: datetime) -> MemberResu
     if member.last_login is not None:
         return Refused(
             reason=(
-                "Этот участник уже входил, поэтому на него ссылается журнал — удалить нельзя. "
-                "Отключите его: записи сохранятся, а роль можно будет вернуть."
+                'Этот участник уже входил, поэтому на него ссылается журнал — удалить нельзя. '
+                'Отключите его: записи сохранятся, а роль можно будет вернуть.'
             )
         )
 
@@ -366,22 +366,22 @@ def _record(action: str, author: Member, target: Member, at: datetime) -> None:
 
 def _self_refusal(author: Member, member: Member) -> Refused | None:
     if author.pk == member.pk:
-        return Refused(reason="Нельзя отключить или удалить самого себя.")
+        return Refused(reason='Нельзя отключить или удалить самого себя.')
     return None
 
 
 def _self_demotion_refusal(author: Member, member: Member, role: str) -> Refused | None:
     if author.pk == member.pk and role != author.role:
-        return Refused(reason="Нельзя изменить собственную роль.")
+        return Refused(reason='Нельзя изменить собственную роль.')
     return None
 
 
 def _role_refusal(author: Member, role: str) -> Refused | None:
     """Нельзя назначить роль выше собственной (3.1)."""
     if role not in Role.values:
-        return Refused(reason="Такой роли нет.")
+        return Refused(reason='Такой роли нет.')
     if role == Role.ADMIN and author.role != Role.ADMIN:
-        return Refused(reason="Нельзя назначить роль выше собственной.")
+        return Refused(reason='Нельзя назначить роль выше собственной.')
     return None
 
 
@@ -397,8 +397,8 @@ def _last_admin_refusal(member: Member, *, role: str, is_active: bool) -> Refuse
     if others == 0:
         return Refused(
             reason=(
-                "Это последний администратор. Установка без администратора необратима — "
-                "сначала назначьте другого."
+                'Это последний администратор. Установка без администратора необратима — '
+                'сначала назначьте другого.'
             )
         )
     return None
@@ -407,18 +407,18 @@ def _last_admin_refusal(member: Member, *, role: str, is_active: bool) -> Refuse
 def _email_refusal(email: str, exclude_id: int | None = None) -> Refused | None:
     normalized = email.strip().lower()
     if not normalized:
-        return Refused(reason="Почта обязательна: она же логин.")
+        return Refused(reason='Почта обязательна: она же логин.')
     taken = Member.objects.filter(email=normalized)
     if exclude_id is not None:
         taken = taken.exclude(pk=exclude_id)
     if taken.exists():
-        return Refused(reason=f"Участник с почтой {normalized} уже есть.")
+        return Refused(reason=f'Участник с почтой {normalized} уже есть.')
     return None
 
 
 def _password_refusal(password: str) -> Refused | None:
     if len(password) < MIN_PASSWORD_LENGTH:
-        return Refused(reason=f"Пароль короче {MIN_PASSWORD_LENGTH} символов.")
+        return Refused(reason=f'Пароль короче {MIN_PASSWORD_LENGTH} символов.')
     return None
 
 

@@ -22,8 +22,8 @@ from core.text import humanize_duration
 
 #: Что принадлежит домену, а не группе, и переносом не затрагивается (10.4).
 KEEPS = (
-    "Разрешённые адреса, комментарий и реестр адресов домена не меняются — они принадлежат "
-    "домену, а не группе."
+    'Разрешённые адреса, комментарий и реестр адресов домена не меняются — они принадлежат '
+    'домену, а не группе.'
 )
 
 #: Режим, который следит за появлением непрошеного адреса. Открытый инцидент — ровно про это.
@@ -78,7 +78,7 @@ class MovePage:
         return any(row.changed for row in self.rows)
 
 
-def move_page(*, domain_id: int, target_id: int | None, new_group_name: str = "") -> MovePage:
+def move_page(*, domain_id: int, target_id: int | None, new_group_name: str = '') -> MovePage:
     """
     Собрать сводку переноса — ТЗ 10.4, критерий 28.
 
@@ -86,7 +86,7 @@ def move_page(*, domain_id: int, target_id: int | None, new_group_name: str = ""
     настройки не нужно и незачем: у новой группы все пять наследуемых параметров остаются «по
     умолчанию», то есть ровно те же, что и у случая «без группы» (раздел 5).
     """
-    domain = Domain.objects.select_related("group").get(pk=domain_id)
+    domain = Domain.objects.select_related('group').get(pk=domain_id)
     global_settings = GlobalSettings.objects.get()
 
     fresh = new_group_name.strip()
@@ -102,10 +102,10 @@ def move_page(*, domain_id: int, target_id: int | None, new_group_name: str = ""
         domain_id=domain.pk,
         domain_name=domain.name,
         current_id=domain.group_id,
-        current_group=domain.group.name if domain.group else "Без группы",
+        current_group=domain.group.name if domain.group else 'Без группы',
         new_group_name=fresh,
         target_id=resolved_id,
-        target_name=fresh or (target.name if target else "Без группы"),
+        target_name=fresh or (target.name if target else 'Без группы'),
         rows=_rows(before, after),
         keeps=KEEPS,
         incident_warning=_incident_warning(domain, after),
@@ -122,13 +122,13 @@ def _rows(before: EffectiveSettings, after: EffectiveSettings) -> tuple[MoveRow,
 
     return (
         MoveRow(
-            label="Период проверки",
+            label='Период проверки',
             was=was_period,
             becomes=becomes_period,
             changed=was_period != becomes_period,
         ),
         MoveRow(
-            label="Когда уведомлять",
+            label='Когда уведомлять',
             was=was_mode,
             becomes=becomes_mode,
             changed=was_mode != becomes_mode,
@@ -139,23 +139,23 @@ def _rows(before: EffectiveSettings, after: EffectiveSettings) -> tuple[MoveRow,
 def _incident_warning(domain: Domain, after: EffectiveSettings) -> str:
     """10.4: открытый инцидент плюс режим, который такие события не отслеживает."""
     if after.notification_mode.value == TRACKS_UNRESOLVED:
-        return ""
+        return ''
     if not domain.incidents.filter(closed_at__isnull=True).exists():
-        return ""
+        return ''
     return (
-        "Новая группа не следит за выходом из разрешённых. Домен перестанет присылать "
-        "уведомление о непрошеном адресе — а сейчас у него как раз есть такой."
+        'Новая группа не следит за выходом из разрешённых. Домен перестанет присылать '
+        'уведомление о непрошеном адресе — а сейчас у него как раз есть такой.'
     )
 
 
 def _options(resolved_id: int | None) -> tuple[GroupOption, ...]:
     """Варианты поля с поиском. «Без группы» — такой же вариант, а не отсутствие выбора."""
-    groups = Group.objects.annotate(size=Count("domains")).order_by("name")
+    groups = Group.objects.annotate(size=Count('domains')).order_by('name')
     return (
         GroupOption(
-            value="",
-            name="Без группы",
-            domain_count="—",
+            value='',
+            name='Без группы',
+            domain_count='—',
             selected=resolved_id is None,
         ),
         *(

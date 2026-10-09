@@ -26,20 +26,20 @@ SUMMARY_NAME_LIMIT = 10
 
 #: Заголовки из утверждённой таблицы Q-C11.
 HEADERS: dict[str, str] = {
-    EventType.ADDRESS_APPEARED.value: "Появился адрес",
-    EventType.ADDRESS_GONE.value: "Адрес пропал",
-    EventType.NOT_ALLOWED.value: "Адрес вне разрешённых",
-    EventType.BACK_TO_NORMAL.value: "Снова в норме",
-    EventType.RESOLVE_FAILED.value: "Домен не резолвится",
-    EventType.RESOLVE_RECOVERED.value: "Домен снова резолвится",
+    EventType.ADDRESS_APPEARED.value: 'Появился адрес',
+    EventType.ADDRESS_GONE.value: 'Адрес пропал',
+    EventType.NOT_ALLOWED.value: 'Адрес вне разрешённых',
+    EventType.BACK_TO_NORMAL.value: 'Снова в норме',
+    EventType.RESOLVE_FAILED.value: 'Домен не резолвится',
+    EventType.RESOLVE_RECOVERED.value: 'Домен снова резолвится',
 }
 
 #: Знак у изменившегося адреса — строка 3 в 8.4: появившийся, пропавший, несовпавший.
 SIGNS: dict[str, str] = {
-    EventType.ADDRESS_APPEARED.value: "+",
-    EventType.ADDRESS_GONE.value: "−",
-    EventType.NOT_ALLOWED.value: "✕",
-    EventType.BACK_TO_NORMAL.value: "−",
+    EventType.ADDRESS_APPEARED.value: '+',
+    EventType.ADDRESS_GONE.value: '−',
+    EventType.NOT_ALLOWED.value: '✕',
+    EventType.BACK_TO_NORMAL.value: '−',
 }
 
 
@@ -53,8 +53,8 @@ class MessageInput:
     #: Актуальный набор — строка 4 (Q-D10).
     current: tuple[str, ...] = ()
     group_name: str | None = None
-    domain_comment: str = ""
-    group_comment: str = ""
+    domain_comment: str = ''
+    group_comment: str = ''
     #: Длительность инцидента для «Снова в норме» (критерий 17).
     duration: str | None = None
     #: Сколько проверок подряд домен не резолвится — для RESOLVE_FAILED.
@@ -96,27 +96,27 @@ def _build(
     limit: int | None,
 ) -> str:
     lines = [
-        f"<b>{escape_html(HEADERS.get(message.event_type, message.event_type))}</b>",
-        f"<code>{escape_html(message.domain_name)}</code>",
+        f'<b>{escape_html(HEADERS.get(message.event_type, message.event_type))}</b>',
+        f'<code>{escape_html(message.domain_name)}</code>',
     ]
 
-    sign = SIGNS.get(message.event_type, "")
+    sign = SIGNS.get(message.event_type, '')
     for address in _shorten(message.changed, limit):
-        lines.append(f"{sign} <code>{escape_html(address)}</code>".strip())
+        lines.append(f'{sign} <code>{escape_html(address)}</code>'.strip())
 
     if message.duration:
-        lines.append(f"Проблема держалась {escape_html(message.duration)}.")
+        lines.append(f'Проблема держалась {escape_html(message.duration)}.')
     if message.failed_attempts:
-        lines.append(f"Не резолвится {message.failed_attempts} проверок подряд.")
+        lines.append(f'Не резолвится {message.failed_attempts} проверок подряд.')
 
     if include_current and message.current:
-        shown = ", ".join(
-            f"<code>{escape_html(address)}</code>"
+        shown = ', '.join(
+            f'<code>{escape_html(address)}</code>'
             for address in _shorten(message.current, limit)
         )
-        lines.append(f"Актуальные адреса: {shown}")
+        lines.append(f'Актуальные адреса: {shown}')
     if message.group_name:
-        lines.append(f"Группа: {escape_html(message.group_name)}")
+        lines.append(f'Группа: {escape_html(message.group_name)}')
 
     comment = comment_of(message)
     if include_comment and comment:
@@ -124,7 +124,7 @@ def _build(
     if include_link:
         lines.append(f'<a href="{escape_html(message.domain_url)}">Открыть домен →</a>')
 
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def compose_outage(*, component: str, detail: str | None = None) -> str:
@@ -136,13 +136,13 @@ def compose_outage(*, component: str, detail: str | None = None) -> str:
     продолжают считать, что за доменами следят.»
     """
     lines = [
-        "<b>Проверки остановлены</b>",
-        f"Не отвечает компонент инфраструктуры: <code>{escape_html(component)}</code>.",
-        "Пока он не восстановлен, за доменами никто не следит.",
+        '<b>Проверки остановлены</b>',
+        f'Не отвечает компонент инфраструктуры: <code>{escape_html(component)}</code>.',
+        'Пока он не восстановлен, за доменами никто не следит.',
     ]
     if detail:
         lines.append(escape_html(detail))
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def compose_reminder(
@@ -156,17 +156,17 @@ def compose_reminder(
     в первом сообщении.
     """
     lines = [
-        "<b>Расхождение держится</b>",
-        f"<code>{escape_html(domain_name)}</code>",
-        f"Возраст: {escape_html(age)}",
+        '<b>Расхождение держится</b>',
+        f'<code>{escape_html(domain_name)}</code>',
+        f'Возраст: {escape_html(age)}',
     ]
     if unmatched:
-        shown = ", ".join(
-            f"<code>{escape_html(address)}</code>" for address in _shorten(unmatched, ADDRESS_LIMIT)
+        shown = ', '.join(
+            f'<code>{escape_html(address)}</code>' for address in _shorten(unmatched, ADDRESS_LIMIT)
         )
-        lines.append(f"Вне разрешённых: {shown}")
+        lines.append(f'Вне разрешённых: {shown}')
     lines.append(f'<a href="{escape_html(domain_url)}">Открыть домен →</a>')
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def compose_summary(*, event_type: str, domain_names: tuple[str, ...], journal_url: str) -> str:
@@ -180,15 +180,15 @@ def compose_summary(*, event_type: str, domain_names: tuple[str, ...], journal_u
     header = HEADERS.get(event_type, event_type)
     shown = _shorten(domain_names, SUMMARY_NAME_LIMIT)
     lines = [
-        f"<b>{escape_html(header)}</b>",
-        f"Затронуто доменов: {len(domain_names)}",
-        ", ".join(f"<code>{escape_html(name)}</code>" for name in shown),
+        f'<b>{escape_html(header)}</b>',
+        f'Затронуто доменов: {len(domain_names)}',
+        ', '.join(f'<code>{escape_html(name)}</code>' for name in shown),
         f'<a href="{escape_html(journal_url)}">Открыть журнал →</a>',
     ]
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def _shorten(addresses: tuple[str, ...], limit: int | None) -> list[str]:
     if limit is None or len(addresses) <= limit:
         return list(addresses)
-    return [*addresses[:limit], f"и ещё {len(addresses) - limit}"]
+    return [*addresses[:limit], f'и ещё {len(addresses) - limit}']

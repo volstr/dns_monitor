@@ -43,9 +43,9 @@ from core.adapters.system_clock import SystemClock
 
 #: ТЗ 3: сроки жизни ссылки-приглашения.
 LIFETIME_CHOICES = {
-    "24h": timedelta(hours=24),
-    "7d": timedelta(days=7),
-    "30d": timedelta(days=30),
+    '24h': timedelta(hours=24),
+    '7d': timedelta(days=7),
+    '30d': timedelta(days=30),
 }
 
 GENERATED_PASSWORD_BYTES = 12
@@ -60,7 +60,7 @@ class MemberList(AdminView):
 
     def get(self, request: HttpRequest) -> HttpResponse:
         page = members_page(viewer=request.user, state_store=_store())  # type: ignore[arg-type]
-        return render(request, "accounts/members.html", {"page": page, "screen": "members"})
+        return render(request, 'accounts/members.html', {'page': page, 'screen': 'members'})
 
 
 class MemberInvite(AdminView):
@@ -72,18 +72,18 @@ class MemberInvite(AdminView):
     """
 
     def post(self, request: HttpRequest) -> HttpResponse:
-        email = request.POST.get("email", "")
-        name = request.POST.get("name", "")
-        role = request.POST.get("role", Role.OBSERVER)
+        email = request.POST.get('email', '')
+        name = request.POST.get('name', '')
+        role = request.POST.get('role', Role.OBSERVER)
         at = SystemClock().now()
 
-        if request.POST.get("way") == "password":
+        if request.POST.get('way') == 'password':
             password = secrets.token_urlsafe(GENERATED_PASSWORD_BYTES)
             result = invite_with_password(
                 email=email, name=name, role=role, password=password, author=request.user, at=at
             )
         else:
-            lifetime = LIFETIME_CHOICES.get(request.POST.get("lifetime", "7d"), timedelta(days=7))
+            lifetime = LIFETIME_CHOICES.get(request.POST.get('lifetime', '7d'), timedelta(days=7))
             result = invite_with_link(
                 email=email,
                 name=name,
@@ -99,16 +99,16 @@ class MemberInvite(AdminView):
         elif isinstance(result, PasswordIssued):
             # Показывается один раз (ТЗ 3): второй возможности не будет.
             messages.success(
-                request, f"Участник создан. Пароль (показывается один раз): {result.password}"
+                request, f'Участник создан. Пароль (показывается один раз): {result.password}'
             )
         elif isinstance(result, InvitationIssued):
             messages.success(
                 request,
-                f"Участник создан. Ссылка действует до "
-                f"{localtime(result.expires_at):%d.%m.%Y %H:%M} и остаётся "
-                f"в списке, пока не открыта.",
+                f'Участник создан. Ссылка действует до '
+                f'{localtime(result.expires_at):%d.%m.%Y %H:%M} и остаётся '
+                f'в списке, пока не открыта.',
             )
-        return redirect("member-list")
+        return redirect('member-list')
 
 
 class MemberUpdate(AdminView):
@@ -117,13 +117,13 @@ class MemberUpdate(AdminView):
     def post(self, request: HttpRequest, member_id: int) -> HttpResponse:
         result = update_member(
             member_id=member_id,
-            name=request.POST.get("name", ""),
-            email=request.POST.get("email", ""),
-            role=request.POST.get("role", Role.OBSERVER),
+            name=request.POST.get('name', ''),
+            email=request.POST.get('email', ''),
+            role=request.POST.get('role', Role.OBSERVER),
             author=request.user,  # type: ignore[arg-type]
             at=SystemClock().now(),
         )
-        return _back(request, result, "Изменения сохранены.")
+        return _back(request, result, 'Изменения сохранены.')
 
 
 class MemberAction(AdminView):
@@ -133,53 +133,53 @@ class MemberAction(AdminView):
         author: Member = request.user  # type: ignore[assignment]
         at = SystemClock().now()
 
-        if action == "deactivate":
+        if action == 'deactivate':
             return _back(
                 request,
                 deactivate_member(member_id=member_id, author=author, at=at),
-                "Участник отключён. Роль можно вернуть кнопкой «Включить».",
+                'Участник отключён. Роль можно вернуть кнопкой «Включить».',
             )
-        if action == "activate":
+        if action == 'activate':
             return _back(
                 request,
                 activate_member(member_id=member_id, author=author, at=at),
-                "Участник включён. Прежние сессии остаются завершёнными: нужно войти заново.",
+                'Участник включён. Прежние сессии остаются завершёнными: нужно войти заново.',
             )
-        if action == "delete":
+        if action == 'delete':
             return _back(
                 request,
                 delete_member(member_id=member_id, author=author, at=at),
-                "Участник удалён.",
+                'Участник удалён.',
             )
-        if action == "sessions":
+        if action == 'sessions':
             return _back(
                 request,
                 terminate_sessions(member_id=member_id, author=author, at=at),
-                "Все сессии участника завершены.",
+                'Все сессии участника завершены.',
             )
-        if action == "authenticator":
+        if action == 'authenticator':
             return _back(
                 request,
                 unbind_authenticator(member_id=member_id, author=author, at=at),
-                "Аутентификатор отвязан: при следующем входе участник привяжет его заново.",
+                'Аутентификатор отвязан: при следующем входе участник привяжет его заново.',
             )
 
         # Сброс пароля — последняя ветка, и к ней нужен явный вход. Пока его не было,
         # сюда проваливалось **любое** нераспознанное действие: адрес вида
         # `/members/5/wathever/` выдавал участнику новый пароль и завершал его сессии.
-        if action != "password":
-            raise Http404(f"Действия «{action}» нет.")
+        if action != 'password':
+            raise Http404(f'Действия «{action}» нет.')
 
         password = secrets.token_urlsafe(GENERATED_PASSWORD_BYTES)
         result = reset_password(member_id=member_id, password=password, author=author, at=at)
         if isinstance(result, Refused):
-            return _back(request, result, "")
+            return _back(request, result, '')
         messages.success(
             request,
-            f"Пароль сброшен. Новый (показывается один раз): {password}. "
-            f"Прежний недействителен, сессии завершены.",
+            f'Пароль сброшен. Новый (показывается один раз): {password}. '
+            f'Прежний недействителен, сессии завершены.',
         )
-        return redirect("member-list")
+        return redirect('member-list')
 
 
 def _back(request: HttpRequest, result: object, success: str) -> HttpResponse:
@@ -187,4 +187,4 @@ def _back(request: HttpRequest, result: object, success: str) -> HttpResponse:
         messages.error(request, result.reason)
     elif success:
         messages.success(request, success)
-    return redirect("member-list")
+    return redirect('member-list')

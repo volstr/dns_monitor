@@ -43,6 +43,6 @@ class FakeChannel(NotificationChannel):
         self._next_id += 1
         return Sent(channel_message_id=message_id)
 
-    def fail_next(self, error: str = "канал недоступен", *, retryable: bool = True) -> None:
+    def fail_next(self, error: str = 'канал недоступен', *, retryable: bool = True) -> None:
         """Назначить отказ на следующую отправку."""
         self._results.append(NotSent(error=error, retryable=retryable))

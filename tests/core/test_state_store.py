@@ -24,7 +24,7 @@ from core.ports.state_store import (
 )
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-REDIS_URL = "redis://redis:6379"
+REDIS_URL = 'redis://redis:6379'
 #: Логическая база берётся из настроек теста, а не пишется числом. Числом здесь стоял ноль —
 #: то есть рабочая база запущенного приложения: тесты ходили в неё, и `flushdb` в проверке
 #: критерия 55 стирал бы живые сессии и блокировки разработчика.
@@ -49,9 +49,9 @@ def test_11_11_key_carries_its_own_lifetime() -> None:
 
 
 def test_11_11_key_names_follow_the_table() -> None:
-    assert scheduler_lock(42).name == "sched:lock:domain:42"
-    assert domain_cooldown(42).name == "check:cooldown:domain:42"
-    assert group_cooldown(7).name == "check:cooldown:group:7"
+    assert scheduler_lock(42).name == 'sched:lock:domain:42'
+    assert domain_cooldown(42).name == 'check:cooldown:domain:42'
+    assert group_cooldown(7).name == 'check:cooldown:group:7'
 
 
 def test_11_1_second_instance_does_not_take_a_held_lock(store: FakeStateStore) -> None:
@@ -101,11 +101,11 @@ def test_11_13_unavailable_store_raises(clock: FakeClock) -> None:
 
 
 def test_8_6_accumulator_collects_items_and_counts_them(store: FakeStateStore) -> None:
-    key = merge_window("telegram", "not_allowed")
+    key = merge_window('telegram', 'not_allowed')
 
-    assert store.accumulate(key, "pay-gw.contoso.ru") == 1
-    assert store.accumulate(key, "api.contoso.ru") == 2
-    assert store.collected(key) == ("pay-gw.contoso.ru", "api.contoso.ru")
+    assert store.accumulate(key, 'pay-gw.contoso.ru') == 1
+    assert store.accumulate(key, 'api.contoso.ru') == 2
+    assert store.collected(key) == ('pay-gw.contoso.ru', 'api.contoso.ru')
 
 
 def test_8_6_window_is_fixed_and_not_extended_by_new_events(
@@ -113,24 +113,24 @@ def test_8_6_window_is_fixed_and_not_extended_by_new_events(
 ) -> None:
     # 11.11: срок ставится при первом добавлении. Иначе поток событий продлевал бы окно
     # бесконечно и сводка не ушла бы никогда.
-    key = merge_window("telegram", "not_allowed")
-    store.accumulate(key, "первый")
+    key = merge_window('telegram', 'not_allowed')
+    store.accumulate(key, 'первый')
 
     clock.advance(timedelta(seconds=60))
-    store.accumulate(key, "второй")
+    store.accumulate(key, 'второй')
     clock.advance(timedelta(seconds=31))
 
     assert store.collected(key) == ()
 
 
 def test_8_6_released_accumulator_starts_over(store: FakeStateStore) -> None:
-    key = merge_window("telegram", "not_allowed")
-    store.accumulate(key, "первый")
+    key = merge_window('telegram', 'not_allowed')
+    store.accumulate(key, 'первый')
 
     store.release(key)
 
     assert store.collected(key) == ()
-    assert store.accumulate(key, "второй") == 1
+    assert store.accumulate(key, 'второй') == 1
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ def redis_inspector() -> redis.Redis:
     return redis.Redis.from_url(REDIS_URL, db=STATE_DB, decode_responses=True)
 
 
-@pytest.mark.parametrize("key_number", [910_001])
+@pytest.mark.parametrize('key_number', [910_001])
 def test_54_real_redis_sets_a_lifetime_on_every_key(
     redis_store: RedisStateStore, redis_inspector: redis.Redis, key_number: int
 ) -> None:
@@ -164,7 +164,7 @@ def test_54_real_redis_sets_a_lifetime_on_every_key(
 
 
 def test_real_redis_behaves_like_the_fake(redis_store: RedisStateStore) -> None:
-    key = StateKey("sched:lock:domain:910002", timedelta(seconds=30))
+    key = StateKey('sched:lock:domain:910002', timedelta(seconds=30))
     redis_store.release(key)
 
     assert redis_store.acquire(key) is True
@@ -176,20 +176,20 @@ def test_real_redis_behaves_like_the_fake(redis_store: RedisStateStore) -> None:
 def test_8_6_real_redis_accumulates_with_a_lifetime(
     redis_store: RedisStateStore, redis_inspector: redis.Redis
 ) -> None:
-    key = merge_window("telegram", "probe_event")
+    key = merge_window('telegram', 'probe_event')
     redis_store.release(key)
 
-    assert redis_store.accumulate(key, "pay-gw.contoso.ru") == 1
-    assert redis_store.accumulate(key, "api.contoso.ru") == 2
+    assert redis_store.accumulate(key, 'pay-gw.contoso.ru') == 1
+    assert redis_store.accumulate(key, 'api.contoso.ru') == 2
 
-    assert redis_store.collected(key) == ("pay-gw.contoso.ru", "api.contoso.ru")
+    assert redis_store.collected(key) == ('pay-gw.contoso.ru', 'api.contoso.ru')
     # Ключ накопителя тоже обязан иметь срок жизни (11.11, критерий 54).
     assert redis_inspector.ttl(key.name) > 0
     redis_store.release(key)
 
 
 def test_real_redis_ping_fails_when_unreachable() -> None:
-    store = RedisStateStore.from_url("redis://127.0.0.1:6399", db=0)
+    store = RedisStateStore.from_url('redis://127.0.0.1:6399', db=0)
 
     with pytest.raises(redis.exceptions.ConnectionError):
         store.ping()
@@ -214,15 +214,15 @@ def test_55_a_full_redis_wipe_costs_counters_but_not_data(
     from apps.catalog.models import Domain
     from apps.monitoring.models import AddressRegistryEntry, Event, EventType
 
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
     Event.objects.create(
         domain=domain, occurred_at=MOMENT, event_type=EventType.WATCH_STARTED, payload={}
     )
     AddressRegistryEntry.objects.create(
-        domain=domain, address="10.20.1.14", first_seen_at=MOMENT, last_seen_at=MOMENT
+        domain=domain, address='10.20.1.14', first_seen_at=MOMENT, last_seen_at=MOMENT
     )
     member = Member.objects.create_member(
-        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT
+        email='boss@contoso.ru', name='Анна Кирилова', created_at=MOMENT
     )
 
     lock = scheduler_lock(domain.pk)

@@ -24,29 +24,29 @@ from django.core.exceptions import ImproperlyConfigured
 
 SESSION_SECRET_MIN_LENGTH: Final = 50
 #: Откуда берётся системный пояс, если `APP_TIME_ZONE` и `TZ` не заданы.
-LOCALTIME_PATH: Final = Path("/etc/localtime")
-ZONEINFO_MARKER: Final = "zoneinfo/"
+LOCALTIME_PATH: Final = Path('/etc/localtime')
+ZONEINFO_MARKER: Final = 'zoneinfo/'
 #: Имена, означающие тот же пояс, что и `UTC`.
-UTC_ALIASES: Final = frozenset({"Etc/UTC", "Etc/GMT", "Etc/Universal", "Universal", "Zulu"})
+UTC_ALIASES: Final = frozenset({'Etc/UTC', 'Etc/GMT', 'Etc/Universal', 'Universal', 'Zulu'})
 REDIS_DB_MAX: Final = 15
 #: Учётная запись, которую компоуз создаёт в сервисе `postgres`, и чем она названа в
 #: `DATABASE_URL`. Значения обязаны совпадать: первые создают базу, вторая к ней подключается.
-POSTGRES_ACCOUNT: Final = ("POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB")
+POSTGRES_ACCOUNT: Final = ('POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB')
 
-_SENTRY_DSN: Final = re.compile(r"https?://[^:@/\s]+(?::[^@/\s]*)?@[^/\s]+/(?:[^/\s]+/)*\d+")
-_TELEGRAM_BOT_TOKEN: Final = re.compile(r"\d+:[A-Za-z0-9_-]{30,}")
-_INTEGER: Final = re.compile(r"-?\d+")
+_SENTRY_DSN: Final = re.compile(r'https?://[^:@/\s]+(?::[^@/\s]*)?@[^/\s]+/(?:[^/\s]+/)*\d+')
+_TELEGRAM_BOT_TOKEN: Final = re.compile(r'\d+:[A-Za-z0-9_-]{30,}')
+_INTEGER: Final = re.compile(r'-?\d+')
 #: Имя хоста, адрес или `*`. Django сам допускает поддоменную маску вида `.example.com`,
 #: поэтому ведущая точка разрешена.
-_HOST_NAME: Final = re.compile(r"\*|\.?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|\[?[0-9a-fA-F:.]+]?")
+_HOST_NAME: Final = re.compile(r'\*|\.?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|\[?[0-9a-fA-F:.]+]?')
 
 type _Check = Callable[[str], str | None]
 
 
 class SmtpTls(StrEnum):
-    STARTTLS = "starttls"
-    TLS = "tls"
-    NONE = "none"
+    STARTTLS = 'starttls'
+    TLS = 'tls'
+    NONE = 'none'
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,8 +100,8 @@ class EnvironmentConfigError(ImproperlyConfigured):
 
     def __init__(self, errors: tuple[EnvError, ...]) -> None:
         self.errors = errors
-        lines = "\n".join(f"  {error.variable}: {error.reason}" for error in errors)
-        super().__init__(f"Приложение не запущено: ошибка в переменных окружения.\n{lines}")
+        lines = '\n'.join(f'  {error.variable}: {error.reason}' for error in errors)
+        super().__init__(f'Приложение не запущено: ошибка в переменных окружения.\n{lines}')
 
 
 def load_env(source: Mapping[str, str] | None = None) -> Env:
@@ -114,50 +114,50 @@ def load_env(source: Mapping[str, str] | None = None) -> Env:
 def parse_env(source: Mapping[str, str]) -> EnvParseResult:
     read = _Reader(source)
 
-    database_url = read.required("DATABASE_URL", _database_url_problem)
-    if not read.failed("DATABASE_URL"):
+    database_url = read.required('DATABASE_URL', _database_url_problem)
+    if not read.failed('DATABASE_URL'):
         _check_postgres_account(read, database_url)
-    redis_url = read.required("REDIS_URL", _redis_url_problem)
-    redis_db_state = read.integer("REDIS_DB_STATE", default=0, minimum=0, maximum=REDIS_DB_MAX)
-    redis_db_cache = read.integer("REDIS_DB_CACHE", default=1, minimum=0, maximum=REDIS_DB_MAX)
-    if redis_db_state == redis_db_cache and not read.failed("REDIS_DB_STATE", "REDIS_DB_CACHE"):
+    redis_url = read.required('REDIS_URL', _redis_url_problem)
+    redis_db_state = read.integer('REDIS_DB_STATE', default=0, minimum=0, maximum=REDIS_DB_MAX)
+    redis_db_cache = read.integer('REDIS_DB_CACHE', default=1, minimum=0, maximum=REDIS_DB_MAX)
+    if redis_db_state == redis_db_cache and not read.failed('REDIS_DB_STATE', 'REDIS_DB_CACHE'):
         read.fail(
-            "REDIS_DB_CACHE",
-            "должна отличаться от REDIS_DB_STATE: у кэша и рабочего состояния нет общего "
-            "пространства ключей",
+            'REDIS_DB_CACHE',
+            'должна отличаться от REDIS_DB_STATE: у кэша и рабочего состояния нет общего '
+            'пространства ключей',
         )
-    app_base_url = read.required("APP_BASE_URL", _app_base_url_problem)
-    allowed_hosts = read.host_list("ALLOWED_HOSTS")
-    app_time_zone = read.optional("APP_TIME_ZONE", _time_zone_problem) or _system_time_zone(
+    app_base_url = read.required('APP_BASE_URL', _app_base_url_problem)
+    allowed_hosts = read.host_list('ALLOWED_HOSTS')
+    app_time_zone = read.optional('APP_TIME_ZONE', _time_zone_problem) or _system_time_zone(
         source
     )
-    session_secret = read.required("SESSION_SECRET", _session_secret_problem)
-    auth_2fa_enabled = read.boolean("AUTH_2FA_ENABLED", default=False)
-    dns_timeout_ms = read.integer("DNS_TIMEOUT_MS", default=3000, minimum=1, maximum=60_000)
+    session_secret = read.required('SESSION_SECRET', _session_secret_problem)
+    auth_2fa_enabled = read.boolean('AUTH_2FA_ENABLED', default=False)
+    dns_timeout_ms = read.integer('DNS_TIMEOUT_MS', default=3000, minimum=1, maximum=60_000)
     resolve_concurrency = read.integer(
-        "RESOLVE_CONCURRENCY", default=20, minimum=1, maximum=1000
+        'RESOLVE_CONCURRENCY', default=20, minimum=1, maximum=1000
     )
 
-    smtp_host = read.optional("SMTP_HOST")
-    smtp_port = read.integer("SMTP_PORT", default=587, minimum=1, maximum=65_535)
-    smtp_user = read.optional("SMTP_USER")
-    smtp_password = read.optional("SMTP_PASSWORD")
-    smtp_from = read.optional("SMTP_FROM", _email_problem)
-    smtp_tls = read.choice("SMTP_TLS", default=SmtpTls.STARTTLS)
+    smtp_host = read.optional('SMTP_HOST')
+    smtp_port = read.integer('SMTP_PORT', default=587, minimum=1, maximum=65_535)
+    smtp_user = read.optional('SMTP_USER')
+    smtp_password = read.optional('SMTP_PASSWORD')
+    smtp_from = read.optional('SMTP_FROM', _email_problem)
+    smtp_tls = read.choice('SMTP_TLS', default=SmtpTls.STARTTLS)
     if smtp_host is not None:
         if smtp_user is not None and smtp_password is None:
-            read.fail("SMTP_PASSWORD", "обязательна, когда заданы SMTP_HOST и SMTP_USER")
+            read.fail('SMTP_PASSWORD', 'обязательна, когда заданы SMTP_HOST и SMTP_USER')
         if smtp_password is not None and smtp_user is None:
-            read.fail("SMTP_USER", "обязательна, когда заданы SMTP_HOST и SMTP_PASSWORD")
+            read.fail('SMTP_USER', 'обязательна, когда заданы SMTP_HOST и SMTP_PASSWORD')
         if smtp_from is None:
-            read.fail("SMTP_FROM", "обязательна, когда задан SMTP_HOST")
+            read.fail('SMTP_FROM', 'обязательна, когда задан SMTP_HOST')
 
-    sentry_dsn = read.optional("SENTRY_DSN", _sentry_dsn_problem)
-    sentry_environment = read.text("SENTRY_ENVIRONMENT", default="production")
-    sentry_traces_sample_rate = read.fraction("SENTRY_TRACES_SAMPLE_RATE", default=0.0)
-    app_release = read.text("APP_RELEASE", default="")
+    sentry_dsn = read.optional('SENTRY_DSN', _sentry_dsn_problem)
+    sentry_environment = read.text('SENTRY_ENVIRONMENT', default='production')
+    sentry_traces_sample_rate = read.fraction('SENTRY_TRACES_SAMPLE_RATE', default=0.0)
+    app_release = read.text('APP_RELEASE', default='')
 
-    telegram_bot_token = read.optional("TELEGRAM_BOT_TOKEN", _telegram_bot_token_problem)
+    telegram_bot_token = read.optional('TELEGRAM_BOT_TOKEN', _telegram_bot_token_problem)
 
     if read.errors:
         return EnvParseResult(env=None, errors=tuple(read.errors))
@@ -167,7 +167,7 @@ def parse_env(source: Mapping[str, str]) -> EnvParseResult:
         redis_url=redis_url,
         redis_db_state=redis_db_state,
         redis_db_cache=redis_db_cache,
-        app_base_url=app_base_url.rstrip("/"),
+        app_base_url=app_base_url.rstrip('/'),
         allowed_hosts=allowed_hosts,
         app_time_zone=app_time_zone,
         session_secret=session_secret,
@@ -193,15 +193,15 @@ def django_database(database_url: str) -> dict[str, object]:
     """``DATABASES["default"]`` из проверенного ``DATABASE_URL``."""
     parts = urlsplit(database_url)
     return {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": unquote(parts.path.lstrip("/")),
-        "USER": unquote(parts.username or ""),
-        "PASSWORD": unquote(parts.password or ""),
-        "HOST": parts.hostname or "",
-        "PORT": str(parts.port or ""),
-        "OPTIONS": dict(parse_qsl(parts.query)),
-        "CONN_MAX_AGE": 60,
-        "CONN_HEALTH_CHECKS": True,
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': unquote(parts.path.lstrip('/')),
+        'USER': unquote(parts.username or ''),
+        'PASSWORD': unquote(parts.password or ''),
+        'HOST': parts.hostname or '',
+        'PORT': str(parts.port or ''),
+        'OPTIONS': dict(parse_qsl(parts.query)),
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
     }
 
 
@@ -219,7 +219,7 @@ class _Reader:
         return any(error.variable in variables for error in self.errors)
 
     def optional(self, variable: str, check: _Check | None = None) -> str | None:
-        value = self._source.get(variable, "").strip() or None
+        value = self._source.get(variable, '').strip() or None
         if value is not None and check is not None:
             reason = check(value)
             if reason is not None:
@@ -229,8 +229,8 @@ class _Reader:
     def required(self, variable: str, check: _Check) -> str:
         value = self.optional(variable, check)
         if value is None:
-            self.fail(variable, "обязательная переменная не задана")
-            return ""
+            self.fail(variable, 'обязательная переменная не задана')
+            return ''
         return value
 
     def text(self, variable: str, *, default: str) -> str:
@@ -247,10 +247,10 @@ class _Reader:
         if raw is None:
             return ()
 
-        names = tuple(part.strip() for part in raw.split(",") if part.strip())
+        names = tuple(part.strip() for part in raw.split(',') if part.strip())
         for name in names:
             if _HOST_NAME.fullmatch(name) is None:
-                self.fail(variable, f"«{name}» не похоже на имя хоста или адрес")
+                self.fail(variable, f'«{name}» не похоже на имя хоста или адрес')
         return names
 
     def integer(self, variable: str, *, default: int, minimum: int, maximum: int) -> int:
@@ -258,11 +258,11 @@ class _Reader:
         if raw is None:
             return default
         if _INTEGER.fullmatch(raw) is None:
-            self.fail(variable, "ожидается целое число")
+            self.fail(variable, 'ожидается целое число')
             return default
         value = int(raw)
         if not minimum <= value <= maximum:
-            self.fail(variable, f"допустимы значения от {minimum} до {maximum}")
+            self.fail(variable, f'допустимы значения от {minimum} до {maximum}')
             return default
         return value
 
@@ -273,9 +273,9 @@ class _Reader:
         try:
             value = float(raw)
         except ValueError:
-            value = float("nan")
+            value = float('nan')
         if not 0.0 <= value <= 1.0:
-            self.fail(variable, "ожидается число от 0 до 1")
+            self.fail(variable, 'ожидается число от 0 до 1')
             return default
         return value
 
@@ -283,9 +283,9 @@ class _Reader:
         raw = self.optional(variable)
         if raw is None:
             return default
-        if raw in {"true", "false"}:
-            return raw == "true"
-        self.fail(variable, "ожидается true или false")
+        if raw in {'true', 'false'}:
+            return raw == 'true'
+        self.fail(variable, 'ожидается true или false')
         return default
 
     def choice[E: StrEnum](self, variable: str, *, default: E) -> E:
@@ -296,8 +296,8 @@ class _Reader:
         try:
             return choices(raw)
         except ValueError:
-            allowed = ", ".join(member.value for member in choices)
-            self.fail(variable, f"допустимые значения: {allowed}")
+            allowed = ', '.join(member.value for member in choices)
+            self.fail(variable, f'допустимые значения: {allowed}')
             return default
 
 
@@ -312,12 +312,12 @@ def _has_valid_port(parts: SplitResult) -> bool:
 def _database_url_problem(value: str) -> str | None:
     parts = urlsplit(value)
     if (
-        parts.scheme not in {"postgres", "postgresql"}
+        parts.scheme not in {'postgres', 'postgresql'}
         or not parts.hostname
-        or not parts.path.strip("/")
+        or not parts.path.strip('/')
         or not _has_valid_port(parts)
     ):
-        return "ожидается адрес вида postgresql://пользователь:пароль@хост:порт/база"
+        return 'ожидается адрес вида postgresql://пользователь:пароль@хост:порт/база'
     return None
 
 
@@ -333,35 +333,35 @@ def _check_postgres_account(read: _Reader, database_url: str) -> None:
     """
     parts = urlsplit(database_url)
     in_url = {
-        "POSTGRES_USER": unquote(parts.username or ""),
-        "POSTGRES_PASSWORD": unquote(parts.password or ""),
-        "POSTGRES_DB": unquote(parts.path.lstrip("/")),
+        'POSTGRES_USER': unquote(parts.username or ''),
+        'POSTGRES_PASSWORD': unquote(parts.password or ''),
+        'POSTGRES_DB': unquote(parts.path.lstrip('/')),
     }
     for variable in POSTGRES_ACCOUNT:
         declared = read.optional(variable)
         if declared is None or declared == in_url[variable]:
             continue
-        reason = "не совпадает с тем, что записано в DATABASE_URL"
-        if variable == "POSTGRES_PASSWORD":
-            reason += "; спецсимволы пароля в DATABASE_URL экранируются: @ → %40, : → %3A, / → %2F"
+        reason = 'не совпадает с тем, что записано в DATABASE_URL'
+        if variable == 'POSTGRES_PASSWORD':
+            reason += '; спецсимволы пароля в DATABASE_URL экранируются: @ → %40, : → %3A, / → %2F'
         read.fail(variable, reason)
 
 
 def _redis_url_problem(value: str) -> str | None:
     parts = urlsplit(value)
-    if parts.scheme not in {"redis", "rediss"} or not parts.hostname or not _has_valid_port(parts):
-        return "ожидается адрес вида redis://хост:порт"
-    if parts.path not in {"", "/"} or "db" in dict(parse_qsl(parts.query)):
-        return "номер базы задаётся переменными REDIS_DB_STATE и REDIS_DB_CACHE, а не в адресе"
+    if parts.scheme not in {'redis', 'rediss'} or not parts.hostname or not _has_valid_port(parts):
+        return 'ожидается адрес вида redis://хост:порт'
+    if parts.path not in {'', '/'} or 'db' in dict(parse_qsl(parts.query)):
+        return 'номер базы задаётся переменными REDIS_DB_STATE и REDIS_DB_CACHE, а не в адресе'
     return None
 
 
 def _app_base_url_problem(value: str) -> str | None:
     parts = urlsplit(value)
-    if parts.scheme not in {"http", "https"} or not parts.hostname or not _has_valid_port(parts):
-        return "ожидается адрес вида https://хост или https://хост:порт"
-    if parts.path not in {"", "/"} or parts.query or parts.fragment:
-        return "адрес установки задаётся без пути, параметров и якоря"
+    if parts.scheme not in {'http', 'https'} or not parts.hostname or not _has_valid_port(parts):
+        return 'ожидается адрес вида https://хост или https://хост:порт'
+    if parts.path not in {'', '/'} or parts.query or parts.fragment:
+        return 'адрес установки задаётся без пути, параметров и якоря'
     return None
 
 
@@ -379,10 +379,10 @@ def _system_time_zone(source: Mapping[str, str]) -> str:
     Значение из окружения проверяется так же, как `APP_TIME_ZONE`, но неверное здесь не роняет
     запуск: это догадка, а не требование, и падать из-за чужой переменной неправильно.
     """
-    declared = source.get("TZ", "").strip()
+    declared = source.get('TZ', '').strip()
     if declared and _time_zone_problem(declared) is None:
         return declared
-    return _time_zone_from_localtime() or "UTC"
+    return _time_zone_from_localtime() or 'UTC'
 
 
 def _time_zone_from_localtime() -> str | None:
@@ -397,7 +397,7 @@ def _time_zone_from_localtime() -> str | None:
     if name in UTC_ALIASES:
         # `Etc/UTC` — ссылка на тот же пояс, что и `UTC`. Каноническое имя короче и
         # понятнее в настройках и логах, а поведение одинаковое.
-        return "UTC"
+        return 'UTC'
     return name if _time_zone_problem(name) is None else None
 
 
@@ -411,29 +411,29 @@ def _time_zone_problem(value: str) -> str | None:
     try:
         ZoneInfo(value)
     except (ZoneInfoNotFoundError, ValueError):
-        return "неизвестный часовой пояс; ожидается имя вида Europe/Moscow или UTC"
+        return 'неизвестный часовой пояс; ожидается имя вида Europe/Moscow или UTC'
     return None
 
 
 def _session_secret_problem(value: str) -> str | None:
     if len(value) < SESSION_SECRET_MIN_LENGTH:
-        return f"должна быть не короче {SESSION_SECRET_MIN_LENGTH} символов"
+        return f'должна быть не короче {SESSION_SECRET_MIN_LENGTH} символов'
     return None
 
 
 def _email_problem(value: str) -> str | None:
-    if "@" not in value:
-        return "ожидается почтовый адрес"
+    if '@' not in value:
+        return 'ожидается почтовый адрес'
     return None
 
 
 def _sentry_dsn_problem(value: str) -> str | None:
     if _SENTRY_DSN.fullmatch(value) is None:
-        return "ожидается DSN вида https://ключ@хост/номер_проекта"
+        return 'ожидается DSN вида https://ключ@хост/номер_проекта'
     return None
 
 
 def _telegram_bot_token_problem(value: str) -> str | None:
     if _TELEGRAM_BOT_TOKEN.fullmatch(value) is None:
-        return "ожидается токен бота вида 123456789:AA… из @BotFather"
+        return 'ожидается токен бота вида 123456789:AA… из @BotFather'
     return None

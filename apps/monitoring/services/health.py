@@ -21,8 +21,8 @@ from django.db import DatabaseError, connection
 from apps.accounts.models import AuditAction, AuditRecord
 from core.ports.state_store import StateStore
 
-REDIS = "redis"
-DATABASE = "postgresql"
+REDIS = 'redis'
+DATABASE = 'postgresql'
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,5 +61,5 @@ def record_checks_stopped(*, at: datetime, report: HealthReport) -> AuditRecord:
         action=AuditAction.CHECKS_STOPPED,
         occurred_at=at,
         author=None,
-        author_name="",
+        author_name='',
     )

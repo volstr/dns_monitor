@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class NotificationsConfig(AppConfig):
-    name = "apps.notifications"
-    label = "notifications"
+    name = 'apps.notifications'
+    label = 'notifications'

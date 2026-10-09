@@ -22,6 +22,6 @@ class RecordType(StrEnum):
     «показывать цель», которая и так приходит в ответе на A-запрос.
     """
 
-    A = "a"
-    AAAA = "aaaa"
-    CNAME = "cname"
+    A = 'a'
+    AAAA = 'aaaa'
+    CNAME = 'cname'

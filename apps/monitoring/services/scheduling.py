@@ -61,9 +61,9 @@ def claim_due_domains(*, at: datetime, limit: int) -> tuple[ClaimedDomain, ...]:
     with transaction.atomic():
         rows = list(
             Domain.objects.filter(watch_enabled=True, next_check_at__lte=at)
-            .order_by("next_check_at")
+            .order_by('next_check_at')
             .select_for_update(skip_locked=True)
-            .values_list("pk", "name")[:limit]
+            .values_list('pk', 'name')[:limit]
         )
         if rows:
             Domain.objects.filter(pk__in=[pk for pk, _ in rows]).update(
@@ -100,8 +100,8 @@ def prune_check_history(*, domain_id: int) -> int:
     ):
         keep.extend(
             Check.objects.filter(domain_id=domain_id, outcome__in=outcomes)
-            .order_by("-checked_at")
-            .values_list("pk", flat=True)[:limit]
+            .order_by('-checked_at')
+            .values_list('pk', flat=True)[:limit]
         )
     deleted, _ = Check.objects.filter(domain_id=domain_id).exclude(pk__in=keep).delete()
     return deleted

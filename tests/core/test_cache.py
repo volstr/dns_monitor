@@ -31,7 +31,7 @@ from core.ports.cache import (
 from core.ports.state_store import login_failures, scheduler_lock
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-REDIS_URL = "redis://redis:6379"
+REDIS_URL = 'redis://redis:6379'
 #: Логические базы берутся из настроек теста, а не пишутся числами: число легко разойдётся
 #: с окружением, и проверка ушла бы в рабочую базу запущенного приложения.
 STATE_DB = django_settings.ENV.redis_db_state
@@ -71,16 +71,16 @@ def test_11_12_version_in_the_key_makes_the_old_value_unreachable(cache: FakeCac
     ТЗ объясняет, почему именно так: при нескольких экземплярах сервиса удаление подвержено
     гонке, а смена версии просто делает старый ключ недостижимым, и он уходит по сроку.
     """
-    cache.put(settings_of_domain(7, 1), "период 5 минут")
+    cache.put(settings_of_domain(7, 1), 'период 5 минут')
 
     assert cache.get(settings_of_domain(7, 2)) is None
     # Старое значение не удалено — оно именно недостижимо и умрёт само.
-    assert cache.get(settings_of_domain(7, 1)) == "период 5 минут"
+    assert cache.get(settings_of_domain(7, 1)) == 'период 5 минут'
 
 
 def test_11_12_user_key_is_forgotten_immediately(cache: FakeCache) -> None:
     """Отозванный доступ не должен переживать своё отзывание (11.12, критерий 61)."""
-    cache.put(user(4), "admin")
+    cache.put(user(4), 'admin')
 
     cache.forget(user(4))
 
@@ -88,7 +88,7 @@ def test_11_12_user_key_is_forgotten_immediately(cache: FakeCache) -> None:
 
 
 def test_11_12_value_does_not_outlive_its_ttl(cache: FakeCache, clock: FakeClock) -> None:
-    cache.put(user(4), "admin")
+    cache.put(user(4), 'admin')
 
     clock.advance(USER_TTL + timedelta(seconds=1))
 
@@ -96,8 +96,8 @@ def test_11_12_value_does_not_outlive_its_ttl(cache: FakeCache, clock: FakeClock
 
 
 def test_11_12_flush_takes_the_whole_cache(cache: FakeCache) -> None:
-    cache.put(settings_of_domain(7, 1), "a")
-    cache.put(overview_view(), "b")
+    cache.put(settings_of_domain(7, 1), 'a')
+    cache.put(overview_view(), 'b')
 
     assert cache.flush() == 2
     assert cache.keys() == frozenset()
@@ -133,7 +133,7 @@ def test_11_12_real_cache_sets_a_lifetime_on_every_key(
     То есть именно бессрочный ключ и переживёт нехватку памяти, вытеснив вместо себя полезные.
     """
     key = settings_of_domain(920_001, 1)
-    redis_cache.put(key, "значение")
+    redis_cache.put(key, 'значение')
 
     ttl = cache_inspector.ttl(key.name)
 
@@ -154,13 +154,13 @@ def test_62_flushing_the_cache_does_not_touch_the_working_state(
     в боевой конфигурации достаточно одной неверной цифры в переменной окружения.
     """
     lock = scheduler_lock(920_002)
-    counter = login_failures("хеш-логина", "10.0.0.1")
+    counter = login_failures('хеш-логина', '10.0.0.1')
     redis_state.release(lock)
     redis_state.release(counter)
     redis_state.acquire(lock)
-    redis_state.remember(counter, "3")
-    redis_cache.put(settings_of_domain(920_002, 1), "период 5 минут")
-    redis_cache.put(overview_view(), "сводка")
+    redis_state.remember(counter, '3')
+    redis_cache.put(settings_of_domain(920_002, 1), 'период 5 минут')
+    redis_cache.put(overview_view(), 'сводка')
 
     deleted = redis_cache.flush()
 
@@ -168,7 +168,7 @@ def test_62_flushing_the_cache_does_not_touch_the_working_state(
     assert redis_cache.get(overview_view()) is None
     # Рабочее состояние на месте: блокировка занята, счётчик читается.
     assert redis_state.is_held(lock) is True
-    assert redis_state.recall(counter) == "3"
+    assert redis_state.recall(counter) == '3'
     redis_state.release(lock)
     redis_state.release(counter)
 
@@ -180,8 +180,8 @@ def test_11_12_cache_and_state_do_not_share_a_key_space(redis_cache: RedisCache)
     Без этого разделение было бы декоративным: общего пространства ключей `CLAUDE.md` не
     допускает, и проверить это можно только настоящим Redis.
     """
-    name = f"{PREFIX}probe:920003"
-    redis_cache.put(CacheKey(name, timedelta(seconds=30)), "из кэша")
+    name = f'{PREFIX}probe:920003'
+    redis_cache.put(CacheKey(name, timedelta(seconds=30)), 'из кэша')
     state_side = redis.Redis.from_url(REDIS_URL, db=STATE_DB, decode_responses=True)
 
     assert state_side.get(name) is None

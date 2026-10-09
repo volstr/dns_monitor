@@ -82,7 +82,7 @@ def settings_page() -> SettingsPage:
         reminder_interval_hours=row.reminder_interval_seconds // HOUR,
         merge_window_seconds=row.merge_window_seconds,
         merge_threshold=row.merge_threshold,
-        dns_servers_text="\n".join(row.dns_servers),
+        dns_servers_text='\n'.join(row.dns_servers),
         check_ipv6=row.check_ipv6,
         resolve_failure_threshold=row.resolve_failure_threshold,
         event_retention_days=row.event_retention_seconds // DAY,
@@ -97,6 +97,6 @@ def settings_page() -> SettingsPage:
         session_lifetime_hours=row.session_lifetime_seconds // HOUR,
         login_failure_threshold=row.login_failure_threshold,
         telegram_chat_id=row.telegram_chat_id,
-        email_recipients_text="\n".join(row.email_recipients),
+        email_recipients_text='\n'.join(row.email_recipients),
         webhook_url=row.webhook_url,
     )

@@ -29,8 +29,8 @@ pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
 AFTER_WINDOW = MOMENT + timedelta(seconds=60)
-CHAT = "-1001234567890"
-MAIL = ["duty@contoso.ru", "noc@contoso.ru"]
+CHAT = '-1001234567890'
+MAIL = ['duty@contoso.ru', 'noc@contoso.ru']
 
 
 @pytest.fixture
@@ -45,17 +45,17 @@ def domain() -> Domain:
         email_recipients=MAIL,
         notification_mode=NotificationMode.NOT_ALLOWED,
     )
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
-    AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
+    AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
     return domain
 
 
 def make_event(domain: Domain, **extra: object) -> Event:
     return Event.objects.create(
         domain=domain,
-        event_type=extra.pop("event_type", EventType.NOT_ALLOWED),
+        event_type=extra.pop('event_type', EventType.NOT_ALLOWED),
         occurred_at=MOMENT,
-        payload={"addresses": ["185.44.9.201"]},
+        payload={'addresses': ['185.44.9.201']},
         **extra,
     )
 
@@ -78,7 +78,7 @@ def test_d11_a_channel_needs_both_a_recipient_and_an_implementation(domain: Doma
     развозить «по всем, у кого есть адресат», вебхук на каждое событие дал бы в журнале запись
     «не доставлено» — подводный камень, названный в Q-D11 прямо.
     """
-    GlobalSettings.objects.filter(pk=1).update(webhook_url="https://hooks.contoso.ru/dns")
+    GlobalSettings.objects.filter(pk=1).update(webhook_url='https://hooks.contoso.ru/dns')
 
     ready = ready_channels(GlobalSettings.objects.get())
 
@@ -96,7 +96,7 @@ def test_d11_mail_recipients_reach_the_channel_one_per_line(domain: Domain) -> N
     """Адресат почты — перечень адресов, и канал получает его строкой (8.3)."""
     ready = ready_channels(GlobalSettings.objects.get())
 
-    assert ready[ChannelKind.EMAIL] == "duty@contoso.ru\nnoc@contoso.ru"
+    assert ready[ChannelKind.EMAIL] == 'duty@contoso.ru\nnoc@contoso.ru'
 
 
 # ─────────────── развозка ───────────────
@@ -112,16 +112,16 @@ def test_d11_event_is_queued_to_every_configured_channel(
     assert isinstance(result, Queued)
     assert [item.channel for item in result.to] == [ChannelKind.TELEGRAM, ChannelKind.EMAIL]
     assert event.notifications.count() == 2
-    assert set(Notification.objects.values_list("recipient", flat=True)) == {
+    assert set(Notification.objects.values_list('recipient', flat=True)) == {
         CHAT,
-        "duty@contoso.ru\nnoc@contoso.ru",
+        'duty@contoso.ru\nnoc@contoso.ru',
     }
 
 
 def test_d11_nothing_is_queued_when_no_channel_is_configured(
     domain: Domain, store: FakeStateStore
 ) -> None:
-    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id="", email_recipients=[])
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id='', email_recipients=[])
     event = make_event(domain)
 
     result = dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
@@ -138,7 +138,7 @@ def test_8_6_merge_window_is_counted_per_channel(
     слияния считается по каждому каналу отдельно — иначе два канала вдвое быстрее набирали бы
     порог, и сводка уходила бы там, где событий было вдвое меньше.
     """
-    other = Domain.objects.create(name="api.contoso.ru")
+    other = Domain.objects.create(name='api.contoso.ru')
 
     dispatch_event(event_id=make_event(domain).pk, at=MOMENT, state_store=store)
     result = dispatch_event(event_id=make_event(other).pk, at=MOMENT, state_store=store)
@@ -160,7 +160,7 @@ def test_d11_each_channel_is_delivered_by_its_own_implementation(
 
     assert run.sent == 2
     assert channels[ChannelKind.TELEGRAM.value].messages[0].recipient == CHAT
-    assert channels[ChannelKind.EMAIL.value].messages[0].recipient.startswith("duty@")
+    assert channels[ChannelKind.EMAIL.value].messages[0].recipient.startswith('duty@')
 
 
 def test_d11_one_channel_failing_does_not_affect_the_other(
@@ -176,14 +176,14 @@ def test_d11_one_channel_failing_does_not_affect_the_other(
     channels = {
         ChannelKind.TELEGRAM.value: FakeChannel(),
         ChannelKind.EMAIL.value: FakeChannel(
-            results=[NotSent(error="сервер не отвечает", retryable=True)]
+            results=[NotSent(error='сервер не отвечает', retryable=True)]
         ),
     }
 
     run = deliver_due(at=AFTER_WINDOW, channels=channels, state_store=store)
 
     assert (run.sent, run.failed) == (1, 1)
-    statuses = dict(Notification.objects.values_list("channel", "status"))
+    statuses = dict(Notification.objects.values_list('channel', 'status'))
     assert statuses[ChannelKind.TELEGRAM.value] == DeliveryStatus.SENT
     assert statuses[ChannelKind.EMAIL.value] == DeliveryStatus.PENDING
 
@@ -207,7 +207,7 @@ def test_d11_a_row_without_an_implementation_is_not_retried_forever(
     assert run.gave_up == 1
     email = Notification.objects.get(channel=ChannelKind.EMAIL)
     assert email.status == DeliveryStatus.FAILED
-    assert "нет реализации" in email.last_error
+    assert 'нет реализации' in email.last_error
 
 
 # ─────────────── ветка переписки у каждого канала своя ───────────────
@@ -229,14 +229,14 @@ def test_7_3_reply_goes_into_the_thread_of_the_same_channel(
     )
     deliver_due(at=AFTER_WINDOW, channels=both_channels(), state_store=store)
     openings = dict(
-        Notification.objects.filter(status=DeliveryStatus.SENT).values_list("channel", "pk")
+        Notification.objects.filter(status=DeliveryStatus.SENT).values_list('channel', 'pk')
     )
 
     closing = make_event(domain, event_type=EventType.BACK_TO_NORMAL, incident=incident)
     dispatch_event(event_id=closing.pk, at=AFTER_WINDOW, state_store=store)
 
     replies = dict(
-        closing.notifications.values_list("channel", "reply_to_id")  # type: ignore[misc]
+        closing.notifications.values_list('channel', 'reply_to_id')  # type: ignore[misc]
     )
     assert replies[ChannelKind.TELEGRAM.value] == openings[ChannelKind.TELEGRAM.value]
     assert replies[ChannelKind.EMAIL.value] == openings[ChannelKind.EMAIL.value]

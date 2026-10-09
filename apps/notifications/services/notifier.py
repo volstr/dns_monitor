@@ -104,10 +104,10 @@ def _no_implementation(
         mark_failed(
             notification_id=notification.pk,
             at=at,
-            error=f"нет реализации канала «{kind}»",
+            error=f'нет реализации канала «{kind}»',
             retryable=False,
         )
-    logger.error("нет реализации канала", extra={"component": "notifier", "channel": kind})
+    logger.error('нет реализации канала', extra={'component': 'notifier', 'channel': kind})
     return _plus(run, gave_up=len(batch))
 
 
@@ -130,16 +130,16 @@ def _send_one(
     )
     if isinstance(outcome, GaveUp):
         logger.error(
-            "уведомление не доставлено, повторы исчерпаны",
-            extra={"notification": notification.pk, "error": result.error},
+            'уведомление не доставлено, повторы исчерпаны',
+            extra={'notification': notification.pk, 'error': result.error},
         )
         # 11.14: неудача доставки **после исчерпания всех повторов** — ошибка приложения.
         # Отдельная неудачная попытка ею не является: ради этого и существуют повторы.
         report(
             Failure(
-                cause="delivery:gave-up",
-                message=f"уведомление не доставлено, повторы исчерпаны: {result.error}",
-                tags={"notification": str(notification.pk)},
+                cause='delivery:gave-up',
+                message=f'уведомление не доставлено, повторы исчерпаны: {result.error}',
+                tags={'notification': str(notification.pk)},
             )
         )
         return _plus(run, gave_up=1)
@@ -158,14 +158,14 @@ def _send_summary(
     key = StateKey(merge_key, window)
     # Накопитель — источник имён; если он успел истечь, берём их из самих событий.
     names = state_store.collected(key) or _domain_names(batch)
-    event_type = merge_key.rsplit(":", 1)[-1]
+    event_type = merge_key.rsplit(':', 1)[-1]
 
     result = channel.send(
         recipient=batch[0].recipient,
         text=compose_summary(
             event_type=event_type,
             domain_names=names,
-            journal_url=f"{settings.ENV.app_base_url}/events/?type={event_type}",
+            journal_url=f'{settings.ENV.app_base_url}/events/?type={event_type}',
         ),
     )
     state_store.release(key)
@@ -188,7 +188,7 @@ def _send_summary(
 
 
 def _domain_names(batch: list[Notification]) -> tuple[str, ...]:
-    names = Event.objects.filter(notifications__in=batch).values_list("domain__name", flat=True)
+    names = Event.objects.filter(notifications__in=batch).values_list('domain__name', flat=True)
     return tuple(sorted(set(names)))
 
 
@@ -200,8 +200,8 @@ def _reply_to(notification: Notification) -> str | None:
 
 def _plus(run: DeliveryRun, **delta: int) -> DeliveryRun:
     return DeliveryRun(
-        sent=run.sent + delta.get("sent", 0),
-        merged=run.merged + delta.get("merged", 0),
-        failed=run.failed + delta.get("failed", 0),
-        gave_up=run.gave_up + delta.get("gave_up", 0),
+        sent=run.sent + delta.get('sent', 0),
+        merged=run.merged + delta.get('merged', 0),
+        failed=run.failed + delta.get('failed', 0),
+        gave_up=run.gave_up + delta.get('gave_up', 0),
     )

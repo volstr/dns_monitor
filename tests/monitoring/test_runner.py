@@ -14,7 +14,7 @@ from core.adapters.fake_state_store import FakeStateStore
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-NAME = "pay-gw.contoso.ru"
+NAME = 'pay-gw.contoso.ru'
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def test_d51_empty_list_falls_back_to_the_system_servers(
     Domain.objects.create(name=NAME, next_check_at=MOMENT)
 
     report = run_one_tick(
-        clock=clock, state_store=store, servers_of_system=lambda: ("127.0.0.1",)
+        clock=clock, state_store=store, servers_of_system=lambda: ('127.0.0.1',)
     )
 
     assert not isinstance(report, TickSkipped)
@@ -64,7 +64,7 @@ def test_4_1_tick_is_skipped_when_nobody_has_a_server(
     report = run_one_tick(clock=clock, state_store=store, servers_of_system=no_system_servers)
 
     assert isinstance(report, TickSkipped)
-    assert "DNS-сервера" in report.reason
+    assert 'DNS-сервера' in report.reason
     assert Check.objects.count() == 0
 
 
@@ -81,7 +81,7 @@ def test_empty_list_does_not_consume_the_domain(clock: FakeClock, store: FakeSta
 def test_11_1_tick_runs_with_configured_servers(clock: FakeClock, store: FakeStateStore) -> None:
     # Серверов нет в природе, но обход обязан состояться: домен резолвится неудачно и это
     # штатный исход (6.1), а не падение процесса.
-    set_servers("127.0.0.1")
+    set_servers('127.0.0.1')
     Domain.objects.create(name=NAME, next_check_at=MOMENT)
 
     report = run_one_tick(clock=clock, state_store=store)
@@ -92,7 +92,7 @@ def test_11_1_tick_runs_with_configured_servers(clock: FakeClock, store: FakeSta
 
 
 def test_no_due_domains_is_an_empty_tick(clock: FakeClock, store: FakeStateStore) -> None:
-    set_servers("127.0.0.1")
+    set_servers('127.0.0.1')
 
     report = run_one_tick(clock=clock, state_store=store)
 
@@ -101,9 +101,9 @@ def test_no_due_domains_is_an_empty_tick(clock: FakeClock, store: FakeStateStore
 
 
 def test_describe_names_what_happened() -> None:
-    skipped = describe(TickSkipped(reason="список DNS-серверов пуст"), MOMENT)
+    skipped = describe(TickSkipped(reason='список DNS-серверов пуст'), MOMENT)
     done = describe(TickReport(claimed=3, checked=2, skipped=1, failed=0), MOMENT)
 
-    assert "пропущен" in skipped
-    assert "взято 3" in done
-    assert "проверено 2" in done
+    assert 'пропущен' in skipped
+    assert 'взято 3' in done
+    assert 'проверено 2' in done

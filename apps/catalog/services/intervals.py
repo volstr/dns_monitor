@@ -29,28 +29,28 @@ from core.text import humanize_duration
 COMFORTABLE_RATIO = 3
 
 
-def freshness_warning(*, period_seconds: int, threshold_seconds: int, subject: str = "") -> str:
+def freshness_warning(*, period_seconds: int, threshold_seconds: int, subject: str = '') -> str:
     """Предупреждение о соотношении или пустая строка, если всё в порядке."""
     period = humanize_duration(timedelta(seconds=period_seconds))
     threshold = humanize_duration(timedelta(seconds=threshold_seconds))
-    where = f" у группы «{subject}»" if subject else ""
+    where = f' у группы «{subject}»' if subject else ''
 
     if threshold_seconds <= period_seconds:
         return (
-            f"Порог актуальности{where} ({threshold}) не больше периода проверки ({period}). "
-            f"За порог не успевает пройти круг адресов, и часть набора будет ложно объявлена "
-            f"неактуальной."
+            f'Порог актуальности{where} ({threshold}) не больше периода проверки ({period}). '
+            f'За порог не успевает пройти круг адресов, и часть набора будет ложно объявлена '
+            f'неактуальной.'
         )
     if threshold_seconds < period_seconds * COMFORTABLE_RATIO:
         return (
-            f"Порог актуальности{where} ({threshold}) близок к периоду проверки ({period}). "
-            f"Обычно его берут хотя бы втрое больше."
+            f'Порог актуальности{where} ({threshold}) близок к периоду проверки ({period}). '
+            f'Обычно его берут хотя бы втрое больше.'
         )
-    return ""
+    return ''
 
 
 def warnings_for_group(
-    *, group: Group | None, global_settings: GlobalSettings, subject: str = ""
+    *, group: Group | None, global_settings: GlobalSettings, subject: str = ''
 ) -> tuple[str, ...]:
     """Предупреждение для одной группы по её действующим значениям."""
     period = (group.check_period_seconds if group else None) or global_settings.check_period_seconds
@@ -74,7 +74,7 @@ def warnings_after_global_change(global_settings: GlobalSettings) -> tuple[str, 
     """
     collected: list[str] = []
     collected.extend(warnings_for_group(group=None, global_settings=global_settings))
-    for group in Group.objects.order_by("name"):
+    for group in Group.objects.order_by('name'):
         collected.extend(
             warnings_for_group(group=group, global_settings=global_settings, subject=group.name)
         )

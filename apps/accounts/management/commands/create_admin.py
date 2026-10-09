@@ -18,22 +18,22 @@ from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from apps.accounts.services.bootstrap import AdminNotCreated, create_first_admin
 
-PASSWORD_VARIABLE = "ADMIN_PASSWORD"  # noqa: S105 — имя переменной, а не значение
+PASSWORD_VARIABLE = 'ADMIN_PASSWORD'  # noqa: S105 — имя переменной, а не значение
 
 
 class Command(BaseCommand):
-    help = "Создать первого администратора. Работает только на установке без администраторов."
+    help = 'Создать первого администратора. Работает только на установке без администраторов.'
 
     def add_arguments(self, parser: CommandParser) -> None:
-        parser.add_argument("--email", required=True)
-        parser.add_argument("--name", required=True)
+        parser.add_argument('--email', required=True)
+        parser.add_argument('--name', required=True)
 
     def handle(self, *args: Any, **options: Any) -> None:
-        password = os.environ.get(PASSWORD_VARIABLE) or getpass.getpass("Пароль: ")
+        password = os.environ.get(PASSWORD_VARIABLE) or getpass.getpass('Пароль: ')
 
         result = create_first_admin(
-            email=options["email"],
-            name=options["name"],
+            email=options['email'],
+            name=options['name'],
             password=password,
             at=datetime.now(UTC),
         )
@@ -41,4 +41,4 @@ class Command(BaseCommand):
         if isinstance(result, AdminNotCreated):
             raise CommandError(result.reason)
 
-        self.stdout.write(f"Администратор {result.email} создан. Можно входить.")
+        self.stdout.write(f'Администратор {result.email} создан. Можно входить.')

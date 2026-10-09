@@ -30,7 +30,7 @@ TTL = 300
 def free_port() -> int:
     """Свободный порт. Оба сервера критерия 13 слушают его на разных адресах loopback."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
-        probe.bind(("127.0.0.1", 0))
+        probe.bind(('127.0.0.1', 0))
         port: int = probe.getsockname()[1]
     return port
 
@@ -44,11 +44,11 @@ def answers(*addresses: str, cname: str | None = None) -> Handler:
         target = name
         if cname is not None:
             target = dns.name.from_text(cname)
-            response.answer.append(dns.rrset.from_text(name, TTL, "IN", "CNAME", cname))
+            response.answer.append(dns.rrset.from_text(name, TTL, 'IN', 'CNAME', cname))
         if addresses:
-            record_type = "AAAA" if ":" in addresses[0] else "A"
+            record_type = 'AAAA' if ':' in addresses[0] else 'A'
             response.answer.append(
-                dns.rrset.from_text(target, TTL, "IN", record_type, *addresses)
+                dns.rrset.from_text(target, TTL, 'IN', record_type, *addresses)
             )
         return response
 
@@ -83,7 +83,7 @@ def silence() -> Handler:
 
 
 class FakeDnsServer:
-    def __init__(self, handler: Handler, address: str = "127.0.0.1", port: int = 0) -> None:
+    def __init__(self, handler: Handler, address: str = '127.0.0.1', port: int = 0) -> None:
         self.handler = handler
         self.address = address
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

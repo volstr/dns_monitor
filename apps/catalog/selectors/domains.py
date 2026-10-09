@@ -39,19 +39,19 @@ ADDRESS_LIMIT = 6
 class DomainFilter(StrEnum):
     """Сегменты фильтра из прототипа. «Без разрешённых» — требование 8.2."""
 
-    ALL = "all"
-    DISCREPANCIES = "discrepancies"
-    NO_ALLOWLIST = "no_allowlist"
-    DISABLED = "disabled"
+    ALL = 'all'
+    DISCREPANCIES = 'discrepancies'
+    NO_ALLOWLIST = 'no_allowlist'
+    DISABLED = 'disabled'
 
 
 #: Подписи сегментов. Здесь, а не в шаблоне: перечень сегментов и их порядок — свойство
 #: фильтра, и шаблон не должен знать его наизусть.
 FILTER_LABELS = {
-    DomainFilter.ALL: "Все",
-    DomainFilter.DISCREPANCIES: "Расхождения",
-    DomainFilter.NO_ALLOWLIST: "Без разрешённых",
-    DomainFilter.DISABLED: "Выключенные",
+    DomainFilter.ALL: 'Все',
+    DomainFilter.DISCREPANCIES: 'Расхождения',
+    DomainFilter.NO_ALLOWLIST: 'Без разрешённых',
+    DomainFilter.DISABLED: 'Выключенные',
 }
 
 
@@ -134,7 +134,7 @@ class DomainListPage:
 def domain_list_page(
     *,
     at: datetime,
-    search: str = "",
+    search: str = '',
     group_id: int | None = None,
     chosen: DomainFilter = DomainFilter.ALL,
     limit: int = PAGE_SIZE,
@@ -156,7 +156,7 @@ def domain_list_page(
 def domain_rows(
     *,
     at: datetime,
-    search: str = "",
+    search: str = '',
     group_id: int | None = None,
     chosen: DomainFilter = DomainFilter.ALL,
     limit: int = PAGE_SIZE,
@@ -194,7 +194,7 @@ def domain_rows(
 
 def _group_options() -> tuple[GroupOption, ...]:
     """Группы для поля выбора с поиском (10.4). Порядок — по имени, как в прототипе."""
-    groups = Group.objects.annotate(size=Count("domains")).order_by("name")
+    groups = Group.objects.annotate(size=Count('domains')).order_by('name')
     return tuple(
         GroupOption(id=group.pk, name=group.name, domain_count=group.size) for group in groups
     )
@@ -203,10 +203,10 @@ def _group_options() -> tuple[GroupOption, ...]:
 def _filtered(
     *, search: str, group_id: int | None, chosen: DomainFilter
 ) -> QuerySet[Domain]:
-    domains = Domain.objects.select_related("group").annotate(
-        has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef("pk"))),
+    domains = Domain.objects.select_related('group').annotate(
+        has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef('pk'))),
         has_open_incident=Exists(
-            Incident.objects.filter(domain=OuterRef("pk"), closed_at__isnull=True)
+            Incident.objects.filter(domain=OuterRef('pk'), closed_at__isnull=True)
         ),
     )
 
@@ -233,7 +233,7 @@ def _filtered(
             # Связь «к многим»: без этого домен с двумя подходящими адресами задвоится.
             domains = domains.distinct()
 
-    return domains.order_by("name")
+    return domains.order_by('name')
 
 
 def _search_condition(text: str) -> tuple[Q, bool]:
@@ -264,7 +264,7 @@ def _resolved_settings(
 def _allowlists(domain_ids: list[int]) -> dict[int, tuple[str, ...]]:
     """Записи белых списков одной выборкой: нужны и счёт, и текст единственной записи."""
     entries = AllowlistEntry.objects.filter(domain_id__in=domain_ids).values_list(
-        "domain_id", "raw"
+        'domain_id', 'raw'
     )
     collected: dict[int, list[str]] = {}
     for domain_id, raw in entries:
@@ -286,7 +286,7 @@ def _row(
     return DomainRow(
         id=domain.pk,
         name=domain.name,
-        group_name=domain.group.name if domain.group else "",
+        group_name=domain.group.name if domain.group else '',
         comment=domain.comment,
         watch_enabled=domain.watch_enabled,
         addresses=tuple(_chip(row, domain) for row in shown),
@@ -306,12 +306,12 @@ def _chip(row: RegistryRow, domain: Domain) -> AddressChip:
     """Чип адреса. Классы и значки — прототипа: `.chip`, `.chip.out`, `.chip.gone`, `.chip.new`."""
     address = str(row.address)
     if row.status == AddressStatus.STALE:
-        return AddressChip(address=address, css="gone", glyph="")
+        return AddressChip(address=address, css='gone', glyph='')
     if row.status == AddressStatus.UNMATCHED:
-        return AddressChip(address=address, css="out", glyph="✕")
+        return AddressChip(address=address, css='out', glyph='✕')
     if _is_new(row, domain):
-        return AddressChip(address=address, css="new", glyph="+")
-    return AddressChip(address=address, css="", glyph="")
+        return AddressChip(address=address, css='new', glyph='+')
+    return AddressChip(address=address, css='', glyph='')
 
 
 def _is_new(row: RegistryRow, domain: Domain) -> bool:
@@ -335,16 +335,16 @@ def _matching(
     """Колонка «Проверка адресов» — состояние вхождения и пояснение под ним."""
     if domain.consecutive_resolve_failures > 0:
         return Badge(
-            label="Нет ответа",
-            tone="fail",
-            detail=f"Неудачных проверок подряд: {domain.consecutive_resolve_failures}",
+            label='Нет ответа',
+            tone='fail',
+            detail=f'Неудачных проверок подряд: {domain.consecutive_resolve_failures}',
         )
 
     if not entries:
         # Сравнивать не с чем (Q-D25). Подпись прототипа «только изменения» уместна лишь тогда,
         # когда режим действительно следит за изменениями.
-        detail = "только изменения" if mode == NotificationMode.ADDRESS_CHANGE else ""
-        return Badge(label="Ничего не задано", tone="", detail=detail)
+        detail = 'только изменения' if mode == NotificationMode.ADDRESS_CHANGE else ''
+        return Badge(label='Ничего не задано', tone='', detail=detail)
 
     detail = (
         entries[0]
@@ -353,8 +353,8 @@ def _matching(
     )
     unmatched = sum(1 for row in registry if row.status == AddressStatus.UNMATCHED)
     if unmatched:
-        word = plural(unmatched, "не решён", "не решено", "не решено")
-        return Badge(label=f"{unmatched} {word}", tone="breach", detail=detail)
+        word = plural(unmatched, 'не решён', 'не решено', 'не решено')
+        return Badge(label=f'{unmatched} {word}', tone='breach', detail=detail)
 
     fresh = sum(1 for row in registry if row.status != AddressStatus.STALE)
-    return Badge(label="Все решены" if fresh > 1 else "Решён", tone="ok", detail=detail)
+    return Badge(label='Все решены' if fresh > 1 else 'Решён', tone='ok', detail=detail)

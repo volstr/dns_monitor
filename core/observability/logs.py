@@ -27,10 +27,10 @@ from typing import Any
 #: Поля, которые `logging` кладёт в запись сам. Всё, чего здесь нет, пришло из `extra` и
 #: считается полем предметной области: домен, группа, компонент, номер уведомления.
 _BUILTIN: frozenset[str] = frozenset(
-    logging.LogRecord("", 0, "", 0, "", None, None).__dict__
-) | frozenset({"message", "asctime", "taskName"})
+    logging.LogRecord('', 0, '', 0, '', None, None).__dict__
+) | frozenset({'message', 'asctime', 'taskName'})
 
-_run_id: ContextVar[str] = ContextVar("run_id", default="")
+_run_id: ContextVar[str] = ContextVar('run_id', default='')
 
 
 def new_run() -> str:
@@ -70,16 +70,16 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, Any] = {
-            "ts": dt.datetime.fromtimestamp(record.created).astimezone().isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
+            'ts': dt.datetime.fromtimestamp(record.created).astimezone().isoformat(),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
         }
         if record.exc_info:
-            payload["error"] = self.formatException(record.exc_info)
+            payload['error'] = self.formatException(record.exc_info)
 
         for key, value in record.__dict__.items():
-            if key not in _BUILTIN and not key.startswith("_"):
+            if key not in _BUILTIN and not key.startswith('_'):
                 payload[key] = _plain(value)
 
         # `ensure_ascii=False`: имена доменов и тексты отказов по-русски должны остаться

@@ -55,7 +55,7 @@ def system_servers() -> tuple[str, ...]:
 
 #: Типы записей, которые дают адреса. CNAME адресов не даёт: по Q-D12 его цель приходит вместе
 #: с ответом на A-запрос, отдельного запроса для неё не нужно.
-_ADDRESS_RECORD_TYPES: dict[RecordType, str] = {RecordType.A: "A", RecordType.AAAA: "AAAA"}
+_ADDRESS_RECORD_TYPES: dict[RecordType, str] = {RecordType.A: 'A', RecordType.AAAA: 'AAAA'}
 
 
 class DnsResolver(Resolver):
@@ -66,7 +66,7 @@ class DnsResolver(Resolver):
         port: int = DEFAULT_DNS_PORT,
     ) -> None:
         if not servers:
-            message = "Список DNS-серверов пуст: опрашивать некого (ТЗ 4.1)"
+            message = 'Список DNS-серверов пуст: опрашивать некого (ТЗ 4.1)'
             raise ValueError(message)
         self._servers = tuple(servers)
         self._timeout = timeout_ms / 1000
@@ -78,19 +78,19 @@ class DnsResolver(Resolver):
         )
         # Домен, у которого не отмечен ни один адресный тип, адресов не наблюдает. Запрос A всё
         # равно делается: он даёт цель цепочки CNAME, ради которой флаг и включают (Q-D12).
-        queried = wanted or ("A",)
+        queried = wanted or ('A',)
         last_error: str | None = None
 
         for server in self._servers:
             reply = self._ask(server, name, queried, collect=bool(wanted))
             if reply is None:
-                last_error = f"{server}: сервер не ответил"
+                last_error = f'{server}: сервер не ответил'
                 continue
             return reply
 
         return ResolveResult(
             outcome=ResolveOutcome.UNAVAILABLE,
-            error=last_error or "ни один сервер не ответил",
+            error=last_error or 'ни один сервер не ответил',
         )
 
     def _ask(
@@ -143,5 +143,5 @@ class DnsResolver(Resolver):
 
 def _canonical_name(name: str, canonical: str) -> str | None:
     """Цель цепочки CNAME. ``None``, если цепочки не было (Q-D12)."""
-    target = canonical.rstrip(".")
-    return None if target == name.rstrip(".") else target
+    target = canonical.rstrip('.')
+    return None if target == name.rstrip('.') else target

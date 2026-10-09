@@ -41,17 +41,17 @@ def send_outage_alert(
 ) -> AlertResult:
     """Сообщить дежурным, что проверки остановлены. Исключений не бросает."""
     if not channel.is_configured:
-        return AlertSkipped(reason="канал не настроен")
+        return AlertSkipped(reason='канал не настроен')
 
     try:
         recipient = GlobalSettings.objects.get().telegram_chat_id
     except DatabaseError as error:
         # Отказал не Redis, а сама база: адресата прочитать неоткуда. Молчим, но заметно.
-        logger.error("некому сообщить об аварии: база недоступна", extra={"error": str(error)})
-        return AlertSkipped(reason="база недоступна")
+        logger.error('некому сообщить об аварии: база недоступна', extra={'error': str(error)})
+        return AlertSkipped(reason='база недоступна')
 
     if not recipient:
-        return AlertSkipped(reason="адресат не задан")
+        return AlertSkipped(reason='адресат не задан')
 
     result = channel.send(
         recipient=recipient, text=compose_outage(component=component, detail=detail)
@@ -60,5 +60,5 @@ def send_outage_alert(
         return AlertSent(channel_message_id=result.channel_message_id)
 
     # Доставка не удалась — повторять здесь нечем и некогда: очередь недоступна по условию.
-    logger.error("уведомление об аварии не доставлено", extra={"error": result.error})
+    logger.error('уведомление об аварии не доставлено', extra={'error': result.error})
     return AlertSkipped(reason=result.error)

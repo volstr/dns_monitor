@@ -93,9 +93,9 @@ def tick(
     )
 
 
-_CHECKED = "checked"
-_SKIPPED = "skipped"
-_FAILED = "failed"
+_CHECKED = 'checked'
+_SKIPPED = 'skipped'
+_FAILED = 'failed'
 
 
 def report_failures(failures: list[BaseException]) -> None:
@@ -107,10 +107,10 @@ def report_failures(failures: list[BaseException]) -> None:
     for cause, errors in by_cause.items():
         report(
             Failure(
-                cause=f"check:{cause}",
-                message=f"проверка домена упала: {cause}",
+                cause=f'check:{cause}',
+                message=f'проверка домена упала: {cause}',
                 affected=len(errors),
-                tags={"run": current_run()},
+                tags={'run': current_run()},
                 error=errors[0],
             )
         )
@@ -152,7 +152,7 @@ def _check_one(
             dispatch_event(event_id=event_id, at=at, state_store=state_store)
     except Exception as error:
         # Один домен не должен ронять обход. Резервирование вернёт его в выборку через полминуты.
-        logger.exception("проверка домена упала", extra={"domain": item.name})
+        logger.exception('проверка домена упала', extra={'domain': item.name})
         # Список общий для потоков: `list.append` под GIL атомарен, отдельная блокировка здесь
         # была бы защитой от несуществующей гонки.
         failures.append(error)

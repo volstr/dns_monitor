@@ -27,9 +27,9 @@ from core.adapters.fake_state_store import FakeStateStore
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 24, 14, 38, tzinfo=UTC)
-PASSWORD = "tuman-9-krisa-vody"
-EMAIL = "a.kirilova@contoso.ru"
-IP = "10.20.1.14"
+PASSWORD = 'tuman-9-krisa-vody'
+EMAIL = 'a.kirilova@contoso.ru'
+IP = '10.20.1.14'
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def store(clock: FakeClock) -> FakeStateStore:
 @pytest.fixture
 def member() -> Member:
     return Member.objects.create_member(
-        email=EMAIL, name="Анна Кирилова", created_at=MOMENT, role=Role.ADMIN, password=PASSWORD
+        email=EMAIL, name='Анна Кирилова', created_at=MOMENT, role=Role.ADMIN, password=PASSWORD
     )
 
 
@@ -54,7 +54,7 @@ def sign_in(
     *,
     email: str = EMAIL,
     password: str = PASSWORD,
-    code: str = "",
+    code: str = '',
     at: datetime = MOMENT,
     two_factor: bool = False,
 ) -> object:
@@ -77,7 +77,7 @@ def test_3_correct_password_opens_access(member: Member, store: FakeStateStore) 
 
 
 def test_3_wrong_password_is_refused(member: Member, store: FakeStateStore) -> None:
-    result = sign_in(store, password="не тот")
+    result = sign_in(store, password='не тот')
 
     assert isinstance(result, Rejected)
     assert result.attempts_left == 4
@@ -85,7 +85,7 @@ def test_3_wrong_password_is_refused(member: Member, store: FakeStateStore) -> N
 
 def test_c19_unknown_login_looks_the_same_as_a_wrong_password(store: FakeStateStore) -> None:
     """Q-C19: по тексту отказа нельзя перебрать учётные записи."""
-    result = sign_in(store, email="nobody@contoso.ru")
+    result = sign_in(store, email='nobody@contoso.ru')
 
     assert isinstance(result, Rejected)
     assert result.attempts_left == 4
@@ -100,9 +100,9 @@ def test_3_disabled_member_cannot_sign_in(member: Member, store: FakeStateStore)
 def test_33_threshold_of_failures_locks_the_login(member: Member, store: FakeStateStore) -> None:
     """Критерий 33: N неудачных попыток → блокировка на 15 минут."""
     for _ in range(4):
-        assert isinstance(sign_in(store, password="не тот"), Rejected)
+        assert isinstance(sign_in(store, password='не тот'), Rejected)
 
-    assert isinstance(sign_in(store, password="не тот"), Locked)
+    assert isinstance(sign_in(store, password='не тот'), Locked)
     # Даже с верным паролем: блокировка на паре «логин + IP», а не на попытке.
     assert isinstance(sign_in(store), Locked)
 
@@ -112,7 +112,7 @@ def test_56_lock_expires_on_its_own(
 ) -> None:
     """Критерий 56: через 15 минут блокировка снята без участия приложения."""
     for _ in range(5):
-        sign_in(store, password="не тот")
+        sign_in(store, password='не тот')
     assert isinstance(sign_in(store), Locked)
 
     clock.advance(timedelta(minutes=16))
@@ -130,12 +130,12 @@ def test_57_counting_window_is_fixed_not_sliding(
     неудаче, редкие опечатки накопятся за месяцы и заблокируют вход на ровном месте.
     """
     for _ in range(4):
-        sign_in(store, password="не тот")
+        sign_in(store, password='не тот')
 
     clock.advance(timedelta(minutes=16))
 
     for _ in range(4):
-        result = sign_in(store, password="не тот", at=clock.now())
+        result = sign_in(store, password='не тот', at=clock.now())
         assert isinstance(result, Rejected)
 
 
@@ -143,7 +143,7 @@ def test_32_member_with_the_flag_must_change_the_password_first(store: FakeState
     """Критерий 32: до смены пароля доступа к остальным экранам нет."""
     member = Member.objects.create_member(
         email=EMAIL,
-        name="Анна Кирилова",
+        name='Анна Кирилова',
         created_at=MOMENT,
         password=PASSWORD,
         must_change_password=True,
@@ -187,7 +187,7 @@ def test_52_the_same_code_is_not_accepted_twice(member: Member, store: FakeState
 def test_3_wrong_code_counts_as_a_failed_attempt(member: Member, store: FakeStateStore) -> None:
     Member.objects.filter(pk=member.pk).update(totp_secret=new_totp_secret())
 
-    result = sign_in(store, code="000000", two_factor=True)
+    result = sign_in(store, code='000000', two_factor=True)
 
     assert isinstance(result, Rejected)
     assert result.attempts_left == 4
@@ -214,7 +214,7 @@ def test_3_binding_refuses_a_wrong_code(member: Member, store: FakeStateStore) -
         confirm_totp_binding(
             member_id=member.pk,
             secret=new_totp_secret(),
-            code="000000",
+            code='000000',
             at=MOMENT,
             state_store=store,
         )
@@ -225,17 +225,17 @@ def test_3_binding_refuses_a_wrong_code(member: Member, store: FakeStateStore) -
 def test_login_threshold_comes_from_settings(member: Member, store: FakeStateStore) -> None:
     GlobalSettings.objects.filter(pk=1).update(login_failure_threshold=2)
 
-    assert isinstance(sign_in(store, password="не тот"), Rejected)
-    assert isinstance(sign_in(store, password="не тот"), Locked)
+    assert isinstance(sign_in(store, password='не тот'), Rejected)
+    assert isinstance(sign_in(store, password='не тот'), Locked)
 
 
 def test_50_code_field_is_absent_from_the_markup(client: Client) -> None:
     """Критерий 50: при AUTH_2FA_ENABLED=false разметки поля кода нет в ответе сервера."""
-    body = client.get(reverse("login")).content.decode()
+    body = client.get(reverse('login')).content.decode()
 
     assert 'name="password"' in body
     assert 'name="code"' not in body
-    assert "Код из приложения" not in body
+    assert 'Код из приложения' not in body
 
 
 def test_3_missing_code_says_so_instead_of_blaming_the_password(
@@ -243,48 +243,48 @@ def test_3_missing_code_says_so_instead_of_blaming_the_password(
 ) -> None:
     """Человек вводит верные почту и пароль — текст отказа обязан назвать настоящую причину."""
     monkeypatch.setattr(
-        settings, "ENV", dataclasses.replace(settings.ENV, auth_2fa_enabled=True)
+        settings, 'ENV', dataclasses.replace(settings.ENV, auth_2fa_enabled=True)
     )
 
-    response = client.post(reverse("login"), {"email": EMAIL, "password": PASSWORD})
+    response = client.post(reverse('login'), {'email': EMAIL, 'password': PASSWORD})
 
     body = response.content.decode()
-    assert "AUTH_2FA_ENABLED" in body
-    assert "Проверьте почту и пароль" not in body
+    assert 'AUTH_2FA_ENABLED' in body
+    assert 'Проверьте почту и пароль' not in body
 
 
 def test_50_code_field_appears_when_the_second_factor_is_on(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        settings, "ENV", dataclasses.replace(settings.ENV, auth_2fa_enabled=True)
+        settings, 'ENV', dataclasses.replace(settings.ENV, auth_2fa_enabled=True)
     )
 
-    body = client.get(reverse("login")).content.decode()
+    body = client.get(reverse('login')).content.decode()
 
     assert 'name="code"' in body
 
 
 def test_3_login_screen_signs_a_member_in(client: Client, member: Member) -> None:
-    response = client.post(reverse("login"), {"email": EMAIL, "password": PASSWORD})
+    response = client.post(reverse('login'), {'email': EMAIL, 'password': PASSWORD})
 
     assert response.status_code == 302
-    assert client.get(reverse("overview")).status_code == 200
+    assert client.get(reverse('overview')).status_code == 200
 
 
 def test_3_anonymous_visitor_is_sent_to_the_login_screen(client: Client) -> None:
     """Перенаправление, а не отказ: человек не вошёл, и ему есть куда идти."""
-    response = client.get(reverse("domain-list"))
+    response = client.get(reverse('domain-list'))
 
     assert response.status_code == 302
-    assert reverse("login") in response["Location"]
+    assert reverse('login') in response['Location']
     # Адрес запомнен: ссылка из уведомления (8.4) после входа откроется сама.
-    assert "next" in response["Location"]
+    assert 'next' in response['Location']
 
 
 def test_3_logout_ends_the_session(client: Client, member: Member) -> None:
     client.force_login(member)
 
-    client.post(reverse("logout"))
+    client.post(reverse('logout'))
 
-    assert client.get(reverse("overview")).status_code == 302
+    assert client.get(reverse('overview')).status_code == 302

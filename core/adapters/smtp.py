@@ -31,22 +31,22 @@ from typing import Protocol
 from core.ports.notification_channel import NotificationChannel, NotSent, SendResult, Sent
 
 #: Режимы шифрования из `SMTP_TLS` (11.10).
-TLS_STARTTLS = "starttls"
-TLS_IMPLICIT = "tls"
-TLS_NONE = "none"
+TLS_STARTTLS = 'starttls'
+TLS_IMPLICIT = 'tls'
+TLS_NONE = 'none'
 
 TIMEOUT_SECONDS = 10
 
 #: Имя отправителя в заголовке From. Дежурный видит его в списке писем раньше темы.
-SENDER_NAME = "DNS monitoring"
+SENDER_NAME = 'DNS monitoring'
 
 #: Тема письма берётся из первой строки сообщения — это заголовок события по 8.4 («Адрес вне
 #: разрешённых», «Домен не резолвится»). Отдельная тема означала бы второй источник названий
 #: событий рядом с утверждённой таблицей Q-C11.
-SUBJECT_FALLBACK = "Уведомление DNS monitoring"
+SUBJECT_FALLBACK = 'Уведомление DNS monitoring'
 
-_TAG = re.compile(r"<[^>]+>")
-_BREAK = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_TAG = re.compile(r'<[^>]+>')
+_BREAK = re.compile(r'<br\s*/?>', re.IGNORECASE)
 
 
 class Transport(Protocol):
@@ -128,11 +128,11 @@ class SmtpChannel(NotificationChannel):
 
     def send(self, *, recipient: str, text: str, reply_to: str | None = None) -> SendResult:
         if not self.is_configured:
-            return NotSent(error="SMTP_HOST или SMTP_FROM не задан", retryable=False)
+            return NotSent(error='SMTP_HOST или SMTP_FROM не задан', retryable=False)
 
         recipients = _recipients(recipient)
         if not recipients:
-            return NotSent(error="не задан ни один адрес получателя", retryable=False)
+            return NotSent(error='не задан ни один адрес получателя', retryable=False)
 
         message = _build(
             sender=str(self._sender), recipients=recipients, text=text, reply_to=reply_to
@@ -148,7 +148,7 @@ class SmtpChannel(NotificationChannel):
             # то, ради чего существуют повторы (критерий 78).
             return NotSent(error=_reason(error), retryable=True)
 
-        return Sent(channel_message_id=str(message["Message-ID"]))
+        return Sent(channel_message_id=str(message['Message-ID']))
 
     def _connection(self) -> Transport:
         if self._transport is not None:
@@ -166,19 +166,19 @@ def _recipients(recipient: str) -> list[str]:
 
 def _build(*, sender: str, recipients: list[str], text: str, reply_to: str | None) -> EmailMessage:
     message = EmailMessage()
-    message["From"] = formataddr((SENDER_NAME, sender))
-    message["To"] = ", ".join(recipients)
-    message["Subject"] = _subject(text)
-    message["Message-ID"] = make_msgid()
+    message['From'] = formataddr((SENDER_NAME, sender))
+    message['To'] = ', '.join(recipients)
+    message['Subject'] = _subject(text)
+    message['Message-ID'] = make_msgid()
     if reply_to:
         # 7.3: возврат в норму приходит ответом на исходное сообщение. У почты ветку задают
         # два заголовка сразу: In-Reply-To понимают все клиенты, References — те, что строят
         # дерево переписки.
-        message["In-Reply-To"] = reply_to
-        message["References"] = reply_to
+        message['In-Reply-To'] = reply_to
+        message['References'] = reply_to
 
     message.set_content(_as_plain(text))
-    message.add_alternative(text, subtype="html")
+    message.add_alternative(text, subtype='html')
     return message
 
 
@@ -198,8 +198,8 @@ def _as_plain(text: str) -> str:
     целиком, здесь снимается только разметка. Иначе появился бы второй источник текста, и они
     разошлись бы при первой же правке 8.4.
     """
-    return _TAG.sub("", _BREAK.sub("\n", text)).replace("&lt;", "<").replace("&gt;", ">").replace(
-        "&amp;", "&"
+    return _TAG.sub('', _BREAK.sub('\n', text)).replace('&lt;', '<').replace('&gt;', '>').replace(
+        '&amp;', '&'
     )
 
 

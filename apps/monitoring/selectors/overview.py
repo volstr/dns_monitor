@@ -86,11 +86,11 @@ def overview(*, at: datetime) -> Overview:
     global_settings = GlobalSettings.objects.get()
     incidents = list(
         Incident.objects.filter(closed_at__isnull=True)
-        .select_related("domain", "domain__group")
-        .order_by("opened_at")
+        .select_related('domain', 'domain__group')
+        .order_by('opened_at')
     )
     schedule = Domain.objects.aggregate(
-        last=Max("last_successful_check_at"), following=Min("next_check_at")
+        last=Max('last_successful_check_at'), following=Min('next_check_at')
     )
 
     # Открытая запись инцидента и расхождение **сейчас** — не одно и то же. Администратор мог
@@ -104,16 +104,16 @@ def overview(*, at: datetime) -> Overview:
     return Overview(
         open_items=current,
         last_closed_at=(
-            Incident.objects.filter(closed_at__isnull=False).aggregate(last=Max("closed_at"))[
-                "last"
+            Incident.objects.filter(closed_at__isnull=False).aggregate(last=Max('closed_at'))[
+                'last'
             ]
             if not items
             else None
         ),
         awaiting_close=len(items) - len(current),
         stats=_stats(current, at, global_settings),
-        last_check_at=schedule["last"],
-        next_check_at=schedule["following"],
+        last_check_at=schedule['last'],
+        next_check_at=schedule['following'],
     )
 
 
@@ -135,43 +135,43 @@ def _stats(
             occurred_at__gte=changed_since,
             event_type__in=(EventType.ADDRESS_APPEARED, EventType.ADDRESS_GONE),
         )
-        .values("domain_id")
+        .values('domain_id')
         .distinct()
         .count()
     )
     failing = Domain.objects.filter(
         consecutive_resolve_failures__gte=global_settings.resolve_failure_threshold
     )
-    attempts = failing.aggregate(worst=Max("consecutive_resolve_failures"))["worst"] or 0
+    attempts = failing.aggregate(worst=Max('consecutive_resolve_failures'))['worst'] or 0
 
     return (
         Stat(
-            label="Под наблюдением",
+            label='Под наблюдением',
             value=watched,
             note=f"в {groups} {plural(groups, 'группе', 'группах', 'группах')}",
-            tone="",
+            tone='',
         ),
         Stat(
-            label="Не решены",
+            label='Не решены',
             value=len(current),
             note=_unresolved_note(current),
-            tone="s-breach" if current else "",
+            tone='s-breach' if current else '',
         ),
         Stat(
-            label="Адреса изменились",
+            label='Адреса изменились',
             value=changed,
-            note="за последние сутки",
-            tone="s-change" if changed else "",
+            note='за последние сутки',
+            tone='s-change' if changed else '',
         ),
         Stat(
-            label="Не резолвится",
+            label='Не резолвится',
             value=failing.count(),
             note=(
                 f"{attempts} {plural(attempts, 'попытка', 'попытки', 'попыток')} подряд"
                 if attempts
-                else "все домены отвечают"
+                else 'все домены отвечают'
             ),
-            tone="s-fail" if attempts else "",
+            tone='s-fail' if attempts else '',
         ),
     )
 
@@ -183,11 +183,11 @@ def _unresolved_note(current: tuple[OpenDiscrepancy, ...]) -> str:
     Расхождения отсортированы по возрасту, поэтому назван самый старый: если разбирать, то с него.
     """
     if not current:
-        return "расхождений нет"
+        return 'расхождений нет'
     first = current[0].domain_name
     if len(current) == 1:
         return first
-    return f"{first} и ещё {len(current) - 1}"
+    return f'{first} и ещё {len(current) - 1}'
 
 
 def _items(
@@ -220,7 +220,7 @@ def _items(
                 if row.status == AddressStatus.UNMATCHED
             ),
             opened_at=incident.opened_at,
-            age_text=f"держится {humanize_duration(at - incident.opened_at)}",
+            age_text=f'держится {humanize_duration(at - incident.opened_at)}',
             last_message_at=incident.last_message_at,
         )
         for incident in incidents

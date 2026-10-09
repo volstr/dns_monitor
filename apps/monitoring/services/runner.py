@@ -65,17 +65,17 @@ def run_one_tick(
     health = check_health(state_store=state_store)
     if not health.healthy:
         # 11.13: проверки останавливаются, и остановка обязана быть заметной.
-        reason = f"инфраструктура недоступна: {health.failed_component}"
-        logger.error(reason, extra={"component": health.failed_component})
+        reason = f'инфраструктура недоступна: {health.failed_component}'
+        logger.error(reason, extra={'component': health.failed_component})
         if previously_healthy:
             # 11.14, критерий 69: авария инфраструктуры — единственное, что уходит **в оба
             # канала**. Дежурным, потому что сервис перестал следить за доменами; в Sentry,
             # потому что разработчикам нужна причина. Группировка — по отказавшему компоненту.
             report(
                 Failure(
-                    cause=f"infrastructure:{health.failed_component}",
+                    cause=f'infrastructure:{health.failed_component}',
                     message=reason,
-                    tags={"component": health.failed_component or "неизвестен"},
+                    tags={'component': health.failed_component or 'неизвестен'},
                 )
             )
             record_checks_stopped(at=clock.now(), report=health)
@@ -83,7 +83,7 @@ def run_one_tick(
             # компонент, сообщающий об отказе, не может зависеть от отказавшего (11.13).
             send_outage_alert(
                 channel=TelegramChannel(settings.ENV.telegram_bot_token),
-                component=health.failed_component or "неизвестен",
+                component=health.failed_component or 'неизвестен',
                 detail=health.detail,
             )
         return TickSkipped(reason=reason, healthy=False)
@@ -106,8 +106,8 @@ def run_one_tick(
         # Ни в настройках, ни у системы. Падать каждые пять секунд бессмысленно: жалуемся
         # понятно и ждём, пока появится хоть один.
         reason = (
-            "ни в настройках, ни у системы нет ни одного DNS-сервера: проверки невозможны. "
-            "Укажите серверы в настройках или проверьте /etc/resolv.conf"
+            'ни в настройках, ни у системы нет ни одного DNS-сервера: проверки невозможны. '
+            'Укажите серверы в настройках или проверьте /etc/resolv.conf'
         )
         logger.warning(reason)
         return TickSkipped(reason=reason)
@@ -127,13 +127,13 @@ def _purge(at: datetime) -> None:
     if purged is None or not purged.total:
         return
     logger.info(
-        "уборка по срокам хранения",
+        'уборка по срокам хранения',
         extra={
-            "events": purged.events,
-            "audit": purged.audit_records,
-            "registry": purged.registry_entries,
-            "buckets": purged.hourly_buckets + purged.daily_buckets,
-            "notifications": purged.notifications,
+            'events': purged.events,
+            'audit': purged.audit_records,
+            'registry': purged.registry_entries,
+            'buckets': purged.hourly_buckets + purged.daily_buckets,
+            'notifications': purged.notifications,
         },
     )
 
@@ -147,8 +147,8 @@ def describe(report: TickReport | TickSkipped, at: datetime) -> str:
     """
     moment = localtime(at)
     if isinstance(report, TickSkipped):
-        return f"тик пропущен в {moment:%H:%M:%S}: {report.reason}"
+        return f'тик пропущен в {moment:%H:%M:%S}: {report.reason}'
     return (
-        f"тик в {moment:%H:%M:%S}: взято {report.claimed}, проверено {report.checked}, "
-        f"пропущено {report.skipped}, упало {report.failed}"
+        f'тик в {moment:%H:%M:%S}: взято {report.claimed}, проверено {report.checked}, '
+        f'пропущено {report.skipped}, упало {report.failed}'
     )

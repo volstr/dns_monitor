@@ -81,7 +81,7 @@ def due(*, at: datetime, limit: int = 100) -> tuple[Notification, ...]:
             status=DeliveryStatus.PENDING,
             next_attempt_at__lte=at,
             attempt__lt=MAX_ATTEMPTS,
-        ).order_by("next_attempt_at")[:limit]
+        ).order_by('next_attempt_at')[:limit]
     )
 
 
@@ -91,7 +91,7 @@ def mark_delivered(*, notification_id: int, at: datetime, channel_message_id: st
         status=DeliveryStatus.SENT,
         sent_at=at,
         channel_message_id=channel_message_id,
-        last_error="",
+        last_error='',
     )
     return Delivered(notification_id=notification_id, channel_message_id=channel_message_id)
 

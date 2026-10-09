@@ -18,7 +18,7 @@ from __future__ import annotations
 from core.ports.notification_channel import NotificationChannel, NotSent, SendResult
 
 NOT_IMPLEMENTED = (
-    "канал «Вебхук» не реализован: в первой версии обязателен только Telegram (ТЗ 8.3)"
+    'канал «Вебхук» не реализован: в первой версии обязателен только Telegram (ТЗ 8.3)'
 )
 
 
@@ -36,5 +36,5 @@ class WebhookChannel(NotificationChannel):
         запись в журнал.
         """
         if not recipient:
-            return NotSent(error="адрес вебхука не задан", retryable=False)
+            return NotSent(error='адрес вебхука не задан', retryable=False)
         return NotSent(error=NOT_IMPLEMENTED, retryable=False)

@@ -32,9 +32,9 @@ pytestmark = pytest.mark.django_db
 
 START = datetime(2026, 9, 22, 9, 0, tzinfo=UTC)
 THRESHOLD = timedelta(hours=24)
-NAME = "pay-gw.contoso.ru"
-BEFORE = ("10.20.1.14", "10.20.2.60")
-AFTER = ("10.20.3.77", "10.20.3.78")
+NAME = 'pay-gw.contoso.ru'
+BEFORE = ('10.20.1.14', '10.20.2.60')
+AFTER = ('10.20.3.77', '10.20.3.78')
 
 
 @pytest.fixture(autouse=True)
@@ -56,7 +56,7 @@ def store() -> FakeStateStore:
 
 def make_domain(name: str = NAME, *, due_at: datetime | None = None) -> Domain:
     domain = Domain.objects.create(name=name, next_check_at=due_at)
-    AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+    AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
     return domain
 
 
@@ -136,7 +136,7 @@ def test_36_service_stopped_longer_than_the_threshold_starts_without_an_avalanch
     Три домена вместо одного — потому что критерий про лавину: проверять «нет уведомлений» на
     единственном домене бессмысленно, лавина начинается со второго.
     """
-    names = [f"host-{index}.contoso.ru" for index in range(3)]
+    names = [f'host-{index}.contoso.ru' for index in range(3)]
     domains = [make_domain(name, due_at=START) for name in names]
     resolver = FakeResolver({name: [answered(*BEFORE)] for name in names})
     tick(at=START, resolver=resolver, state_store=store, concurrency=1)

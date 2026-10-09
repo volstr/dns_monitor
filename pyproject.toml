@@ -35,12 +35,22 @@ line-length = 100
 target-version = "py312"
 extend-exclude = ["guide", "apps/*/migrations"]
 
+[tool.ruff.format]
+# Совпадает с flake8-quotes ниже, чтобы форматтер и линтер не спорили.
+quote-style = "single"
+
 [tool.ruff.lint]
 # D213 — единственное правило из pydocstyle, которое нам нужно: многострочный docstring
 # начинается с новой строки после кавычек. Остальные D-правила не включены намеренно.
-select = ["E", "W", "F", "I", "B", "UP", "DJ", "S", "SIM", "PT", "RUF", "D213"]
+select = ["E", "W", "F", "I", "B", "UP", "DJ", "S", "SIM", "PT", "RUF", "D213", "Q"]
 # RUF001–RUF003: кириллица в строках и комментариях — норма для русского интерфейса.
 ignore = ["RUF001", "RUF002", "RUF003"]
+
+# Строки — в одинарных кавычках, docstring — в двойных.
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "single"
+docstring-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S603"]

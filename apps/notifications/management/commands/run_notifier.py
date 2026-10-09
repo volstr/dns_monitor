@@ -28,13 +28,13 @@ POLL_INTERVAL_SECONDS = 5.0
 
 
 class Command(BaseCommand):
-    help = "Доставка уведомлений из очереди исходящих (ТЗ 8.3)"
+    help = 'Доставка уведомлений из очереди исходящих (ТЗ 8.3)'
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            "--once",
-            action="store_true",
-            help="выполнить один проход и выйти — для отладки и ручного прогона",
+            '--once',
+            action='store_true',
+            help='выполнить один проход и выйти — для отладки и ручного прогона',
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -48,7 +48,7 @@ class Command(BaseCommand):
         stop = threading.Event()
 
         def request_stop(signum: int, frame: FrameType | None) -> None:
-            logger.info("run_notifier: получен сигнал, останавливаюсь")
+            logger.info('run_notifier: получен сигнал, останавливаюсь')
             stop.set()
 
         signal.signal(signal.SIGTERM, request_stop)
@@ -58,6 +58,6 @@ class Command(BaseCommand):
             at = clock.now()
             result = run_one_delivery(clock=clock, state_store=state_store)
             logger.info(describe(result, at))
-            if options["once"]:
+            if options['once']:
                 return
             stop.wait(POLL_INTERVAL_SECONDS)

@@ -25,16 +25,16 @@ class LoginForm(forms.Form):
     def __init__(self, *args: Any, two_factor_enabled: bool = False, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if not two_factor_enabled:
-            del self.fields["code"]
+            del self.fields['code']
 
     def login_email(self) -> str:
-        return str(self.cleaned_data.get("email") or "")
+        return str(self.cleaned_data.get('email') or '')
 
     def login_password(self) -> str:
-        return str(self.cleaned_data.get("password") or "")
+        return str(self.cleaned_data.get('password') or '')
 
     def totp_code(self) -> str:
-        return str(self.cleaned_data.get("code") or "")
+        return str(self.cleaned_data.get('code') or '')
 
 
 class TotpBindingForm(forms.Form):
@@ -43,7 +43,7 @@ class TotpBindingForm(forms.Form):
     code = forms.CharField(max_length=6)
 
     def totp_code(self) -> str:
-        return str(self.cleaned_data.get("code") or "")
+        return str(self.cleaned_data.get('code') or '')
 
 
 class PasswordChangeForm(forms.Form):
@@ -54,10 +54,10 @@ class PasswordChangeForm(forms.Form):
 
     def clean(self) -> dict[str, Any]:
         data = super().clean()
-        if data.get("password") != data.get("repeat"):
-            message = "Пароли не совпадают."
+        if data.get('password') != data.get('repeat'):
+            message = 'Пароли не совпадают.'
             raise forms.ValidationError(message)
         return data
 
     def new_password(self) -> str:
-        return str(self.cleaned_data.get("password") or "")
+        return str(self.cleaned_data.get('password') or '')

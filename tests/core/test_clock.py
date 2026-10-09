@@ -38,7 +38,7 @@ def test_fake_clock_can_be_set_to_an_exact_moment() -> None:
 
 def test_fake_clock_rejects_naive_time() -> None:
     # ТЗ 4.0: метки времени — тип с часовым поясом, хранение в UTC.
-    with pytest.raises(ValueError, match="часовым поясом"):
+    with pytest.raises(ValueError, match='часовым поясом'):
         FakeClock(datetime(2026, 9, 22, 14, 38))
 
 

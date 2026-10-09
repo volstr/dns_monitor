@@ -12,15 +12,15 @@ from django.urls import URLPattern, URLResolver, include, path
 from apps.monitoring.views import Healthcheck
 
 urlpatterns: list[URLPattern | URLResolver] = [
-    path("health/", Healthcheck.as_view(), name="healthcheck"),
+    path('health/', Healthcheck.as_view(), name='healthcheck'),
 ]
 
-if "django.contrib.admin" in settings.INSTALLED_APPS:
+if 'django.contrib.admin' in settings.INSTALLED_APPS:
     from config.admin import site as dev_admin
 
-    urlpatterns.append(path("admin/", dev_admin.urls))
+    urlpatterns.append(path('admin/', dev_admin.urls))
 
 urlpatterns += [
-    path("", include("apps.accounts.urls")),
-    path("", include("apps.catalog.urls")),
+    path('', include('apps.accounts.urls')),
+    path('', include('apps.catalog.urls')),
 ]

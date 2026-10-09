@@ -27,13 +27,13 @@ TICK_INTERVAL_SECONDS = 5.0
 
 
 class Command(BaseCommand):
-    help = "Планировщик проверок доменов (ТЗ 11.1)"
+    help = 'Планировщик проверок доменов (ТЗ 11.1)'
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
-            "--once",
-            action="store_true",
-            help="выполнить один тик и выйти — для отладки и ручного прогона",
+            '--once',
+            action='store_true',
+            help='выполнить один тик и выйти — для отладки и ручного прогона',
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -47,7 +47,7 @@ class Command(BaseCommand):
         stop = threading.Event()
 
         def request_stop(signum: int, frame: FrameType | None) -> None:
-            logger.info("run_checker: получен сигнал, останавливаюсь")
+            logger.info('run_checker: получен сигнал, останавливаюсь')
             stop.set()
 
         signal.signal(signal.SIGTERM, request_stop)
@@ -63,6 +63,6 @@ class Command(BaseCommand):
             )
             healthy = report.healthy if isinstance(report, TickSkipped) else True
             logger.info(describe(report, at))
-            if options["once"]:
+            if options['once']:
                 return
             stop.wait(TICK_INTERVAL_SECONDS)

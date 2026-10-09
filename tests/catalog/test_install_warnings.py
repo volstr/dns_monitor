@@ -33,14 +33,14 @@ MOMENT = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
 @pytest.fixture
 def admin() -> Member:
     return Member.objects.create_member(
-        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT, role=Role.ADMIN
+        email='boss@contoso.ru', name='Анна Кирилова', created_at=MOMENT, role=Role.ADMIN
     )
 
 
 @pytest.fixture
 def observer() -> Member:
     return Member.objects.create_member(
-        email="watch@contoso.ru", name="Наблюдатель", created_at=MOMENT, role=Role.OBSERVER
+        email='watch@contoso.ru', name='Наблюдатель', created_at=MOMENT, role=Role.OBSERVER
     )
 
 
@@ -50,14 +50,14 @@ def no_system_servers() -> tuple[str, ...]:
 
 
 def system_has_one() -> tuple[str, ...]:
-    return ("127.0.0.11",)
+    return ('127.0.0.11',)
 
 
 def test_4_1_no_servers_anywhere_is_reported() -> None:
     warnings = install_warnings(servers_of_system=no_system_servers)
 
     assert len(warnings) == 1
-    assert "ни у системы" in warnings[0].text
+    assert 'ни у системы' in warnings[0].text
 
 
 def test_d51_empty_list_is_silent_when_the_system_has_servers() -> None:
@@ -66,14 +66,14 @@ def test_d51_empty_list_is_silent_when_the_system_has_servers() -> None:
 
 
 def test_filled_dns_list_is_silent() -> None:
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"])
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['10.0.0.1'])
 
     assert install_warnings(servers_of_system=no_system_servers) == ()
 
 
 def test_8_3_unconfigured_channel_is_not_a_warning() -> None:
     """Пустой telegram_chat_id — нормальный режим (8.3), а не недоделка."""
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"], telegram_chat_id="")
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['10.0.0.1'], telegram_chat_id='')
 
     assert install_warnings(servers_of_system=no_system_servers) == ()
 
@@ -87,55 +87,55 @@ def test_warning_is_shown_on_every_screen(client: Client, admin: Member) -> None
     показал бы отсутствие предупреждения — верно, но не то, что здесь нужно проверить.
     """
     warning = InstallWarning(
-        text="Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не идут.",
-        action="Заполнить в настройках",
-        url_name="settings",
+        text='Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не идут.',
+        action='Заполнить в настройках',
+        url_name='settings',
     )
 
     body = render_to_string(
-        "base.html", {"install_warnings": [warning], "is_admin": True, "screen": "overview"}
+        'base.html', {'install_warnings': [warning], 'is_admin': True, 'screen': 'overview'}
     )
 
-    assert "Проверки не идут" in body
-    assert "Заполнить в настройках" in body
+    assert 'Проверки не идут' in body
+    assert 'Заполнить в настройках' in body
 
 
 def test_warning_offers_the_fix_only_to_an_admin() -> None:
     """Наблюдателю говорят о причине, но чинить не предлагают: настройки он не меняет (ТЗ 3)."""
     warning = InstallWarning(
-        text="Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не идут.",
-        action="Заполнить в настройках",
-        url_name="settings",
+        text='Ни в настройках, ни у системы нет ни одного DNS-сервера — проверки не идут.',
+        action='Заполнить в настройках',
+        url_name='settings',
     )
 
-    body = render_to_string("base.html", {"install_warnings": [warning], "is_admin": False})
+    body = render_to_string('base.html', {'install_warnings': [warning], 'is_admin': False})
 
-    assert "Проверки не идут" in body
-    assert "Заполнить в настройках" not in body
+    assert 'Проверки не идут' in body
+    assert 'Заполнить в настройках' not in body
 
 
 def test_warning_disappears_once_the_list_is_filled(client: Client, admin: Member) -> None:
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"])
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['10.0.0.1'])
     client.force_login(admin)
 
-    assert "Проверки не идут" not in client.get(reverse("overview")).content.decode()
+    assert 'Проверки не идут' not in client.get(reverse('overview')).content.decode()
 
 
 def test_card_explains_a_paused_domain() -> None:
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"])
-    domain = Domain.objects.create(name="google.com", watch_enabled=False)
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['10.0.0.1'])
+    domain = Domain.objects.create(name='google.com', watch_enabled=False)
 
     card = domain_card(domain_id=domain.pk, at=MOMENT)
 
     assert card is not None
-    assert "приостановлено" in card.empty_reason
+    assert 'приостановлено' in card.empty_reason
 
 
 def test_card_explains_a_domain_without_a_schedule() -> None:
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["10.0.0.1"])
-    domain = Domain.objects.create(name="google.com", next_check_at=None)
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['10.0.0.1'])
+    domain = Domain.objects.create(name='google.com', next_check_at=None)
 
     card = domain_card(domain_id=domain.pk, at=MOMENT)
 
     assert card is not None
-    assert "Проверить сейчас" in card.empty_reason
+    assert 'Проверить сейчас' in card.empty_reason

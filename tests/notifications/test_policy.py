@@ -6,7 +6,7 @@ from apps.catalog.models import NotificationMode
 from apps.monitoring.models import EventType
 from apps.notifications.services.policy import Send, Skip, SkipReason, decide
 
-OPENING = "42"
+OPENING = '42'
 
 
 def result(
@@ -45,14 +45,14 @@ def test_8_1_not_allowed_mode_ignores_address_changes() -> None:
 
 
 @pytest.mark.parametrize(
-    "mode", [NotificationMode.ADDRESS_CHANGE, NotificationMode.NOT_ALLOWED]
+    'mode', [NotificationMode.ADDRESS_CHANGE, NotificationMode.NOT_ALLOWED]
 )
 def test_8_1_resolve_failed_notifies_in_every_mode_but_none(mode: NotificationMode) -> None:
     assert isinstance(result(EventType.RESOLVE_FAILED, mode), Send)
 
 
 @pytest.mark.parametrize(
-    "mode", [NotificationMode.ADDRESS_CHANGE, NotificationMode.NOT_ALLOWED]
+    'mode', [NotificationMode.ADDRESS_CHANGE, NotificationMode.NOT_ALLOWED]
 )
 def test_d8_resolve_recovered_follows_resolve_failed(mode: NotificationMode) -> None:
     decision = result(EventType.RESOLVE_RECOVERED, mode)

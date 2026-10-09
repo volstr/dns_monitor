@@ -29,16 +29,16 @@ URL_MAX_LENGTH = 2048
 class NotificationMode(models.TextChoices):
     """Режимы уведомлений — ТЗ 8.1."""
 
-    NONE = "none", "Не уведомлять"
-    ADDRESS_CHANGE = "address_change", "При изменении адресов"
-    NOT_ALLOWED = "not_allowed", "При выходе из разрешённых"
+    NONE = 'none', 'Не уведомлять'
+    ADDRESS_CHANGE = 'address_change', 'При изменении адресов'
+    NOT_ALLOWED = 'not_allowed', 'При выходе из разрешённых'
 
 
 # Перечисление живёт в core: его знают и порт резолвера, и модель, а core про apps не знает.
 RECORD_TYPE_CHOICES = [
-    (RecordType.A.value, "A"),
-    (RecordType.AAAA.value, "AAAA"),
-    (RecordType.CNAME.value, "CNAME"),
+    (RecordType.A.value, 'A'),
+    (RecordType.AAAA.value, 'AAAA'),
+    (RecordType.CNAME.value, 'CNAME'),
 ]
 
 
@@ -112,27 +112,27 @@ class GlobalSettings(models.Model):
     # прямо запрещает администратору приложения направлять исходящее через свой сервер.
     # Пустое значение означает «Не настроен» и является нормальным режимом.
     telegram_chat_id = models.CharField(
-        max_length=CHANNEL_RECIPIENT_MAX_LENGTH, blank=True, default=""
+        max_length=CHANNEL_RECIPIENT_MAX_LENGTH, blank=True, default=''
     )
     email_recipients = ArrayField(
         models.EmailField(max_length=EMAIL_MAX_LENGTH), default=list, blank=True
     )
-    webhook_url = models.CharField(max_length=URL_MAX_LENGTH, blank=True, default="")
+    webhook_url = models.CharField(max_length=URL_MAX_LENGTH, blank=True, default='')
 
     class Meta:
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(pk=1),
-                name="global_settings_single_row",
+                name='global_settings_single_row',
             ),
             models.CheckConstraint(
                 condition=models.Q(check_period_seconds__gte=60),
-                name="global_settings_check_period_at_least_minute",
+                name='global_settings_check_period_at_least_minute',
             ),
         ]
 
     def __str__(self) -> str:
-        return "Общие настройки"
+        return 'Общие настройки'
 
 
 class Group(models.Model):
@@ -144,7 +144,7 @@ class Group(models.Model):
     """
 
     name = models.CharField(max_length=GROUP_NAME_MAX_LENGTH, unique=True)
-    comment = models.CharField(max_length=COMMENT_MAX_LENGTH, blank=True, default="")
+    comment = models.CharField(max_length=COMMENT_MAX_LENGTH, blank=True, default='')
 
     check_period_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
     freshness_threshold_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
@@ -162,7 +162,7 @@ class Group(models.Model):
     reminder_interval_seconds = models.PositiveIntegerField(null=True, blank=True, default=None)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ['name']
 
     def __str__(self) -> str:
         return self.name
@@ -183,9 +183,9 @@ class Domain(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="domains",
+        related_name='domains',
     )
-    comment = models.CharField(max_length=COMMENT_MAX_LENGTH, blank=True, default="")
+    comment = models.CharField(max_length=COMMENT_MAX_LENGTH, blank=True, default='')
     record_types = ArrayField(
         models.CharField(max_length=ENUM_MAX_LENGTH, choices=RECORD_TYPE_CHOICES),
         default=default_record_types,
@@ -193,7 +193,7 @@ class Domain(models.Model):
     # Q-D12: цель цепочки CNAME из `canonical_name` ответа. Заполняется, только если у домена
     # включён флаг CNAME и цель отличается от имени. Событий не порождает, в реестр не идёт.
     cname_target = models.CharField(
-        max_length=DOMAIN_NAME_MAX_LENGTH, blank=True, default=""
+        max_length=DOMAIN_NAME_MAX_LENGTH, blank=True, default=''
     )
     watch_enabled = models.BooleanField(default=True)
     # Единственное место расписания (ТЗ 11.1, plan.md этап 4). Заполняется при создании домена.
@@ -206,11 +206,11 @@ class Domain(models.Model):
     consecutive_resolve_failures = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ['name']
         constraints = [
             models.CheckConstraint(
                 condition=~models.Q(record_types=[]),
-                name="domain_has_record_type",
+                name='domain_has_record_type',
             ),
         ]
 
@@ -228,18 +228,18 @@ class AllowlistEntry(models.Model):
     «входит в …» определяется длиной префикса, а не отдельным полем.
     """
 
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="allowlist")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='allowlist')
     entry = CidrField()
     raw = models.CharField(max_length=ALLOWLIST_ENTRY_MAX_LENGTH)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["domain", "entry"], name="allowlist_entry_unique"),
+            models.UniqueConstraint(fields=['domain', 'entry'], name='allowlist_entry_unique'),
         ]
         indexes = [
             # Вхождение адреса в подсеть — один запрос с `>>=`, а не выгрузка списка в Python
             # (plan.md, этап 2).
-            GistIndex(fields=["entry"], opclasses=["inet_ops"], name="allowlist_entry_gist"),
+            GistIndex(fields=['entry'], opclasses=['inet_ops'], name='allowlist_entry_gist'),
         ]
 
     def __str__(self) -> str:

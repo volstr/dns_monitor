@@ -40,10 +40,10 @@ from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
 
 #: Ключи промежуточных шагов входа. Полноценной сессией участника они не являются.
-PENDING_MEMBER = "pending_member_id"
-PENDING_BINDING = "pending_totp_binding"
+PENDING_MEMBER = 'pending_member_id'
+PENDING_BINDING = 'pending_totp_binding'
 
-LOCKED_TEXT = "Слишком много неудачных попыток. Вход заблокирован на 15 минут."
+LOCKED_TEXT = 'Слишком много неудачных попыток. Вход заблокирован на 15 минут.'
 
 
 def _store() -> RedisStateStore:
@@ -54,7 +54,7 @@ def _store() -> RedisStateStore:
 #: потому, что `deploy/nginx.conf` перезаписывает его на каждом запросе, а порта наружу у `web`
 #: нет: присланное клиентом значение до приложения не доходит. Открыть порт `web` в бою значит
 #: сделать заголовок подделываемым — вместе с `X-Forwarded-Proto` из `config/settings/prod.py`.
-FORWARDED_FOR_HEADER = "HTTP_X_REAL_IP"
+FORWARDED_FOR_HEADER = 'HTTP_X_REAL_IP'
 
 
 def _client_ip(request: HttpRequest) -> str:
@@ -70,8 +70,8 @@ def _client_ip(request: HttpRequest) -> str:
     """
     return (
         request.META.get(FORWARDED_FOR_HEADER)
-        or request.META.get("REMOTE_ADDR")
-        or "unknown"
+        or request.META.get('REMOTE_ADDR')
+        or 'unknown'
     )
 
 
@@ -82,8 +82,8 @@ class Login(PublicView):
         two_factor = settings.ENV.auth_2fa_enabled
         return render(
             request,
-            "accounts/login.html",
-            {"form": LoginForm(two_factor_enabled=two_factor), "two_factor": two_factor},
+            'accounts/login.html',
+            {'form': LoginForm(two_factor_enabled=two_factor), 'two_factor': two_factor},
         )
 
     def post(self, request: HttpRequest) -> HttpResponse:
@@ -92,8 +92,8 @@ class Login(PublicView):
         if not form.is_valid():
             return render(
                 request,
-                "accounts/login.html",
-                {"form": form, "two_factor": two_factor, "error": _form_error(form, two_factor)},
+                'accounts/login.html',
+                {'form': form, 'two_factor': two_factor, 'error': _form_error(form, two_factor)},
             )
 
         result = authenticate(
@@ -116,12 +116,12 @@ def _form_error(form: LoginForm, two_factor: bool) -> str:
     верные почту и пароль, получает этот текст и ищет ошибку не там. Про существование учётной
     записи здесь по-прежнему ничего не сообщается (Q-C19) — речь только о заполнении полей.
     """
-    if two_factor and "code" in form.errors:
+    if two_factor and 'code' in form.errors:
         return (
-            "Нужен код из приложения-аутентификатора: второй фактор включён в окружении "
-            "переменной AUTH_2FA_ENABLED."
+            'Нужен код из приложения-аутентификатора: второй фактор включён в окружении '
+            'переменной AUTH_2FA_ENABLED.'
         )
-    return "Проверьте почту и пароль."
+    return 'Проверьте почту и пароль.'
 
 
 def _after_authenticate(
@@ -129,28 +129,28 @@ def _after_authenticate(
 ) -> HttpResponse:
     if isinstance(result, Authenticated):
         member = Member.objects.get(pk=result.member_id)
-        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-        return redirect("overview")
+        start_session(request, member, backend='django.contrib.auth.backends.ModelBackend')
+        return redirect('overview')
 
     if isinstance(result, PasswordChangeRequired):
         request.session[PENDING_MEMBER] = result.member_id
-        return redirect("password-change")
+        return redirect('password-change')
 
     if isinstance(result, TotpSetupRequired):
         request.session[PENDING_MEMBER] = result.member_id
-        return redirect("totp-setup")
+        return redirect('totp-setup')
 
     if isinstance(result, Rejected):
-        error = f"Неверная почта или пароль. Осталось попыток: {result.attempts_left}."
+        error = f'Неверная почта или пароль. Осталось попыток: {result.attempts_left}.'
     else:
         error = LOCKED_TEXT
     return render(
         request,
-        "accounts/login.html",
+        'accounts/login.html',
         {
-            "form": LoginForm(two_factor_enabled=two_factor),
-            "two_factor": two_factor,
-            "error": error,
+            'form': LoginForm(two_factor_enabled=two_factor),
+            'two_factor': two_factor,
+            'error': error,
         },
     )
 
@@ -165,7 +165,7 @@ class Logout(PublicView):
 
     def post(self, request: HttpRequest) -> HttpResponse:
         end_session(request)
-        return redirect("login")
+        return redirect('login')
 
 
 class TotpSetup(PublicView):
@@ -179,19 +179,19 @@ class TotpSetup(PublicView):
     def get(self, request: HttpRequest) -> HttpResponse:
         member = _pending_member(request)
         if member is None:
-            return redirect("login")
+            return redirect('login')
         return _totp_screen(request, member, _secret(request))
 
     def post(self, request: HttpRequest) -> HttpResponse:
         member = _pending_member(request)
         if member is None:
-            return redirect("login")
+            return redirect('login')
 
         secret = _secret(request)
         form = TotpBindingForm(request.POST)
         if not form.is_valid():
             return _totp_screen(
-                request, member, secret, error="Введите шесть цифр из приложения."
+                request, member, secret, error='Введите шесть цифр из приложения.'
             )
 
         bound = confirm_totp_binding(
@@ -203,13 +203,13 @@ class TotpSetup(PublicView):
         )
         if not bound:
             return _totp_screen(
-                request, member, secret, error="Код не подошёл. Попробуйте следующий."
+                request, member, secret, error='Код не подошёл. Попробуйте следующий.'
             )
 
         del request.session[PENDING_BINDING]
         del request.session[PENDING_MEMBER]
-        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-        return redirect("overview")
+        start_session(request, member, backend='django.contrib.auth.backends.ModelBackend')
+        return redirect('overview')
 
 
 def _pending_member(request: HttpRequest) -> Member | None:
@@ -228,16 +228,16 @@ def _secret(request: HttpRequest) -> str:
 
 
 def _totp_screen(
-    request: HttpRequest, member: Member, secret: str, error: str = ""
+    request: HttpRequest, member: Member, secret: str, error: str = ''
 ) -> HttpResponse:
     return render(
         request,
-        "accounts/totp_setup.html",
+        'accounts/totp_setup.html',
         {
-            "form": TotpBindingForm(),
-            "secret": secret,
-            "uri": provisioning_uri(secret=secret, email=member.email),
-            "error": error,
+            'form': TotpBindingForm(),
+            'secret': secret,
+            'uri': provisioning_uri(secret=secret, email=member.email),
+            'error': error,
         },
     )
 
@@ -252,13 +252,13 @@ class AcceptInvitation(PublicView):
 
     def get(self, request: HttpRequest, token: str) -> HttpResponse:
         return render(
-            request, "accounts/join.html", {"form": PasswordChangeForm(), "token": token}
+            request, 'accounts/join.html', {'form': PasswordChangeForm(), 'token': token}
         )
 
     def post(self, request: HttpRequest, token: str) -> HttpResponse:
         form = PasswordChangeForm(request.POST)
         if not form.is_valid():
-            return render(request, "accounts/join.html", {"form": form, "token": token})
+            return render(request, 'accounts/join.html', {'form': form, 'token': token})
 
         result = accept_invitation(
             token=token,
@@ -267,12 +267,12 @@ class AcceptInvitation(PublicView):
             state_store=_store(),
         )
         if isinstance(result, Refused):
-            return render(request, "accounts/join.html", {"error": result.reason, "token": token})
+            return render(request, 'accounts/join.html', {'error': result.reason, 'token': token})
 
         member = Member.objects.get(pk=result.member_id)
-        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-        messages.success(request, "Пароль задан. Добро пожаловать.")
-        return redirect("overview")
+        start_session(request, member, backend='django.contrib.auth.backends.ModelBackend')
+        messages.success(request, 'Пароль задан. Добро пожаловать.')
+        return redirect('overview')
 
 
 class PasswordChange(PublicView):
@@ -280,27 +280,27 @@ class PasswordChange(PublicView):
 
     def get(self, request: HttpRequest) -> HttpResponse:
         if _pending_member(request) is None:
-            return redirect("login")
-        return render(request, "accounts/password_change.html", {"form": PasswordChangeForm()})
+            return redirect('login')
+        return render(request, 'accounts/password_change.html', {'form': PasswordChangeForm()})
 
     def post(self, request: HttpRequest) -> HttpResponse:
         member = _pending_member(request)
         if member is None:
-            return redirect("login")
+            return redirect('login')
 
         form = PasswordChangeForm(request.POST)
         if not form.is_valid():
-            return render(request, "accounts/password_change.html", {"form": form})
+            return render(request, 'accounts/password_change.html', {'form': form})
 
         result = set_own_password(member_id=member.pk, password=form.new_password())
         if isinstance(result, Refused):
             return render(
                 request,
-                "accounts/password_change.html",
-                {"form": form, "error": result.reason},
+                'accounts/password_change.html',
+                {'form': form, 'error': result.reason},
             )
 
         del request.session[PENDING_MEMBER]
-        start_session(request, member, backend="django.contrib.auth.backends.ModelBackend")
-        messages.success(request, "Пароль изменён.")
-        return redirect("overview")
+        start_session(request, member, backend='django.contrib.auth.backends.ModelBackend')
+        messages.success(request, 'Пароль изменён.')
+        return redirect('overview')

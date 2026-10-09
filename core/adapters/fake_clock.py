@@ -30,6 +30,6 @@ class FakeClock(Clock):
 
 def _aware(moment: datetime) -> datetime:
     if moment.tzinfo is None:
-        message = "Момент времени обязан быть с часовым поясом: хранение в UTC (ТЗ 4.0)"
+        message = 'Момент времени обязан быть с часовым поясом: хранение в UTC (ТЗ 4.0)'
         raise ValueError(message)
     return moment

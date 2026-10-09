@@ -90,5 +90,5 @@ class FakeStateStore(StateStore):
 
     def _guard(self) -> None:
         if not self.available:
-            message = "хранилище рабочего состояния недоступно"
+            message = 'хранилище рабочего состояния недоступно'
             raise StateStoreUnavailable(message)

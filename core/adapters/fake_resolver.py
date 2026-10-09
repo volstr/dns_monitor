@@ -31,7 +31,7 @@ def no_records(answered_by: str | None = None) -> ResolveResult:
     return ResolveResult(outcome=ResolveOutcome.NO_RECORDS, answered_by=answered_by)
 
 
-def unavailable(error: str = "ни один сервер не ответил") -> ResolveResult:
+def unavailable(error: str = 'ни один сервер не ответил') -> ResolveResult:
     return ResolveResult(outcome=ResolveOutcome.UNAVAILABLE, error=error)
 
 
@@ -47,7 +47,7 @@ class FakeResolver(Resolver):
     def set(self, name: str, results: Sequence[ResolveResult]) -> None:
         """Задать последовательность ответов для имени. Повторяется по кругу."""
         if not results:
-            message = f"Для имени {name} нужен хотя бы один ответ"
+            message = f'Для имени {name} нужен хотя бы один ответ'
             raise ValueError(message)
         self._answers[name] = list(results)
         self._position[name] = 0
@@ -57,7 +57,7 @@ class FakeResolver(Resolver):
         results = self._answers.get(name)
         if results is None:
             # Молчаливый UNAVAILABLE спрятал бы опечатку в имени и сделал бы тест зелёным зря.
-            message = f"Для имени {name} ответы не заданы"
+            message = f'Для имени {name} ответы не заданы'
             raise LookupError(message)
         position = self._position[name]
         self._position[name] = (position + 1) % len(results)

@@ -15,7 +15,7 @@ from core.adapters.fake_state_store import FakeStateStore
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-CHAT = "-1001234567890"
+CHAT = '-1001234567890'
 
 
 @pytest.fixture
@@ -28,8 +28,8 @@ def domain() -> Domain:
     GlobalSettings.objects.filter(pk=1).update(
         telegram_chat_id=CHAT, notification_mode=NotificationMode.NOT_ALLOWED
     )
-    group = Group.objects.create(name="Платёжный контур", comment="Дежурит команда платежей")
-    return Domain.objects.create(name="pay-gw.contoso.ru", group=group, comment="Платёжный шлюз")
+    group = Group.objects.create(name='Платёжный контур', comment='Дежурит команда платежей')
+    return Domain.objects.create(name='pay-gw.contoso.ru', group=group, comment='Платёжный шлюз')
 
 
 def make_event(
@@ -43,7 +43,7 @@ def make_event(
         domain=domain,
         event_type=event_type,
         occurred_at=MOMENT,
-        payload=payload or {"addresses": ["185.44.9.201"]},
+        payload=payload or {'addresses': ['185.44.9.201']},
         incident=incident,
     )
 
@@ -62,7 +62,7 @@ def test_8_6_message_waits_for_the_window_to_close(domain: Domain, store: FakeSt
 
 
 def test_8_6_window_counts_events_of_the_same_type(domain: Domain, store: FakeStateStore) -> None:
-    other = Domain.objects.create(name="api.contoso.ru", group=domain.group)
+    other = Domain.objects.create(name='api.contoso.ru', group=domain.group)
 
     first = dispatch_event(event_id=make_event(domain).pk, at=MOMENT, state_store=store)
     second = dispatch_event(event_id=make_event(other).pk, at=MOMENT, state_store=store)
@@ -105,7 +105,7 @@ def test_15_address_change_mode_ignores_not_allowed(
 
 def test_8_3_unconfigured_channel_queues_nothing(domain: Domain, store: FakeStateStore) -> None:
     # Пустой адресат — «Не настроен», нормальный режим, а не ошибка.
-    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id="")
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id='')
 
     result = dispatch_event(event_id=make_event(domain).pk, at=MOMENT, state_store=store)
 
@@ -118,22 +118,22 @@ def test_8_4_text_carries_the_domain_and_the_comment(
     dispatch_event(event_id=make_event(domain).pk, at=MOMENT, state_store=store)
 
     text = Notification.objects.get().text
-    assert "<b>Адрес вне разрешённых</b>" in text
-    assert "pay-gw.contoso.ru" in text
-    assert "Платёжный шлюз" in text
-    assert "Группа: Платёжный контур" in text
+    assert '<b>Адрес вне разрешённых</b>' in text
+    assert 'pay-gw.contoso.ru' in text
+    assert 'Платёжный шлюз' in text
+    assert 'Группа: Платёжный контур' in text
 
 
 def test_17_back_to_normal_carries_the_duration(domain: Domain, store: FakeStateStore) -> None:
     incident = Incident.objects.create(domain=domain, opened_at=MOMENT - timedelta(minutes=26))
     opening = Notification.objects.create(
-        channel="telegram",
+        channel='telegram',
         recipient=CHAT,
-        text="Адрес вне разрешённых",
+        text='Адрес вне разрешённых',
         created_at=MOMENT - timedelta(minutes=26),
         next_attempt_at=MOMENT - timedelta(minutes=26),
-        channel_message_id="42",
-        status="sent",
+        channel_message_id='42',
+        status='sent',
     )
     # Открывающее сообщение теперь находится по связи, а не по полю инцидента (Q-D11).
     opening_event = make_event(domain, incident=incident)
@@ -143,7 +143,7 @@ def test_17_back_to_normal_carries_the_duration(domain: Domain, store: FakeState
     dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
 
     notification = Notification.objects.exclude(pk=opening.pk).get()
-    assert "Проблема держалась 26 мин." in notification.text
+    assert 'Проблема держалась 26 мин.' in notification.text
     # Ответ уходит в ветку открывающего сообщения (7.3, Q-D7).
     assert notification.reply_to_id == opening.pk
 
@@ -160,7 +160,7 @@ def test_d7_back_to_normal_without_an_opening_message_is_skipped(
 
 
 def test_7_4_watch_started_never_queues(domain: Domain, store: FakeStateStore) -> None:
-    event = make_event(domain, EventType.WATCH_STARTED, payload={"address_count": 3})
+    event = make_event(domain, EventType.WATCH_STARTED, payload={'address_count': 3})
 
     result = dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
 

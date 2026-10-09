@@ -33,9 +33,9 @@ class Healthcheck(PublicView):
 
         return JsonResponse(
             {
-                "healthy": report.healthy,
-                "failed_component": report.failed_component,
-                "detail": report.detail,
+                'healthy': report.healthy,
+                'failed_component': report.failed_component,
+                'detail': report.detail,
             },
             status=HEALTHY if report.healthy else UNHEALTHY,
         )

@@ -27,7 +27,7 @@ from apps.catalog.services.allowlist import ParsedAllowlist, parse_allowlist
 from apps.catalog.services.domains import normalized_name
 
 #: 10.3: поля строки разделяются точкой с запятой.
-FIELD_SEPARATOR = ";"
+FIELD_SEPARATOR = ';'
 
 #: Сколько строк разбираем за раз. Вставка на миллион строк — не рабочий случай, а способ
 #: положить процесс; предел назван явно, чтобы отказ был внятным.
@@ -55,8 +55,8 @@ class ImportLine:
     def warning(self) -> str:
         """10.3: домен без разрешённых записей принимается, но помечается предупреждением."""
         if self.error or self.allowlist.entries:
-            return ""
-        return "разрешённые записи не заданы — следить получится только за изменением набора"
+            return ''
+        return 'разрешённые записи не заданы — следить получится только за изменением набора'
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,7 +95,7 @@ class ImportResult:
 
 
 def preview_import(
-    *, text: str, group_id: int | None = None, new_group_name: str = ""
+    *, text: str, group_id: int | None = None, new_group_name: str = ''
 ) -> ImportPreview:
     """
     Разобрать вставку, ничего не меняя — ТЗ 10.3.
@@ -121,14 +121,14 @@ def _group_name(group_id: int | None, new_group_name: str) -> str:
     if new_group_name.strip():
         return new_group_name.strip()
     group = Group.objects.filter(pk=group_id).first() if group_id else None
-    return group.name if group else "Без группы"
+    return group.name if group else 'Без группы'
 
 
 def apply_import(
     *,
     text: str,
     group_id: int | None,
-    new_group_name: str = "",
+    new_group_name: str = '',
     update_existing: bool,
     check_now: bool,
     at: datetime,
@@ -193,16 +193,16 @@ def _target_group(group_id: int | None, new_group_name: str) -> Group | None:
 def _line(number: int, text: str) -> ImportLine:
     parts = [part.strip() for part in text.split(FIELD_SEPARATOR)]
     name, reason = normalized_name(parts[0])
-    entries = parse_allowlist(parts[1].replace(" ", "\n") if len(parts) > 1 else "")
-    comment = parts[2] if len(parts) > 2 else ""
+    entries = parse_allowlist(parts[1].replace(' ', '\n') if len(parts) > 1 else '')
+    comment = parts[2] if len(parts) > 2 else ''
 
     error = reason
     if error is None and not entries.can_save:
         first = entries.errors[0]
-        error = f"разрешённая запись «{first.text}»: {first.error}"
+        error = f'разрешённая запись «{first.text}»: {first.error}'
 
     existing = (
-        Domain.objects.select_related("group").filter(name=name).first()
+        Domain.objects.select_related('group').filter(name=name).first()
         if name and error is None
         else None
     )
@@ -222,12 +222,12 @@ def _line(number: int, text: str) -> ImportLine:
 
 def _where(existing: Domain | None) -> str:
     if existing is None:
-        return ""
-    return existing.group.name if existing.group else "Без группы"
+        return ''
+    return existing.group.name if existing.group else 'Без группы'
 
 
 def _failed_text(lines: list[ImportLine]) -> str:
-    return "\n".join(line.text for line in lines if line.error)
+    return '\n'.join(line.text for line in lines if line.error)
 
 
 def _create(name: str, line: ImportLine, group_id: int | None, next_check_at: datetime) -> None:

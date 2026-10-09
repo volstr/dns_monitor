@@ -21,7 +21,7 @@ def escape_html(text: str) -> str:
     Три символа вместо восемнадцати у MarkdownV2 — потому HTML и выбран: ошибка экранирования не
     превращает сообщение в кашу из служебных знаков.
     """
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
 def plural(count: int, one: str, few: str, many: str) -> str:
@@ -53,5 +53,5 @@ def humanize_duration(delta: timedelta) -> str:
     """
     minutes = int(delta.total_seconds()) // 60
     if minutes < 60:
-        return f"{minutes} мин"
-    return f"{minutes // 60} ч {minutes % 60} мин"
+        return f'{minutes} мин'
+    return f'{minutes // 60} ч {minutes % 60} мин'

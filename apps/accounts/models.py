@@ -25,11 +25,11 @@ TOTP_SECRET_MAX_LENGTH = 64
 class Role(models.TextChoices):
     """Две роли — ТЗ 3."""
 
-    ADMIN = "admin", "Администратор"
-    OBSERVER = "observer", "Наблюдатель"
+    ADMIN = 'admin', 'Администратор'
+    OBSERVER = 'observer', 'Наблюдатель'
 
 
-class MemberManager(BaseUserManager["Member"]):
+class MemberManager(BaseUserManager['Member']):
     """
     Тонкий менеджер: хеширование пароля и нормализация почты.
 
@@ -37,7 +37,7 @@ class MemberManager(BaseUserManager["Member"]):
     живут в `apps.accounts.services.members`, а не здесь.
     """
 
-    def create_superuser(self, email: str, name: str, password: str) -> "Member":
+    def create_superuser(self, email: str, name: str, password: str) -> 'Member':
         """
         Поддержка `manage.py createsuperuser` — ТЗ 3.
 
@@ -67,7 +67,7 @@ class MemberManager(BaseUserManager["Member"]):
         role: str = Role.OBSERVER,
         password: str | None = None,
         **extra: object,
-    ) -> "Member":
+    ) -> 'Member':
         member: Member = self.model(
             email=self.normalize_email(email), name=name, role=role, **extra
         )
@@ -89,10 +89,10 @@ class Member(AbstractBaseUser):
     is_active = models.BooleanField(default=True)
     must_change_password = models.BooleanField(default=False)
     # Привязка аутентификатора. Пустая строка — не привязан; отвязка по 3.1 очищает поле.
-    totp_secret = models.CharField(max_length=TOTP_SECRET_MAX_LENGTH, blank=True, default="")
+    totp_secret = models.CharField(max_length=TOTP_SECRET_MAX_LENGTH, blank=True, default='')
     created_at = models.DateTimeField()
     created_by = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="created_members"
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_members'
     )
 
     # Хеш пароля — varchar(255) с запасом на смену алгоритма (4.0). Поле переопределяет
@@ -107,11 +107,11 @@ class Member(AbstractBaseUser):
 
     objects = MemberManager()
 
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["name"]
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name']
 
     class Meta:
-        ordering = ["name"]
+        ordering = ['name']
 
     def __str__(self) -> str:
         return self.name
@@ -125,9 +125,9 @@ class Member(AbstractBaseUser):
         сессий работало и без смены пароля.
         """
         return salted_hmac(
-            "apps.accounts.models.Member.get_session_auth_hash",
-            f"{self.password}{self.session_epoch}",
-            algorithm="sha256",
+            'apps.accounts.models.Member.get_session_auth_hash',
+            f'{self.password}{self.session_epoch}',
+            algorithm='sha256',
         ).hexdigest()
 
 
@@ -143,7 +143,7 @@ class Invitation(models.Model):
     «назначение» добавляется миграцией без переделки.
     """
 
-    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="invitations")
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='invitations')
     token_hash = models.CharField(max_length=TOKEN_HASH_MAX_LENGTH, unique=True)
     created_at = models.DateTimeField()
     # Срок жизни задаётся при создании: 24 часа, 7 дней или 30 дней (ТЗ 3).
@@ -151,16 +151,16 @@ class Invitation(models.Model):
     # Пока пусто — ссылка не открыта. Открытая ссылка недействительна повторно (критерий 30).
     opened_at = models.DateTimeField(null=True, blank=True, default=None)
     created_by = models.ForeignKey(
-        Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_invitations"
+        Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_invitations'
     )
 
     class Meta:
         indexes = [
-            models.Index(fields=["member", "opened_at"], name="invitation_member_opened"),
+            models.Index(fields=['member', 'opened_at'], name='invitation_member_opened'),
         ]
 
     def __str__(self) -> str:
-        return f"приглашение для {self.member.email}"
+        return f'приглашение для {self.member.email}'
 
 
 class AuditAction(models.TextChoices):
@@ -171,20 +171,20 @@ class AuditAction(models.TextChoices):
     Русские названия в интерфейсе — ⚠ Q-C11, к схеме отношения не имеют.
     """
 
-    MEMBER_INVITED = "member_invited", "Участник приглашён"
-    MEMBER_UPDATED = "member_updated", "Участник изменён"
-    EMAIL_CHANGED = "email_changed", "Почта изменена"
-    ROLE_CHANGED = "role_changed", "Роль изменена"
-    PASSWORD_RESET = "password_reset", "Пароль сброшен"
-    SESSIONS_TERMINATED = "sessions_terminated", "Сессии завершены"
-    AUTHENTICATOR_UNBOUND = "authenticator_unbound", "Аутентификатор отвязан"
-    MEMBER_DEACTIVATED = "member_deactivated", "Участник отключён"
+    MEMBER_INVITED = 'member_invited', 'Участник приглашён'
+    MEMBER_UPDATED = 'member_updated', 'Участник изменён'
+    EMAIL_CHANGED = 'email_changed', 'Почта изменена'
+    ROLE_CHANGED = 'role_changed', 'Роль изменена'
+    PASSWORD_RESET = 'password_reset', 'Пароль сброшен'
+    SESSIONS_TERMINATED = 'sessions_terminated', 'Сессии завершены'
+    AUTHENTICATOR_UNBOUND = 'authenticator_unbound', 'Аутентификатор отвязан'
+    MEMBER_DEACTIVATED = 'member_deactivated', 'Участник отключён'
     # Зеркало предыдущего значения, а не новый термин: 3.1 называет отключение обратимым
     # («роль можно вернуть»), и обратный ход обязан попадать в журнал наравне с прямым —
     # иначе доступ вернулся бы без следа. Q-D42.
-    MEMBER_ACTIVATED = "member_activated", "Участник включён"
-    MEMBER_DELETED = "member_deleted", "Участник удалён"
-    CHECKS_STOPPED = "checks_stopped", "Проверки остановлены"
+    MEMBER_ACTIVATED = 'member_activated', 'Участник включён'
+    MEMBER_DELETED = 'member_deleted', 'Участник удалён'
+    CHECKS_STOPPED = 'checks_stopped', 'Проверки остановлены'
 
 
 class AuditRecord(models.Model):
@@ -207,9 +207,9 @@ class AuditRecord(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="audit_records_authored",
+        related_name='audit_records_authored',
     )
-    author_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default="")
+    author_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default='')
 
     # Кого коснулось. У инфраструктурных записей пусто.
     target = models.ForeignKey(
@@ -217,14 +217,14 @@ class AuditRecord(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="audit_records_targeted",
+        related_name='audit_records_targeted',
     )
-    target_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default="")
+    target_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default='')
 
     class Meta:
         indexes = [
-            models.Index(fields=["occurred_at"], name="audit_record_occurred_at"),
+            models.Index(fields=['occurred_at'], name='audit_record_occurred_at'),
         ]
 
     def __str__(self) -> str:
-        return f"{self.get_action_display()} · {self.occurred_at:%Y-%m-%d %H:%M}"
+        return f'{self.get_action_display()} · {self.occurred_at:%Y-%m-%d %H:%M}'

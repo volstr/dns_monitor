@@ -21,47 +21,47 @@ import re
 from typing import Any
 
 #: Вместо значения. По-русски и однозначно: пустая строка неотличима от настоящей пустоты.
-SCRUBBED = "[вырезано]"
+SCRUBBED = '[вырезано]'
 
 #: Пароль внутри строки подключения: `postgres://user:пароль@host/db`, `redis://:пароль@host`.
 #: Правило по имени ключа такое не ловит — строка подключения приходит внутри **текста**
 #: исключения драйвера, где имени у неё нет.
-_URL_PASSWORD: re.Pattern[str] = re.compile(r"(?P<head>[a-z][a-z0-9+.-]*://[^\s/@:]*:)[^\s/@]+@")
+_URL_PASSWORD: re.Pattern[str] = re.compile(r'(?P<head>[a-z][a-z0-9+.-]*://[^\s/@:]*:)[^\s/@]+@')
 
 #: Токен бота Telegram. Тот же случай: он оказывается в тексте ошибки HTTP-запроса, потому что
 #: стоит прямо в адресе api.telegram.org/bot{token}/….
-_BOT_TOKEN: re.Pattern[str] = re.compile(r"\d{6,}:[A-Za-z0-9_-]{30,}")
+_BOT_TOKEN: re.Pattern[str] = re.compile(r'\d{6,}:[A-Za-z0-9_-]{30,}')
 
 #: Ключ, в имени которого встретилось любое из этих слов, не отправляется. 11.14 называет
 #: токен бота, `SMTP_PASSWORD`, `SESSION_SECRET`, строки подключения к БД и Redis, хеши
 #: паролей, токены приглашений и значения сессионных cookie.
 SECRET_MARKERS: tuple[str, ...] = (
-    "token",
-    "password",
-    "passwd",
-    "secret",
-    "session",
-    "cookie",
-    "authorization",
-    "auth",
-    "credential",
-    "api_key",
-    "apikey",
-    "dsn",
-    "database_url",
-    "redis_url",
-    "_url",
-    "hash",
-    "salt",
+    'token',
+    'password',
+    'passwd',
+    'secret',
+    'session',
+    'cookie',
+    'authorization',
+    'auth',
+    'credential',
+    'api_key',
+    'apikey',
+    'dsn',
+    'database_url',
+    'redis_url',
+    '_url',
+    'hash',
+    'salt',
 )
 
 #: Адрес участника не отправляется: «участник обозначается идентификатором, а не почтовым
 #: адресом» (11.14). Имя тоже: по нему человек опознаётся не хуже.
-USER_KEPT: tuple[str, ...] = ("id",)
+USER_KEPT: tuple[str, ...] = ('id',)
 
 #: Тело запроса к этим обработчикам не отправляется целиком: там пароль в открытом виде.
 #: Сверяется по началу пути, чтобы не зависеть от завершающей косой черты.
-BODY_FREE_PATHS: tuple[str, ...] = ("/login", "/password", "/invite", "/2fa")
+BODY_FREE_PATHS: tuple[str, ...] = ('/login', '/password', '/invite', '/2fa')
 
 #: Глубже событие Sentry не вкладывается. Предел нужен, чтобы циклическая структура в `extra`
 #: не увела обход в бесконечность: событие приходит из чужого кода, доверять его форме нельзя.
@@ -80,7 +80,7 @@ def redact(text: str) -> str:
     Имя домена и адрес при этом остаются: режется ровно пароль в строке подключения и токен
     бота, потому что без остального текст ошибки перестаёт что-либо значить (11.14).
     """
-    without_password = _URL_PASSWORD.sub(rf"\g<head>{SCRUBBED}@", text)
+    without_password = _URL_PASSWORD.sub(rf'\g<head>{SCRUBBED}@', text)
     return _BOT_TOKEN.sub(SCRUBBED, without_password)
 
 
@@ -90,16 +90,16 @@ def scrub_event(event: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(cleaned, dict):  # pragma: no cover — событие всегда словарь
         return event
 
-    user = cleaned.get("user")
+    user = cleaned.get('user')
     if isinstance(user, dict):
-        cleaned["user"] = {key: user[key] for key in USER_KEPT if key in user}
+        cleaned['user'] = {key: user[key] for key in USER_KEPT if key in user}
 
-    request = cleaned.get("request")
+    request = cleaned.get('request')
     if isinstance(request, dict) and _body_is_credentials(request):
         # «Тела запросов к обработчикам входа и смены пароля **целиком**» (11.14). Именно
         # целиком: рядом с паролем в том же теле лежит логин, а логин участника — это его
         # почтовый адрес, который 11.14 отправлять запрещает отдельным пунктом.
-        request.pop("data", None)
+        request.pop('data', None)
 
     return cleaned
 
@@ -114,9 +114,9 @@ def _body_is_credentials(request: dict[str, Any]) -> bool:
     само тело: поле с именем секрета означает форму учётных данных независимо от того, по
     какому адресу её отправили.
     """
-    if any(part in str(request.get("url", "")) for part in BODY_FREE_PATHS):
+    if any(part in str(request.get('url', '')) for part in BODY_FREE_PATHS):
         return True
-    data = request.get("data")
+    data = request.get('data')
     return isinstance(data, dict) and any(is_secret(str(key)) for key in data)
 
 

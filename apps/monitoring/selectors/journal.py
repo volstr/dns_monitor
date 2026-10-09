@@ -34,21 +34,21 @@ PAGE_SIZE = 100
 EXPORT_LIMIT = 100_000
 
 #: 11.7: «UTF-8 с BOM, разделитель — точка с запятой» — сочетание, которое Excel открывает сам.
-CSV_DELIMITER = ";"
-BOM = "﻿"
+CSV_DELIMITER = ';'
+BOM = '﻿'
 
 #: Чем разделяются каналы внутри одной ячейки выгрузки (Q-D11). Не точкой с запятой: она уже
 #: разделяет колонки, и значение пришлось бы брать в кавычки.
-DELIVERY_SEPARATOR = " | "
+DELIVERY_SEPARATOR = ' | '
 
 EVENT_TONES = {
-    EventType.ADDRESS_APPEARED: "change",
-    EventType.ADDRESS_GONE: "change",
-    EventType.NOT_ALLOWED: "breach",
-    EventType.BACK_TO_NORMAL: "ok",
-    EventType.RESOLVE_FAILED: "fail",
-    EventType.RESOLVE_RECOVERED: "ok",
-    EventType.WATCH_STARTED: "ok",
+    EventType.ADDRESS_APPEARED: 'change',
+    EventType.ADDRESS_GONE: 'change',
+    EventType.NOT_ALLOWED: 'breach',
+    EventType.BACK_TO_NORMAL: 'ok',
+    EventType.RESOLVE_FAILED: 'fail',
+    EventType.RESOLVE_RECOVERED: 'ok',
+    EventType.WATCH_STARTED: 'ok',
 }
 
 #: Сегменты фильтра из прототипа. Названия — по утверждённой таблице Q-C11.
@@ -57,19 +57,19 @@ FAILURE_TYPES = (EventType.RESOLVE_FAILED, EventType.RESOLVE_RECOVERED)
 
 
 class JournalFilter(StrEnum):
-    ALL = "all"
-    NOT_ALLOWED = "not_allowed"
-    CHANGES = "changes"
-    RESOLVE_ERRORS = "resolve_errors"
+    ALL = 'all'
+    NOT_ALLOWED = 'not_allowed'
+    CHANGES = 'changes'
+    RESOLVE_ERRORS = 'resolve_errors'
 
 
 class JournalPeriod(StrEnum):
     """Q-C21: значения прототипа плюс «всё хранимое»."""
 
-    TODAY = "today"
-    WEEK = "week"
-    MONTH = "month"
-    ALL = "all"
+    TODAY = 'today'
+    WEEK = 'week'
+    MONTH = 'month'
+    ALL = 'all'
 
 
 PERIOD_LENGTH = {
@@ -133,7 +133,7 @@ class ExportRefused:
 def journal_page(
     *,
     at: datetime,
-    search: str = "",
+    search: str = '',
     chosen: JournalFilter = JournalFilter.ALL,
     period: JournalPeriod = JournalPeriod.ALL,
 ) -> JournalPage:
@@ -151,7 +151,7 @@ def journal_page(
 def journal_export(
     *,
     at: datetime,
-    search: str = "",
+    search: str = '',
     chosen: JournalFilter = JournalFilter.ALL,
     period: JournalPeriod = JournalPeriod.ALL,
 ) -> ExportReady | ExportRefused:
@@ -165,8 +165,8 @@ def journal_export(
     if total > EXPORT_LIMIT:
         return ExportRefused(
             reason=(
-                f"В выборке {total} строк, это больше предела в {EXPORT_LIMIT}. "
-                f"Сузьте период или фильтр."
+                f'В выборке {total} строк, это больше предела в {EXPORT_LIMIT}. '
+                f'Сузьте период или фильтр.'
             )
         )
 
@@ -189,18 +189,18 @@ def _csv(rows: list[JournalRow]) -> bytes:
     """
     buffer = io.StringIO()
     buffer.write(BOM)
-    writer = csv.writer(buffer, delimiter=CSV_DELIMITER, lineterminator="\r\n")
+    writer = csv.writer(buffer, delimiter=CSV_DELIMITER, lineterminator='\r\n')
     writer.writerow(
         [
-            "Момент",
-            "Домен",
-            "Группа",
-            "Тип события",
-            "Затронутые адреса",
-            "Режим уведомлений",
-            "Канал доставки",
-            "Результат доставки",
-            "Участник",
+            'Момент',
+            'Домен',
+            'Группа',
+            'Тип события',
+            'Затронутые адреса',
+            'Режим уведомлений',
+            'Канал доставки',
+            'Результат доставки',
+            'Участник',
         ]
     )
     for row in rows:
@@ -212,7 +212,7 @@ def _csv(rows: list[JournalRow]) -> bytes:
                 row.domain_name,
                 row.group_name,
                 row.label,
-                " ".join(row.addresses),
+                ' '.join(row.addresses),
                 row.notification_mode,
                 # Каналов у события может быть несколько (Q-D11). Колонки 11.7 остаются
                 # двумя, а значения перечисляются **попарно**: третий канал стоит напротив
@@ -227,14 +227,14 @@ def _csv(rows: list[JournalRow]) -> bytes:
                 row.target_name,
             ]
         )
-    return buffer.getvalue().encode("utf-8")
+    return buffer.getvalue().encode('utf-8')
 
 
 def _sources(
     *, at: datetime, search: str, chosen: JournalFilter, period: JournalPeriod
 ) -> tuple[QuerySet[Event], QuerySet[AuditRecord]]:
-    events = Event.objects.select_related("domain", "domain__group").prefetch_related(
-        "notifications"
+    events = Event.objects.select_related('domain', 'domain__group').prefetch_related(
+        'notifications'
     )
     audit = AuditRecord.objects.all()
 
@@ -281,15 +281,15 @@ def _rows(
 ) -> list[JournalRow]:
     events, audit = _sources(at=at, search=search, chosen=chosen, period=period)
 
-    rows = [_event_row(event) for event in events.order_by("-occurred_at")[:limit]]
-    rows.extend(_audit_row(record) for record in audit.order_by("-occurred_at")[:limit])
+    rows = [_event_row(event) for event in events.order_by('-occurred_at')[:limit]]
+    rows.extend(_audit_row(record) for record in audit.order_by('-occurred_at')[:limit])
     rows.sort(key=lambda row: row.occurred_at, reverse=True)
     return rows[:limit]
 
 
 def _event_row(event: Event) -> JournalRow:
     payload = event.payload or {}
-    mode = payload.get("notification_mode") or ""
+    mode = payload.get('notification_mode') or ''
 
     return JournalRow(
         occurred_at=event.occurred_at,
@@ -297,12 +297,12 @@ def _event_row(event: Event) -> JournalRow:
         tone=EVENT_TONES[EventType(event.event_type)],
         domain_id=event.domain_id,
         domain_name=event.domain.name,
-        group_name=event.domain.group.name if event.domain.group else "",
-        addresses=tuple(str(address) for address in payload.get("addresses", ())),
-        notification_mode=str(NotificationMode(mode).label) if mode else "",
+        group_name=event.domain.group.name if event.domain.group else '',
+        addresses=tuple(str(address) for address in payload.get('addresses', ())),
+        notification_mode=str(NotificationMode(mode).label) if mode else '',
         deliveries=_deliveries(event),
         author_name=event.author_name,
-        target_name="",
+        target_name='',
     )
 
 
@@ -325,11 +325,11 @@ def _deliveries(event: Event) -> tuple[Delivery, ...]:
 def _delivery_result(notification: Notification) -> str:
     if notification.status == DeliveryStatus.SENT:
         if notification.sent_at is None:
-            return "доставлено"
-        return f"доставлено {localtime(notification.sent_at):%H:%M:%S}"
+            return 'доставлено'
+        return f'доставлено {localtime(notification.sent_at):%H:%M:%S}'
     if notification.status == DeliveryStatus.FAILED:
-        return f"не доставлено: {notification.last_error}"
-    return "в очереди"
+        return f'не доставлено: {notification.last_error}'
+    return 'в очереди'
 
 
 def _audit_row(record: AuditRecord) -> JournalRow:
@@ -345,12 +345,12 @@ def _audit_row(record: AuditRecord) -> JournalRow:
     return JournalRow(
         occurred_at=record.occurred_at,
         label=str(AuditAction(record.action).label),
-        tone="",
+        tone='',
         domain_id=None,
-        domain_name="",
-        group_name="",
+        domain_name='',
+        group_name='',
         addresses=(),
-        notification_mode="",
+        notification_mode='',
         deliveries=(),
         author_name=record.author_name,
         target_name=record.target_name,

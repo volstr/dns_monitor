@@ -14,9 +14,9 @@ if not ALLOWED_HOSTS:
     # Пустой список в бою — не мелочь. Django при `DEBUG=False` отвергнет тогда любой запрос,
     # и приложение будет выглядеть сломанным, не называя причины. Лучше не стартовать.
     message = (
-        "Приложение не запущено: не задана переменная ALLOWED_HOSTS.\n"
-        "  ALLOWED_HOSTS: обязательная переменная не задана. Перечислите имена, под которыми "
-        "приложение отвечает, через запятую: dns-monitoring.example.com, 10.20.0.7"
+        'Приложение не запущено: не задана переменная ALLOWED_HOSTS.\n'
+        '  ALLOWED_HOSTS: обязательная переменная не задана. Перечислите имена, под которыми '
+        'приложение отвечает, через запятую: dns-monitoring.example.com, 10.20.0.7'
     )
     raise ImproperlyConfigured(message)
 
@@ -28,8 +28,8 @@ if not ALLOWED_HOSTS:
 # nginx ставит `X-Forwarded-Proto` сам на каждый запрос, затирая присланный клиентом, и портов
 # наружу у `web` нет — снаружи до gunicorn не дотянуться в обход прокси. Открыть порт web в
 # бою значит сделать этот заголовок подделываемым.
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-if ENV.app_base_url.startswith("https://"):
+if ENV.app_base_url.startswith('https://'):
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

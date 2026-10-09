@@ -27,24 +27,24 @@ def test_11_9_empty_row_is_not_squeezed_into_the_time_column(
 ) -> None:
     """На свежей установке расхождений нет, и обзор показывает именно эту строку."""
     page = signed_in
-    page.goto(f"{live_server.url}/")
+    page.goto(f'{live_server.url}/')
 
-    row = page.locator(".hist li.blank .sub")
+    row = page.locator('.hist li.blank .sub')
     row.wait_for()
     measured = row.evaluate(
-        """el => {
+        '''el => {
             const box = el.getBoundingClientRect();
             const list = el.closest('.hist').getBoundingClientRect();
             const style = getComputedStyle(el);
             return {width: box.width, offset: box.left - list.left, align: style.textAlign};
-        }"""
+        }'''
     )
 
-    assert measured["width"] > TIME_COLUMN * 2, (
+    assert measured['width'] > TIME_COLUMN * 2, (
         f"текст шириной {measured['width']:.0f}px — он в колонке времени"
     )
     # Выравнивание по левому краю, как у строк с данными. Первая версия правки назвала класс
     # `empty`, и строка получила чужое правило `.empty{text-align:center}` из прототипа.
-    assert measured["align"] in {"start", "left"}, f"выравнивание {measured['align']}"
+    assert measured['align'] in {'start', 'left'}, f"выравнивание {measured['align']}"
     # Отступ слева — обычный отступ строки списка, а не 24 пикселя блока пустого состояния.
-    assert measured["offset"] < 20, f"отступ слева {measured['offset']:.0f}px"
+    assert measured['offset'] < 20, f"отступ слева {measured['offset']:.0f}px"

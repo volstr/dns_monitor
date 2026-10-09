@@ -22,13 +22,13 @@ from apps.accounts.selectors.access import MemberAccessState, access_state
 from core.ports.state_store import StateStore, invitation_token
 
 #: Имена переменных для баннера критерия 75: человек должен знать, что именно просить.
-SMTP_VARIABLES = ("SMTP_HOST", "SMTP_FROM", "SMTP_USER", "SMTP_PASSWORD")
+SMTP_VARIABLES = ('SMTP_HOST', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASSWORD')
 
 STATE_LABELS = {
-    MemberAccessState.ACTIVE: ("Активен", "ok"),
-    MemberAccessState.INVITATION_PENDING: ("Ссылка не открыта", "pend"),
-    MemberAccessState.PASSWORD_ISSUED: ("Пароль выдан, не менялся", "change"),
-    MemberAccessState.DISABLED: ("Отключён", ""),
+    MemberAccessState.ACTIVE: ('Активен', 'ok'),
+    MemberAccessState.INVITATION_PENDING: ('Ссылка не открыта', 'pend'),
+    MemberAccessState.PASSWORD_ISSUED: ('Пароль выдан, не менялся', 'change'),
+    MemberAccessState.DISABLED: ('Отключён', ''),
 }
 
 
@@ -64,12 +64,12 @@ class MembersPage:
 
 def members_page(*, viewer: Member, state_store: StateStore) -> MembersPage:
     """Список участников. Открытые токены приглашений достаются из состояния (Q-D16)."""
-    members = list(Member.objects.order_by("name"))
+    members = list(Member.objects.order_by('name'))
     invitations = {
         invitation.member_id: invitation
         for invitation in Invitation.objects.filter(
             member_id__in=[member.pk for member in members], opened_at__isnull=True
-        ).order_by("created_at")
+        ).order_by('created_at')
     }
 
     return MembersPage(
@@ -91,11 +91,11 @@ def _row(
 ) -> MemberRow:
     state = access_state(member)
     label, tone = STATE_LABELS[state]
-    token = ""
+    token = ''
     if invitation is not None:
         # Открытый текст живёт только в Redis и только до истечения срока ссылки (Q-D16).
         lifetime = invitation.expires_at - invitation.created_at
-        token = state_store.recall(invitation_token(invitation.pk, lifetime)) or ""
+        token = state_store.recall(invitation_token(invitation.pk, lifetime)) or ''
 
     return MemberRow(
         id=member.pk,

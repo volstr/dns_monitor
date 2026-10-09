@@ -21,8 +21,8 @@ pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
 SIX_HOURS = timedelta(hours=6)
-CHAT = "-1001234567890"
-OPENING_ID = "42"
+CHAT = '-1001234567890'
+OPENING_ID = '42'
 
 
 @pytest.fixture
@@ -35,19 +35,19 @@ def incident() -> Incident:
     GlobalSettings.objects.filter(pk=1).update(
         telegram_chat_id=CHAT, notification_mode=NotificationMode.NOT_ALLOWED
     )
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
-    AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
+    AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
     AddressRegistryEntry.objects.create(
-        domain=domain, address="185.44.9.201", first_seen_at=MOMENT, last_seen_at=MOMENT
+        domain=domain, address='185.44.9.201', first_seen_at=MOMENT, last_seen_at=MOMENT
     )
     opening = Notification.objects.create(
-        channel="telegram",
+        channel='telegram',
         recipient=CHAT,
-        text="Адрес вне разрешённых",
+        text='Адрес вне разрешённых',
         created_at=MOMENT,
         next_attempt_at=MOMENT,
         channel_message_id=OPENING_ID,
-        status="sent",
+        status='sent',
     )
     incident = Incident.objects.create(domain=domain, opened_at=MOMENT)
     # Открывающее сообщение находится по связи «событие ↔ уведомление» с отбором по каналу:
@@ -56,7 +56,7 @@ def incident() -> Incident:
         domain=domain,
         event_type=EventType.NOT_ALLOWED,
         occurred_at=MOMENT,
-        payload={"addresses": ["185.44.9.201"]},
+        payload={'addresses': ['185.44.9.201']},
         incident=incident,
     )
     event.notifications.add(opening)
@@ -93,11 +93,11 @@ def test_8_5_reminder_carries_age_and_current_addresses(
     reminders(MOMENT + timedelta(hours=7), store)
 
     text = Notification.objects.exclude(channel_message_id=OPENING_ID).get().text
-    assert "Расхождение держится" in text
-    assert "Возраст: 7 ч 0 мин" in text
-    assert "185.44.9.201" in text
+    assert 'Расхождение держится' in text
+    assert 'Возраст: 7 ч 0 мин' in text
+    assert '185.44.9.201' in text
     # Комментарий домена в напоминании не повторяется (8.5).
-    assert "Открыть домен" in text
+    assert 'Открыть домен' in text
 
 
 def test_41_a_message_about_a_new_address_counts_as_a_reminder(
@@ -110,7 +110,7 @@ def test_41_a_message_about_a_new_address_counts_as_a_reminder(
 
 
 def test_42_never_remind_means_no_reminders(incident: Incident, store: FakeStateStore) -> None:
-    group = Group.objects.create(name="Тестовые стенды", reminder_interval_seconds=0)
+    group = Group.objects.create(name='Тестовые стенды', reminder_interval_seconds=0)
     Domain.objects.filter(pk=incident.domain_id).update(group=group)
 
     assert reminders(MOMENT + timedelta(days=1), store) == 0
@@ -127,7 +127,7 @@ def test_d7_no_opening_message_means_no_reminders(
 ) -> None:
     # Продолжение существует только при наличии открывающего сообщения. «Нет открывающего» —
     # это теперь отсутствие доставленного уведомления по инциденту, а не пустая строка в поле.
-    Notification.objects.update(channel_message_id="")
+    Notification.objects.update(channel_message_id='')
 
     assert reminders(MOMENT + timedelta(hours=7), store) == 0
 

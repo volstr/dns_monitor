@@ -23,19 +23,19 @@ MOMENT = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
 @pytest.fixture
 def admin() -> Member:
     return Member.objects.create_member(
-        email="boss@contoso.ru", name="Анна Кирилова", created_at=MOMENT, role=Role.ADMIN
+        email='boss@contoso.ru', name='Анна Кирилова', created_at=MOMENT, role=Role.ADMIN
     )
 
 
 @pytest.fixture
 def domain() -> Domain:
-    return Domain.objects.create(name="github.com")
+    return Domain.objects.create(name='github.com')
 
 
 def save(client: Client, domain: Domain, allowlist: str) -> str:
     return client.post(
-        reverse("domain-save", args=[domain.pk]),
-        {"allowlist": allowlist, "record_types": ["a"]},
+        reverse('domain-save', args=[domain.pk]),
+        {'allowlist': allowlist, 'record_types': ['a']},
         follow=True,
     ).content.decode()
 
@@ -46,9 +46,9 @@ def test_45_address_inside_a_subnet_warns_and_still_saves(
     """Критерий 45 дословно: предупреждение о перекрытии, сохранение разрешено."""
     client.force_login(admin)
 
-    body = save(client, domain, "140.82.121.0/24\n140.82.121.3")
+    body = save(client, domain, '140.82.121.0/24\n140.82.121.3')
 
-    assert "Сохранено." in body
+    assert 'Сохранено.' in body
     assert AllowlistEntry.objects.filter(domain=domain).count() == 2
 
 
@@ -58,10 +58,10 @@ def test_10_2_overlap_warning_survives_the_save(
     """Раньше предупреждение исчезало вместе с перерисовкой страницы."""
     client.force_login(admin)
 
-    body = save(client, domain, "140.82.121.0/24\n140.82.121.3")
+    body = save(client, domain, '140.82.121.0/24\n140.82.121.3')
 
-    assert "140.82.121.3 уже входит в 140.82.121.0/24 из строки 1" in body
-    assert "скорее всего, лишняя" in body
+    assert '140.82.121.3 уже входит в 140.82.121.0/24 из строки 1' in body
+    assert 'скорее всего, лишняя' in body
 
 
 def test_10_2_subnet_inside_a_wider_subnet_warns_too(
@@ -70,9 +70,9 @@ def test_10_2_subnet_inside_a_wider_subnet_warns_too(
     """Правило то же и для сетей: 140.82.121.0/24 целиком внутри 140.82.0.0/16."""
     client.force_login(admin)
 
-    body = save(client, domain, "140.82.0.0/16\n140.82.121.0/24")
+    body = save(client, domain, '140.82.0.0/16\n140.82.121.0/24')
 
-    assert "140.82.121.0/24 уже входит в 140.82.0.0/16 из строки 1" in body
+    assert '140.82.121.0/24 уже входит в 140.82.0.0/16 из строки 1' in body
     assert AllowlistEntry.objects.filter(domain=domain).count() == 2
 
 
@@ -81,9 +81,9 @@ def test_10_2_duplicate_warning_survives_the_save(
 ) -> None:
     client.force_login(admin)
 
-    body = save(client, domain, "140.82.0.0/16\n140.82.0.0/16")
+    body = save(client, domain, '140.82.0.0/16\n140.82.0.0/16')
 
-    assert "дубликат строки 1" in body
+    assert 'дубликат строки 1' in body
     # Дубликат в базу не попадает, но сказать о нём нужно.
     assert AllowlistEntry.objects.filter(domain=domain).count() == 1
 
@@ -93,7 +93,7 @@ def test_10_2_clean_list_saves_without_warnings(
 ) -> None:
     client.force_login(admin)
 
-    body = save(client, domain, "140.82.0.0/16\n10.20.0.0/22")
+    body = save(client, domain, '140.82.0.0/16\n10.20.0.0/22')
 
-    assert "Сохранено." in body
-    assert "лишняя" not in body
+    assert 'Сохранено.' in body
+    assert 'лишняя' not in body

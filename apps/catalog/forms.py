@@ -40,14 +40,14 @@ class DomainFilterForm(forms.Form):
         """Сегмент фильтра. Мусор в параметре — это «Все», а не ошибка страницы."""
         if not self.is_valid():
             return DomainFilter.ALL
-        chosen = self.cleaned_data.get("chosen")
+        chosen = self.cleaned_data.get('chosen')
         return DomainFilter(chosen) if chosen else DomainFilter.ALL
 
     def search_text(self) -> str:
-        return str(self.cleaned_data.get("search") or "") if self.is_valid() else ""
+        return str(self.cleaned_data.get('search') or '') if self.is_valid() else ''
 
     def group_id(self) -> int | None:
-        return self.cleaned_data.get("group") if self.is_valid() else None
+        return self.cleaned_data.get('group') if self.is_valid() else None
 
 
 class DomainCreateForm(forms.Form):
@@ -65,16 +65,16 @@ class DomainCreateForm(forms.Form):
     allowlist = forms.CharField(required=False, widget=forms.Textarea)
 
     def domain_names(self) -> str:
-        return str(self.cleaned_data.get("names") or "")
+        return str(self.cleaned_data.get('names') or '')
 
     def allowlist_text(self) -> str:
-        return str(self.cleaned_data.get("allowlist") or "")
+        return str(self.cleaned_data.get('allowlist') or '')
 
     def group_id(self) -> int | None:
-        return self.cleaned_data.get("group")
+        return self.cleaned_data.get('group')
 
     def comment_text(self) -> str:
-        return str(self.cleaned_data.get("comment") or "")
+        return str(self.cleaned_data.get('comment') or '')
 
 
 class DomainCardForm(forms.Form):
@@ -88,19 +88,19 @@ class DomainCardForm(forms.Form):
     allow_net = forms.GenericIPAddressField(required=False)
 
     def registry_filter(self) -> RegistryFilter:
-        return self._enum(RegistryFilter, "registry", RegistryFilter.ALL)
+        return self._enum(RegistryFilter, 'registry', RegistryFilter.ALL)
 
     def history_filter(self) -> HistoryFilter:
-        return self._enum(HistoryFilter, "history", HistoryFilter.ALL)
+        return self._enum(HistoryFilter, 'history', HistoryFilter.ALL)
 
     def suggestion_for(self) -> tuple[str, bool] | None:
         """Какой адрес предложить в поле списка и подсетью ли. ``None`` — кнопку не нажимали."""
         if not self.is_valid():
             return None
-        address = str(self.cleaned_data.get("allow") or "")
+        address = str(self.cleaned_data.get('allow') or '')
         if address:
             return address, False
-        network = str(self.cleaned_data.get("allow_net") or "")
+        network = str(self.cleaned_data.get('allow_net') or '')
         if network:
             return network, True
         return None
@@ -109,7 +109,7 @@ class DomainCardForm(forms.Form):
         if not self.is_valid():
             return default
         try:
-            return kind(str(self.cleaned_data.get(field) or ""))
+            return kind(str(self.cleaned_data.get(field) or ''))
         except ValueError:
             return default
 
@@ -129,16 +129,16 @@ class DomainEditForm(forms.Form):
     watch_enabled = forms.BooleanField(required=False)
 
     def comment_text(self) -> str:
-        return str(self.cleaned_data.get("comment") or "")
+        return str(self.cleaned_data.get('comment') or '')
 
     def allowlist_text(self) -> str:
-        return str(self.cleaned_data.get("allowlist") or "")
+        return str(self.cleaned_data.get('allowlist') or '')
 
     def chosen_record_types(self) -> tuple[str, ...]:
-        return tuple(self.cleaned_data.get("record_types") or ())
+        return tuple(self.cleaned_data.get('record_types') or ())
 
     def watch(self) -> bool:
-        return bool(self.cleaned_data.get("watch_enabled"))
+        return bool(self.cleaned_data.get('watch_enabled'))
 
 
 class GroupForm(forms.Form):
@@ -164,29 +164,29 @@ class GroupForm(forms.Form):
     notify_back_to_normal = forms.CharField(required=False)
 
     def group_name(self) -> str:
-        return str(self.cleaned_data.get("name") or "")
+        return str(self.cleaned_data.get('name') or '')
 
     def comment_text(self) -> str:
-        return str(self.cleaned_data.get("comment") or "")
+        return str(self.cleaned_data.get('comment') or '')
 
     def period_seconds(self) -> int | None:
-        return self._seconds("check_period", "check_period_minutes")
+        return self._seconds('check_period', 'check_period_minutes')
 
     def threshold_seconds(self) -> int | None:
-        return self._seconds("freshness_threshold", "freshness_threshold_minutes")
+        return self._seconds('freshness_threshold', 'freshness_threshold_minutes')
 
     def reminder_seconds(self) -> int | None:
-        return self._chosen_seconds("reminder_interval")
+        return self._chosen_seconds('reminder_interval')
 
     def mode(self) -> str | None:
-        return str(self.cleaned_data.get("notification_mode") or "") or None
+        return str(self.cleaned_data.get('notification_mode') or '') or None
 
     def notify_back(self) -> bool | None:
         """Три состояния: «по умолчанию», «да», «нет». Флажок их не выражает, поэтому список."""
-        raw = str(self.cleaned_data.get("notify_back_to_normal") or "")
-        if raw == "":
+        raw = str(self.cleaned_data.get('notify_back_to_normal') or '')
+        if raw == '':
             return None
-        return raw == "yes"
+        return raw == 'yes'
 
     def _seconds(self, choice_field: str, minutes_field: str) -> int | None:
         minutes = self.cleaned_data.get(minutes_field)
@@ -195,7 +195,7 @@ class GroupForm(forms.Form):
         return self._chosen_seconds(choice_field)
 
     def _chosen_seconds(self, field: str) -> int | None:
-        raw = str(self.cleaned_data.get(field) or "")
+        raw = str(self.cleaned_data.get(field) or '')
         return int(raw) if raw.isdigit() else None
 
 
@@ -234,31 +234,31 @@ class GlobalSettingsForm(forms.Form):
     def values(self) -> SettingsInput:
         """Значения формы в секундах и списках — в том виде, в каком их ждёт сервис."""
         data = self.cleaned_data
-        registry_days = data.get("registry_retention_days")
+        registry_days = data.get('registry_retention_days')
 
         return SettingsInput(
-            check_period_seconds=data["check_period_minutes"] * SECONDS_IN_MINUTE,
-            freshness_threshold_seconds=data["freshness_threshold_hours"] * SECONDS_IN_HOUR,
-            notification_mode=str(data["notification_mode"]),
-            notify_back_to_normal=bool(data.get("notify_back_to_normal")),
-            reminder_interval_seconds=data["reminder_interval_hours"] * SECONDS_IN_HOUR,
-            merge_window_seconds=data["merge_window_seconds"],
-            merge_threshold=data["merge_threshold"],
-            dns_servers=_lines(data.get("dns_servers")),
-            check_ipv6=bool(data.get("check_ipv6")),
-            resolve_failure_threshold=data["resolve_failure_threshold"],
-            event_retention_seconds=data["event_retention_days"] * SECONDS_IN_DAY,
+            check_period_seconds=data['check_period_minutes'] * SECONDS_IN_MINUTE,
+            freshness_threshold_seconds=data['freshness_threshold_hours'] * SECONDS_IN_HOUR,
+            notification_mode=str(data['notification_mode']),
+            notify_back_to_normal=bool(data.get('notify_back_to_normal')),
+            reminder_interval_seconds=data['reminder_interval_hours'] * SECONDS_IN_HOUR,
+            merge_window_seconds=data['merge_window_seconds'],
+            merge_threshold=data['merge_threshold'],
+            dns_servers=_lines(data.get('dns_servers')),
+            check_ipv6=bool(data.get('check_ipv6')),
+            resolve_failure_threshold=data['resolve_failure_threshold'],
+            event_retention_seconds=data['event_retention_days'] * SECONDS_IN_DAY,
             registry_retention_seconds=(
                 registry_days * SECONDS_IN_DAY if registry_days else None
             ),
-            message_include_full_set=bool(data.get("message_include_full_set")),
-            message_include_comment=bool(data.get("message_include_comment")),
-            message_include_link=bool(data.get("message_include_link")),
-            session_lifetime_seconds=data["session_lifetime_hours"] * SECONDS_IN_HOUR,
-            login_failure_threshold=data["login_failure_threshold"],
-            telegram_chat_id=str(data.get("telegram_chat_id") or ""),
-            email_recipients=_lines(data.get("email_recipients")),
-            webhook_url=str(data.get("webhook_url") or ""),
+            message_include_full_set=bool(data.get('message_include_full_set')),
+            message_include_comment=bool(data.get('message_include_comment')),
+            message_include_link=bool(data.get('message_include_link')),
+            session_lifetime_seconds=data['session_lifetime_hours'] * SECONDS_IN_HOUR,
+            login_failure_threshold=data['login_failure_threshold'],
+            telegram_chat_id=str(data.get('telegram_chat_id') or ''),
+            email_recipients=_lines(data.get('email_recipients')),
+            webhook_url=str(data.get('webhook_url') or ''),
         )
 
 
@@ -286,26 +286,26 @@ class ImportForm(forms.Form):
     def source_text(self) -> str:
         """Текст списка: из файла, если он загружен, иначе из поля вставки."""
         if not self.is_valid():
-            return ""
-        uploaded = self.cleaned_data.get("source")
+            return ''
+        uploaded = self.cleaned_data.get('source')
         if uploaded is None:
-            return str(self.cleaned_data.get("text") or "")
+            return str(self.cleaned_data.get('text') or '')
         return _decoded(uploaded.read(self.MAX_FILE_BYTES))
 
     def group_id(self) -> int | None:
-        return self.cleaned_data.get("group") if self.is_valid() else None
+        return self.cleaned_data.get('group') if self.is_valid() else None
 
     def new_group_name(self) -> str:
-        return str(self.cleaned_data.get("new_group") or "") if self.is_valid() else ""
+        return str(self.cleaned_data.get('new_group') or '') if self.is_valid() else ''
 
     def update_existing_flag(self) -> bool:
-        return bool(self.cleaned_data.get("update_existing")) if self.is_valid() else False
+        return bool(self.cleaned_data.get('update_existing')) if self.is_valid() else False
 
     def check_now_flag(self) -> bool:
         """Включён по умолчанию (10.3): первый ответ — отправная точка для сравнений."""
         if not self.is_bound:
             return True
-        return bool(self.cleaned_data.get("check_now")) if self.is_valid() else True
+        return bool(self.cleaned_data.get('check_now')) if self.is_valid() else True
 
 
 class MoveForm(forms.Form):
@@ -320,10 +320,10 @@ class MoveForm(forms.Form):
     new_group = forms.CharField(required=False, max_length=GROUP_NAME_MAX_LENGTH)
 
     def group_id(self) -> int | None:
-        return self.cleaned_data.get("group") if self.is_valid() else None
+        return self.cleaned_data.get('group') if self.is_valid() else None
 
     def new_group_name(self) -> str:
-        return str(self.cleaned_data.get("new_group") or "") if self.is_valid() else ""
+        return str(self.cleaned_data.get('new_group') or '') if self.is_valid() else ''
 
 
 def _decoded(raw: bytes) -> str:
@@ -333,12 +333,12 @@ def _decoded(raw: bytes) -> str:
     UTF-8 — основной случай; CP1251 — запасной, потому что `.csv` из Excel в русской локали
     приходит именно в нём, и ронять импорт из-за кодировки незачем.
     """
-    for encoding in ("utf-8-sig", "cp1251"):
+    for encoding in ('utf-8-sig', 'cp1251'):
         try:
             return raw.decode(encoding)
         except UnicodeDecodeError:
             continue
-    return raw.decode("utf-8", errors="replace")
+    return raw.decode('utf-8', errors='replace')
 
 
 class JournalFilterForm(forms.Form):
@@ -349,18 +349,18 @@ class JournalFilterForm(forms.Form):
     period = forms.CharField(required=False)
 
     def selected_filter(self) -> JournalFilter:
-        return self._enum(JournalFilter, "chosen", JournalFilter.ALL)
+        return self._enum(JournalFilter, 'chosen', JournalFilter.ALL)
 
     def selected_period(self) -> JournalPeriod:
-        return self._enum(JournalPeriod, "period", JournalPeriod.ALL)
+        return self._enum(JournalPeriod, 'period', JournalPeriod.ALL)
 
     def search_text(self) -> str:
-        return str(self.cleaned_data.get("search") or "") if self.is_valid() else ""
+        return str(self.cleaned_data.get('search') or '') if self.is_valid() else ''
 
     def _enum[T: StrEnum](self, kind: type[T], field: str, default: T) -> T:
         if not self.is_valid():
             return default
-        raw = str(self.cleaned_data.get(field) or "")
+        raw = str(self.cleaned_data.get(field) or '')
         try:
             return kind(raw)
         except ValueError:
@@ -369,4 +369,4 @@ class JournalFilterForm(forms.Form):
 
 def _lines(text: object) -> tuple[str, ...]:
     """Список по строке в строке: так его вводят и в DNS-серверах, и в адресах почты."""
-    return tuple(line.strip() for line in str(text or "").splitlines() if line.strip())
+    return tuple(line.strip() for line in str(text or '').splitlines() if line.strip())

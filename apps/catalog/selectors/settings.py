@@ -38,7 +38,7 @@ class EffectiveSettings:
 
 def effective_settings(domain_id: int) -> EffectiveSettings:
     """Разрешённые настройки домена. Домен без группы берёт всё из общих настроек (ТЗ 5)."""
-    domain = Domain.objects.select_related("group").get(pk=domain_id)
+    domain = Domain.objects.select_related('group').get(pk=domain_id)
     return settings_of_group(domain.group)
 
 

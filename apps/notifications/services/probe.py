@@ -52,9 +52,9 @@ type ProbeResult = ProbeSent | ProbeRefused
 #: Заголовок тестового сообщения. Нужен обязательно: сообщение приходит дежурному, который не
 #: знает, что кто-то нажал кнопку, и без пометки примет пример за настоящую тревогу.
 PROBE_HEADER = (
-    "<b>Проверка канала</b>\n"
-    "Это тестовое сообщение из DNS monitoring: доставка работает. Ниже — пример того, как будет "
-    "выглядеть настоящее уведомление.\n"
+    '<b>Проверка канала</b>\n'
+    'Это тестовое сообщение из DNS monitoring: доставка работает. Ниже — пример того, как будет '
+    'выглядеть настоящее уведомление.\n'
 )
 
 #: Пример для тестового сообщения — состав строк из 8.4, с вымышленным доменом.
@@ -65,16 +65,16 @@ PROBE_HEADER = (
 #: тестовое сообщение не походило на макет, потому что ссылки в нём не было вовсе (Q-D41).
 PROBE_EXAMPLE = MessageInput(
     event_type=EventType.NOT_ALLOWED,
-    domain_name="pay-gw.example",
-    domain_url="",
-    changed=("185.44.9.201",),
-    current=("10.20.1.14", "10.20.2.61", "185.44.9.201"),
-    group_name="Платёжный контур",
-    domain_comment="Пример комментария домена: он попадает в сообщение по 8.4.",
+    domain_name='pay-gw.example',
+    domain_url='',
+    changed=('185.44.9.201',),
+    current=('10.20.1.14', '10.20.2.61', '185.44.9.201'),
+    group_name='Платёжный контур',
+    domain_comment='Пример комментария домена: он попадает в сообщение по 8.4.',
 )
 
 
-def send_probe(*, channel: NotificationChannel, typed_recipient: str = "") -> ProbeResult:
+def send_probe(*, channel: NotificationChannel, typed_recipient: str = '') -> ProbeResult:
     """
     Отправить тестовое сообщение. Исключений не бросает.
 
@@ -85,8 +85,8 @@ def send_probe(*, channel: NotificationChannel, typed_recipient: str = "") -> Pr
     if not channel.is_configured:
         return ProbeRefused(
             reason=(
-                "Канал не настроен: не задана переменная окружения TELEGRAM_BOT_TOKEN. "
-                "Токен задаётся только в окружении (ТЗ 8.3)."
+                'Канал не настроен: не задана переменная окружения TELEGRAM_BOT_TOKEN. '
+                'Токен задаётся только в окружении (ТЗ 8.3).'
             ),
             from_channel=False,
         )
@@ -96,7 +96,7 @@ def send_probe(*, channel: NotificationChannel, typed_recipient: str = "") -> Pr
     recipient = typed_recipient.strip() or saved
     if not recipient:
         return ProbeRefused(
-            reason="Не задан идентификатор чата: отправлять некуда.",
+            reason='Не задан идентификатор чата: отправлять некуда.',
             from_channel=False,
         )
 
@@ -117,14 +117,14 @@ def _probe_text(settings_row: GlobalSettings) -> str:
     связи — худшее, что можно прислать. Зато по ней сразу видно, открывается ли `APP_BASE_URL`
     из того места, где сидит дежурный.
     """
-    example = replace(PROBE_EXAMPLE, domain_url=f"{settings.APP_BASE_URL}/domains/")
+    example = replace(PROBE_EXAMPLE, domain_url=f'{settings.APP_BASE_URL}/domains/')
     body = compose(
         example,
         include_current=settings_row.message_include_full_set,
         include_comment=settings_row.message_include_comment,
         include_link=settings_row.message_include_link,
     )
-    return f"{PROBE_HEADER}\n{body}"
+    return f'{PROBE_HEADER}\n{body}'
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,5 +144,5 @@ def disconnect_telegram() -> ChannelDisconnected:
     Событий и записей в журнал не порождается: 3.1 перечисляет действия с участниками, а это
     настройка канала. Факт правки виден по самому экрану.
     """
-    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id="")
+    GlobalSettings.objects.filter(pk=1).update(telegram_chat_id='')
     return ChannelDisconnected()

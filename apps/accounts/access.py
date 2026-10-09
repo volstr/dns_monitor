@@ -42,7 +42,7 @@ class MemberView(View):
 
     def dispatch(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
         if not request.user.is_authenticated:
-            return redirect_to_login(request.get_full_path(), reverse("login"))
+            return redirect_to_login(request.get_full_path(), reverse('login'))
         return super().dispatch(request, *args, **kwargs)
 
 
@@ -74,9 +74,9 @@ def navigation(request: HttpRequest) -> dict[str, object]:
     Счётчики считаются только для вошедшего: на экране входа меню нет вовсе, и лишние запросы
     там ни к чему.
     """
-    user = getattr(request, "user", None)
+    user = getattr(request, 'user', None)
     if not (user and user.is_authenticated):
-        return {"is_admin": False, "counts": None}
+        return {'is_admin': False, 'counts': None}
 
     # Импорт внутри функции: `access` зовут из настроек шаблонов, и на уровне модуля он потянул
     # бы приложения до того, как реестр Django их загрузит.
@@ -84,9 +84,9 @@ def navigation(request: HttpRequest) -> dict[str, object]:
     from apps.catalog.selectors.navigation import navigation_counts
 
     return {
-        "is_admin": user.role == Role.ADMIN,
-        "counts": navigation_counts(),
+        'is_admin': user.role == Role.ADMIN,
+        'counts': navigation_counts(),
         # Состояния, в которых продукт цел, но не делает своего дела. Показываются на каждом
         # экране: пустой реестр сам по себе ничего не объясняет.
-        "install_warnings": install_warnings(),
+        'install_warnings': install_warnings(),
     }

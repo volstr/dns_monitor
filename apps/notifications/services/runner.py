@@ -50,8 +50,8 @@ def run_one_delivery(
     channels = build_channels()
     if not channels:
         reason = (
-            "ни один канал не настроен: не заданы ни TELEGRAM_BOT_TOKEN, ни SMTP_HOST — "
-            "отправлять нечем"
+            'ни один канал не настроен: не заданы ни TELEGRAM_BOT_TOKEN, ни SMTP_HOST — '
+            'отправлять нечем'
         )
         logger.warning(reason)
         return DeliverySkipped(reason=reason)
@@ -96,8 +96,8 @@ def describe(result: DeliveryRun | DeliverySkipped, at: datetime) -> str:
     """
     moment = localtime(at)
     if isinstance(result, DeliverySkipped):
-        return f"доставка пропущена в {moment:%H:%M:%S}: {result.reason}"
+        return f'доставка пропущена в {moment:%H:%M:%S}: {result.reason}'
     return (
-        f"доставка в {moment:%H:%M:%S}: отправлено {result.sent}, "
-        f"слито {result.merged}, отложено {result.failed}, брошено {result.gave_up}"
+        f'доставка в {moment:%H:%M:%S}: отправлено {result.sent}, '
+        f'слито {result.merged}, отложено {result.failed}, брошено {result.gave_up}'
     )

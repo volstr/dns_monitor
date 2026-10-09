@@ -19,41 +19,41 @@ class AddressStatus(StrEnum):
     """Статус адреса. Вычисляется, не хранится (ТЗ 6.4)."""
 
     #: Актуален и совпал с записью белого списка.
-    MATCHED = "matched"
+    MATCHED = 'matched'
     #: Актуален и не совпал ни с одной записью.
-    UNMATCHED = "unmatched"
+    UNMATCHED = 'unmatched'
     #: Последнее обнаружение раньше границы `T - W`. Вопрос о совпадении не задаётся (6.4).
-    STALE = "stale"
+    STALE = 'stale'
     #: Белый список домена пуст — вхождение не с чем сравнивать, поэтому оно не вычисляется.
     #: Требование 8.2: такой домен «не пришлёт уведомление никогда», и логика там названа верной.
     #: Без этого значения пустой список означал бы «все адреса не совпали», то есть инцидент на
     #: каждом домене без списка. Идентификатор новый, введён 2026-09-23 вместе с решением Q-D25.
-    NOT_CHECKED = "not_checked"
+    NOT_CHECKED = 'not_checked'
 
 
 class DomainState(StrEnum):
     """Состояние домена — производная от статусов его адресов (ТЗ 6.4)."""
 
-    NORMAL = "normal"
-    DISCREPANCY = "discrepancy"
-    RESOLVE_ERROR = "resolve_error"
+    NORMAL = 'normal'
+    DISCREPANCY = 'discrepancy'
+    RESOLVE_ERROR = 'resolve_error'
 
 
 class CheckOutcome(StrEnum):
     """Исход одной проверки — цвет отметки в колонке «История» (ТЗ 11.5)."""
 
-    NORMAL = "normal"
-    ADDRESS_SET_CHANGED = "address_set_changed"
+    NORMAL = 'normal'
+    ADDRESS_SET_CHANGED = 'address_set_changed'
     #: Прежнее имя `UNRESOLVED` убрано по Q-13.8: одно слово стояло в двух перечислениях.
-    HAS_UNMATCHED = "has_unmatched"
+    HAS_UNMATCHED = 'has_unmatched'
     #: Проверка прошла, но ни один адрес не подтверждён белым списком (Q-D37). Причин
     #: несколько: список пуст, все адреса неактуальны, после фильтра IPv6 не осталось ничего.
     #: Не `NOT_CHECKED` — так называется статус адреса, а повторять одно слово в двух
     #: перечислениях в этом проекте уже признали ошибкой (Q-13.8).
-    NOT_CONFIRMED = "not_confirmed"
-    RESOLVE_ERROR = "resolve_error"
+    NOT_CONFIRMED = 'not_confirmed'
+    RESOLVE_ERROR = 'resolve_error'
     #: Q-D5: ни один сервер не ответил. В журнал событий не пишется, в колонке — пустая отметка.
-    NOT_PERFORMED = "not_performed"
+    NOT_PERFORMED = 'not_performed'
 
 
 @dataclass(frozen=True, slots=True)

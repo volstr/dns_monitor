@@ -18,14 +18,14 @@ MOMENT = datetime(2026, 9, 22, 14, 38, tzinfo=UTC)
 
 def make_member(**extra: object) -> Member:
     return Member.objects.create_member(
-        email="d.osipov@contoso.ru", name="Дмитрий Осипов", created_at=MOMENT, **extra
+        email='d.osipov@contoso.ru', name='Дмитрий Осипов', created_at=MOMENT, **extra
     )
 
 
 def invite(member: Member, *, opened_at: datetime | None = None, expires_in_days: int = 7) -> None:
     Invitation.objects.create(
         member=member,
-        token_hash=f"hash-{member.pk}-{expires_in_days}",
+        token_hash=f'hash-{member.pk}-{expires_in_days}',
         created_at=MOMENT,
         expires_at=MOMENT + timedelta(days=expires_in_days),
         opened_at=opened_at,

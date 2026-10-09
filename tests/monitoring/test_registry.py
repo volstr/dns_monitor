@@ -21,7 +21,7 @@ MOMENT = datetime(2026, 9, 22, 14, 38, tzinfo=UTC)
 
 @pytest.fixture
 def domain() -> Domain:
-    return Domain.objects.create(name="pay-gw.contoso.ru")
+    return Domain.objects.create(name='pay-gw.contoso.ru')
 
 
 def make_entry(domain: Domain, address: str) -> AddressRegistryEntry:
@@ -31,37 +31,37 @@ def make_entry(domain: Domain, address: str) -> AddressRegistryEntry:
 
 
 def test_4_4_entry_is_unique_per_domain_and_address(domain: Domain) -> None:
-    make_entry(domain, "10.20.1.14")
+    make_entry(domain, '10.20.1.14')
 
     with pytest.raises(IntegrityError), transaction.atomic():
-        make_entry(domain, "10.20.1.14")
+        make_entry(domain, '10.20.1.14')
 
 
 def test_4_4_same_address_belongs_to_different_domains_separately(domain: Domain) -> None:
-    other = Domain.objects.create(name="api.contoso.ru")
+    other = Domain.objects.create(name='api.contoso.ru')
 
-    make_entry(domain, "10.20.1.14")
-    make_entry(other, "10.20.1.14")
+    make_entry(domain, '10.20.1.14')
+    make_entry(other, '10.20.1.14')
 
     assert AddressRegistryEntry.objects.count() == 2
 
 
 def test_address_is_stored_as_ip_address(domain: Domain) -> None:
-    make_entry(domain, "2a02:6b8::1")
+    make_entry(domain, '2a02:6b8::1')
 
     entry = AddressRegistryEntry.objects.get()
 
-    assert entry.address == ipaddress.ip_address("2a02:6b8::1")
+    assert entry.address == ipaddress.ip_address('2a02:6b8::1')
 
 
 def test_13_2_miss_counter_starts_at_zero(domain: Domain) -> None:
-    entry = make_entry(domain, "185.44.9.201")
+    entry = make_entry(domain, '185.44.9.201')
 
     assert entry.consecutive_misses == 0
 
 
 def test_11_3_deleting_a_domain_deletes_its_registry(domain: Domain) -> None:
-    make_entry(domain, "10.20.1.14")
+    make_entry(domain, '10.20.1.14')
 
     domain.delete()
 
@@ -70,22 +70,22 @@ def test_11_3_deleting_a_domain_deletes_its_registry(domain: Domain) -> None:
 
 def test_e1_bucket_is_unique_per_size_and_start(domain: Domain) -> None:
     AddressObservationBucket.objects.create(
-        domain=domain, address="10.20.1.14", bucket_size=BucketSize.HOUR, bucket_start=MOMENT
+        domain=domain, address='10.20.1.14', bucket_size=BucketSize.HOUR, bucket_start=MOMENT
     )
 
     with pytest.raises(IntegrityError), transaction.atomic():
         AddressObservationBucket.objects.create(
-            domain=domain, address="10.20.1.14", bucket_size=BucketSize.HOUR, bucket_start=MOMENT
+            domain=domain, address='10.20.1.14', bucket_size=BucketSize.HOUR, bucket_start=MOMENT
         )
 
 
 def test_e1_hour_and_day_buckets_coexist(domain: Domain) -> None:
     # Часовые живут 30 суток, суточные бессрочно — это разные строки, а не конкуренция.
     AddressObservationBucket.objects.create(
-        domain=domain, address="10.20.1.14", bucket_size=BucketSize.HOUR, bucket_start=MOMENT
+        domain=domain, address='10.20.1.14', bucket_size=BucketSize.HOUR, bucket_start=MOMENT
     )
     AddressObservationBucket.objects.create(
-        domain=domain, address="10.20.1.14", bucket_size=BucketSize.DAY, bucket_start=MOMENT
+        domain=domain, address='10.20.1.14', bucket_size=BucketSize.DAY, bucket_start=MOMENT
     )
 
     assert AddressObservationBucket.objects.count() == 2

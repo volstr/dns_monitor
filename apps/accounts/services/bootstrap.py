@@ -40,17 +40,17 @@ def create_first_admin(
     if Member.objects.filter(role=Role.ADMIN, is_active=True).exists():
         return AdminNotCreated(
             reason=(
-                "В установке уже есть администратор. Новых участников заводят из интерфейса, "
-                "на вкладке «Участники»."
+                'В установке уже есть администратор. Новых участников заводят из интерфейса, '
+                'на вкладке «Участники».'
             )
         )
     if len(password) < MIN_PASSWORD_LENGTH:
         return AdminNotCreated(
-            reason=f"Пароль короче {MIN_PASSWORD_LENGTH} символов."
+            reason=f'Пароль короче {MIN_PASSWORD_LENGTH} символов.'
         )
     normalized = email.strip().lower()
     if Member.objects.filter(email=normalized).exists():
-        return AdminNotCreated(reason=f"Участник с почтой {normalized} уже есть.")
+        return AdminNotCreated(reason=f'Участник с почтой {normalized} уже есть.')
 
     member = Member.objects.create_member(
         email=normalized,

@@ -29,7 +29,7 @@ from apps.catalog.services.intervals import warnings_after_global_change
 MIN_PERIOD_SECONDS = 60
 
 #: Токен бота: число, двоеточие и длинный хвост. Тот же вид, что проверяет `config/env.py`.
-_BOT_TOKEN = re.compile(r"\d{6,}:[A-Za-z0-9_-]{30,}")
+_BOT_TOKEN = re.compile(r'\d{6,}:[A-Za-z0-9_-]{30,}')
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,23 +108,23 @@ def _reasons(values: SettingsInput) -> tuple[str, ...]:
     collected: list[str] = []
 
     if values.check_period_seconds < MIN_PERIOD_SECONDS:
-        collected.append("Период проверки не может быть меньше минуты (ТЗ 11.1).")
+        collected.append('Период проверки не может быть меньше минуты (ТЗ 11.1).')
     if values.freshness_threshold_seconds <= 0:
-        collected.append("Порог актуальности должен быть больше нуля.")
+        collected.append('Порог актуальности должен быть больше нуля.')
     if values.merge_window_seconds <= 0:
-        collected.append("Окно слияния должно быть больше нуля.")
+        collected.append('Окно слияния должно быть больше нуля.')
     if values.merge_threshold < 1:
-        collected.append("Порог слияния — не меньше одного события.")
+        collected.append('Порог слияния — не меньше одного события.')
     if values.resolve_failure_threshold < 1:
-        collected.append("Повторов при ошибке резолва — не меньше одного.")
+        collected.append('Повторов при ошибке резолва — не меньше одного.')
     if values.event_retention_seconds <= 0:
-        collected.append("Срок хранения журнала должен быть больше нуля.")
+        collected.append('Срок хранения журнала должен быть больше нуля.')
     if values.registry_retention_seconds is not None and values.registry_retention_seconds <= 0:
-        collected.append("Срок хранения реестра либо не задан, либо больше нуля.")
+        collected.append('Срок хранения реестра либо не задан, либо больше нуля.')
     if values.session_lifetime_seconds <= 0:
-        collected.append("Срок сессии должен быть больше нуля.")
+        collected.append('Срок сессии должен быть больше нуля.')
     if values.login_failure_threshold < 1:
-        collected.append("Порог блокировки входа — не меньше одной попытки.")
+        collected.append('Порог блокировки входа — не меньше одной попытки.')
 
     collected.extend(_chat_id_reasons(values.telegram_chat_id))
     collected.extend(_dns_reasons(values.dns_servers))
@@ -147,10 +147,10 @@ def _chat_id_reasons(chat_id: str) -> tuple[str, ...]:
     """
     if _BOT_TOKEN.fullmatch(chat_id.strip()):
         return (
-            "В поле «Идентификатор чата» похоже записан токен бота. Токен задаётся только "
-            "переменной окружения TELEGRAM_BOT_TOKEN (ТЗ 8.3) — здесь нужен идентификатор чата, "
-            "например -1001234567890. Если токен уже был сохранён, отзовите его в @BotFather: "
-            "поле уходит в базу и видно на этом экране.",
+            'В поле «Идентификатор чата» похоже записан токен бота. Токен задаётся только '
+            'переменной окружения TELEGRAM_BOT_TOKEN (ТЗ 8.3) — здесь нужен идентификатор чата, '
+            'например -1001234567890. Если токен уже был сохранён, отзовите его в @BotFather: '
+            'поле уходит в базу и видно на этом экране.',
         )
     return ()
 
@@ -167,7 +167,7 @@ def _dns_reasons(servers: tuple[str, ...]) -> tuple[str, ...]:
         try:
             ipaddress.ip_address(server)
         except ValueError:
-            return (f"«{server}» — не похоже на адрес DNS-сервера. Нужен IP-адрес.",)
+            return (f'«{server}» — не похоже на адрес DNS-сервера. Нужен IP-адрес.',)
     return ()
 
 
@@ -176,5 +176,5 @@ def _email_reasons(recipients: tuple[str, ...]) -> tuple[str, ...]:
         try:
             validate_email(recipient)
         except ValidationError:
-            return (f"«{recipient}» — не похоже на почтовый адрес.",)
+            return (f'«{recipient}» — не похоже на почтовый адрес.',)
     return ()

@@ -117,7 +117,7 @@ def suggested_line(address: str, *, as_network: bool) -> str:
     if not as_network:
         return str(parsed)
     prefix = SUGGESTED_IPV4_PREFIX if parsed.version == IPV4_VERSION else SUGGESTED_IPV6_PREFIX
-    return str(ipaddress.ip_network(f"{parsed}/{prefix}", strict=False))
+    return str(ipaddress.ip_network(f'{parsed}/{prefix}', strict=False))
 
 
 def with_suggestion(current: str, suggestion: str) -> str:
@@ -125,23 +125,23 @@ def with_suggestion(current: str, suggestion: str) -> str:
     lines = [line.strip() for line in current.splitlines() if line.strip()]
     if suggestion in lines:
         return current
-    return "\n".join([*lines, suggestion])
+    return '\n'.join([*lines, suggestion])
 
 
 def _parse_line(number: int, text: str) -> ParsedLine:
     if len(text) > MAX_ENTRY_LENGTH:
-        return _failed(number, text, "запись длиннее, чем может быть адрес с маской")
+        return _failed(number, text, 'запись длиннее, чем может быть адрес с маской')
 
-    address_text, _, prefix_text = text.partition("/")
+    address_text, _, prefix_text = text.partition('/')
     address, error = _parse_address(address_text)
     if address is None:
-        return _failed(number, text, error or "не похоже на адрес")
+        return _failed(number, text, error or 'не похоже на адрес')
 
     prefix, error = _parse_prefix(prefix_text, address)
     if error is not None:
         return _failed(number, text, error)
 
-    network = ipaddress.ip_network(f"{address}/{prefix}", strict=False)
+    network = ipaddress.ip_network(f'{address}/{prefix}', strict=False)
     # Ненулевая хостовая часть: Q-13.3 велит нормализовать и показать изменение.
     normalized_from = text if str(network) != text and prefix_text else None
     raw = str(network) if normalized_from else text
@@ -175,25 +175,25 @@ type ParsedAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 def _parse_address(text: str) -> tuple[ParsedAddress | None, str | None]:
     """Разбор адреса с человеческой причиной отказа (10.2)."""
     if not text:
-        return None, "адрес не указан"
-    if ":" in text:
+        return None, 'адрес не указан'
+    if ':' in text:
         try:
             return ipaddress.IPv6Address(text), None
         except ValueError:
-            return None, "не похоже на IPv6-адрес"
+            return None, 'не похоже на IPv6-адрес'
 
-    parts = text.split(".")
+    parts = text.split('.')
     if len(parts) != IPV4_OCTETS:
-        return None, f"в IPv4-адресе четыре октета, а здесь {len(parts)}"
+        return None, f'в IPv4-адресе четыре октета, а здесь {len(parts)}'
     for part in parts:
         if not part.isdigit():
-            return None, f"«{part}» — не число. Октет записывается цифрами"
+            return None, f'«{part}» — не число. Октет записывается цифрами'
         if int(part) > IPV4_MAX_OCTET:
-            return None, f"{part} — недопустимый октет. Значение каждого октета от 0 до 255"
+            return None, f'{part} — недопустимый октет. Значение каждого октета от 0 до 255'
     try:
         return ipaddress.IPv4Address(text), None
     except ValueError:
-        return None, "не похоже на IPv4-адрес"
+        return None, 'не похоже на IPv4-адрес'
 
 
 def _parse_prefix(text: str, address: ParsedAddress) -> tuple[int, str | None]:
@@ -202,10 +202,10 @@ def _parse_prefix(text: str, address: ParsedAddress) -> tuple[int, str | None]:
     if not text:
         return limit, None
     if not text.isdigit():
-        return 0, "длина маски записывается числом после косой черты"
+        return 0, 'длина маски записывается числом после косой черты'
     prefix = int(text)
     if prefix > limit:
-        return 0, f"длина маски у IPv{address.version} — от 0 до {limit}, а здесь {prefix}"
+        return 0, f'длина маски у IPv{address.version} — от 0 до {limit}, а здесь {prefix}'
     return prefix, None
 
 
@@ -229,13 +229,13 @@ def _warning_for(
 
     for other in earlier:
         if other.network == line.network:
-            return f"дубликат строки {other.number}"
+            return f'дубликат строки {other.number}'
 
     for other in earlier:
         if _covers(other.network, line.network):
             return (
-                f"{line.raw} уже входит в {other.raw} из строки {other.number} — "
-                f"запись, скорее всего, лишняя"
+                f'{line.raw} уже входит в {other.raw} из строки {other.number} — '
+                f'запись, скорее всего, лишняя'
             )
 
     return _family_warning(line, record_types)
@@ -255,7 +255,7 @@ def _family_warning(line: ParsedLine, record_types: tuple[str, ...]) -> str | No
     needed = RecordType.AAAA if line.network.version == 6 else RecordType.A
     if needed.value in record_types:
         return None
-    return f"тип записи {needed.value} у домена выключен — эта запись никогда не совпадёт"
+    return f'тип записи {needed.value} у домена выключен — эта запись никогда не совпадёт'
 
 
 def _with_warning(line: ParsedLine, warning: str) -> ParsedLine:

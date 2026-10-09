@@ -21,24 +21,24 @@ MOMENT = datetime(2026, 9, 24, 14, 38, tzinfo=UTC)
 
 def make_member(email: str, role: str = Role.OBSERVER, **extra: object) -> Member:
     return Member.objects.create_member(
-        email=email, name="Участник", created_at=MOMENT, role=role, **extra
+        email=email, name='Участник', created_at=MOMENT, role=role, **extra
     )
 
 
 class MemberScreen(MemberView):
     def get(self, request: HttpRequest) -> HttpResponse:
         del request
-        return HttpResponse("экран")
+        return HttpResponse('экран')
 
 
 class AdminScreen(AdminView):
     def get(self, request: HttpRequest) -> HttpResponse:
         del request
-        return HttpResponse("экран")
+        return HttpResponse('экран')
 
 
 def request_from(member: Member | None) -> HttpRequest:
-    request = RequestFactory().get("/domains/")
+    request = RequestFactory().get('/domains/')
     request.user = member if member is not None else AnonymousUser()  # type: ignore[assignment]
     return request
 
@@ -58,12 +58,12 @@ def test_3_anonymous_visitor_is_sent_to_the_login_screen() -> None:
     response = MemberScreen.as_view()(request_from(None))
 
     assert response.status_code == 302
-    assert response["Location"].startswith("/login/")
-    assert "next=" in response["Location"]
+    assert response['Location'].startswith('/login/')
+    assert 'next=' in response['Location']
 
 
 def test_3_observer_reads_domains() -> None:
-    observer = make_member("watch@contoso.ru")
+    observer = make_member('watch@contoso.ru')
 
     response = MemberScreen.as_view()(request_from(observer))
 
@@ -77,14 +77,14 @@ def test_3_observer_has_no_access_to_the_members_screen() -> None:
     Здесь именно отказ, а не вход: наблюдатель уже вошёл, и предлагать ему войти снова значило
     бы соврать о причине.
     """
-    observer = make_member("watch@contoso.ru")
+    observer = make_member('watch@contoso.ru')
 
     with pytest.raises(PermissionDenied):
         AdminScreen.as_view()(request_from(observer))
 
 
 def test_3_administrator_has_access_to_the_members_screen() -> None:
-    admin = make_member("boss@contoso.ru", role=Role.ADMIN)
+    admin = make_member('boss@contoso.ru', role=Role.ADMIN)
 
     assert AdminScreen.as_view()(request_from(admin)).status_code == 200
 
@@ -99,22 +99,22 @@ def test_3_anonymous_visitor_on_an_admin_screen_is_also_sent_to_login() -> None:
     response = AdminScreen.as_view()(request_from(None))
 
     assert response.status_code == 302
-    assert response["Location"].startswith("/login/")
+    assert response['Location'].startswith('/login/')
 
 
 def test_3_1_navigation_hides_the_members_item_from_an_observer() -> None:
-    observer = make_member("watch@contoso.ru")
-    admin = make_member("boss@contoso.ru", role=Role.ADMIN)
+    observer = make_member('watch@contoso.ru')
+    admin = make_member('boss@contoso.ru', role=Role.ADMIN)
 
-    assert navigation(request_from(observer))["is_admin"] is False
-    assert navigation(request_from(admin))["is_admin"] is True
+    assert navigation(request_from(observer))['is_admin'] is False
+    assert navigation(request_from(admin))['is_admin'] is True
 
 
 def test_nav_counts_are_prepared_for_a_member() -> None:
     """Числа у пунктов меню — часть макета (Q-E5), считаются здесь же."""
-    admin = make_member("boss@contoso.ru", role=Role.ADMIN)
+    admin = make_member('boss@contoso.ru', role=Role.ADMIN)
 
-    counts = navigation(request_from(admin))["counts"]
+    counts = navigation(request_from(admin))['counts']
 
     assert counts is not None
     assert counts.members == 1  # type: ignore[union-attr]
@@ -126,7 +126,7 @@ def test_navigation_survives_a_request_without_a_user() -> None:
 
     Счётчики там не считаются: меню на экране входа нет, и лишние запросы ни к чему.
     """
-    context = navigation(RequestFactory().get("/domains/"))
+    context = navigation(RequestFactory().get('/domains/'))
 
-    assert context["is_admin"] is False
-    assert context["counts"] is None
+    assert context['is_admin'] is False
+    assert context['counts'] is None

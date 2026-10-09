@@ -35,13 +35,13 @@ logger = logging.getLogger(__name__)
 class HistoryMark(StrEnum):
     """Класс отметки. Значения — классы из CSS прототипа, `.tape i` без класса — пустая."""
 
-    NONE = ""
-    OK = "e-ok"
-    CHANGE = "e-change"
-    BREACH = "e-breach"
+    NONE = ''
+    OK = 'e-ok'
+    CHANGE = 'e-change'
+    BREACH = 'e-breach'
     #: Q-D37: проверка прошла, но ни один адрес не подтверждён белым списком.
-    NOT_CONFIRMED = "e-unconfirmed"
-    FAIL = "e-fail"
+    NOT_CONFIRMED = 'e-unconfirmed'
+    FAIL = 'e-fail'
 
 
 #: Исход проверки → цвет отметки. `NOT_PERFORMED` даёт пустую: проверки не было (Q-D5).
@@ -78,19 +78,19 @@ def history_of_domains(domain_ids: Sequence[int]) -> dict[int, DomainHistory]:
         .annotate(
             position=Window(
                 RowNumber(),
-                partition_by=F("domain_id"),
-                order_by=F("checked_at").desc(),
+                partition_by=F('domain_id'),
+                order_by=F('checked_at').desc(),
             )
         )
         .filter(position__lte=HISTORY_LENGTH)
-        .values("domain_id", "checked_at", "outcome")
-        .order_by("domain_id", "checked_at")
+        .values('domain_id', 'checked_at', 'outcome')
+        .order_by('domain_id', 'checked_at')
     )
 
     collected: dict[int, list[tuple[datetime, HistoryMark]]] = {}
     for row in numbered:
-        collected.setdefault(row["domain_id"], []).append(
-            (row["checked_at"], _mark(row["outcome"]))
+        collected.setdefault(row['domain_id'], []).append(
+            (row['checked_at'], _mark(row['outcome']))
         )
 
     return {
@@ -113,7 +113,7 @@ def _mark(outcome: str) -> HistoryMark:
     try:
         return MARK_OF_OUTCOME[CheckOutcome(outcome)]
     except ValueError:
-        logger.warning("неизвестный исход проверки", extra={"outcome": outcome})
+        logger.warning('неизвестный исход проверки', extra={'outcome': outcome})
         return HistoryMark.NONE
 
 

@@ -38,11 +38,11 @@ else:
 class CidrField(_CidrBase):
     """Подсеть или отдельный адрес с полной маской. Колонка ``cidr``."""
 
-    description = "Подсеть в нотации CIDR (ТЗ 10.2)"
+    description = 'Подсеть в нотации CIDR (ТЗ 10.2)'
     empty_strings_allowed = False
 
     def db_type(self, connection: Any) -> str:
-        return "cidr"
+        return 'cidr'
 
     def from_db_value(
         self, value: Any, expression: Any = None, connection: Any = None
@@ -56,7 +56,7 @@ class CidrField(_CidrBase):
             # strict=True: 10.20.1.5/24 отвергается, как и самим типом cidr.
             return ipaddress.ip_network(str(value), strict=True)
         except ValueError as error:
-            raise ValidationError(str(error), code="invalid") from error
+            raise ValidationError(str(error), code='invalid') from error
 
     def get_prep_value(self, value: Any) -> str | None:
         if value is None:
@@ -71,11 +71,11 @@ class CidrField(_CidrBase):
 class InetField(_InetBase):
     """Отдельный IP-адрес. Колонка ``inet``."""
 
-    description = "IP-адрес (ТЗ 4.0)"
+    description = 'IP-адрес (ТЗ 4.0)'
     empty_strings_allowed = False
 
     def db_type(self, connection: Any) -> str:
-        return "inet"
+        return 'inet'
 
     def from_db_value(
         self, value: Any, expression: Any = None, connection: Any = None
@@ -88,9 +88,9 @@ class InetField(_InetBase):
         if isinstance(value, ipaddress.IPv4Interface | ipaddress.IPv6Interface):
             return value.ip
         try:
-            return ipaddress.ip_address(str(value).split("/")[0])
+            return ipaddress.ip_address(str(value).split('/')[0])
         except ValueError as error:
-            raise ValidationError(str(error), code="invalid") from error
+            raise ValidationError(str(error), code='invalid') from error
 
     def get_prep_value(self, value: Any) -> str | None:
         address = self.to_python(value)
@@ -106,9 +106,9 @@ class NetContainsOrEquals(_LookupBase):
     требование 6.3 «в пределах одного семейства» выполняется самим оператором.
     """
 
-    lookup_name = "net_contains_or_equals"
+    lookup_name = 'net_contains_or_equals'
 
     def as_sql(self, compiler: Any, connection: Any) -> tuple[str, list[Any]]:
         lhs, lhs_params = self.process_lhs(compiler, connection)
         rhs, rhs_params = self.process_rhs(compiler, connection)
-        return f"{lhs} >>= {rhs}", list(lhs_params) + list(rhs_params)
+        return f'{lhs} >>= {rhs}', list(lhs_params) + list(rhs_params)

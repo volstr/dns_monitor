@@ -29,19 +29,19 @@ START = datetime(2026, 9, 23, 0, 0, tzinfo=UTC)
 STEP = timedelta(minutes=5)
 TICKS_PER_DAY = 288  # сутки при шаге в пять минут
 
-FAST = "pay-gw.contoso.ru"
-SLOW = "cdn.contoso.ru"
-ADDRESS = "10.20.1.14"
+FAST = 'pay-gw.contoso.ru'
+SLOW = 'cdn.contoso.ru'
+ADDRESS = '10.20.1.14'
 
 
 @pytest.fixture
 def domains() -> tuple[Domain, Domain]:
     """Два домена: один с общим периодом (5 минут), другой с групповым (15 минут)."""
-    slow_group = Group.objects.create(name="Внешние подрядчики", check_period_seconds=15 * 60)
+    slow_group = Group.objects.create(name='Внешние подрядчики', check_period_seconds=15 * 60)
     fast = Domain.objects.create(name=FAST, next_check_at=START)
     slow = Domain.objects.create(name=SLOW, group=slow_group, next_check_at=START)
     for domain in (fast, slow):
-        AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+        AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
     return fast, slow
 
 

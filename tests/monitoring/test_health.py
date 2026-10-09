@@ -16,7 +16,7 @@ from core.adapters.fake_state_store import FakeStateStore
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-NAME = "pay-gw.contoso.ru"
+NAME = 'pay-gw.contoso.ru'
 
 
 @pytest.fixture
@@ -48,11 +48,11 @@ def test_11_13_unavailable_redis_names_the_failed_component(clock: FakeClock) ->
 
 
 def test_known_components_are_named_explicitly() -> None:
-    assert (REDIS, DATABASE) == ("redis", "postgresql")
+    assert (REDIS, DATABASE) == ('redis', 'postgresql')
 
 
 def test_64_checks_stop_while_the_infrastructure_is_down(clock: FakeClock) -> None:
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["127.0.0.1"])
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['127.0.0.1'])
     Domain.objects.create(name=NAME, next_check_at=MOMENT)
     store = FakeStateStore(clock, available=False)
 
@@ -90,7 +90,7 @@ def test_11_13_journal_is_not_flooded_every_tick(clock: FakeClock) -> None:
 
 
 def test_recovered_infrastructure_resumes_checks(clock: FakeClock) -> None:
-    GlobalSettings.objects.filter(pk=1).update(dns_servers=["127.0.0.1"])
+    GlobalSettings.objects.filter(pk=1).update(dns_servers=['127.0.0.1'])
     Domain.objects.create(name=NAME, next_check_at=MOMENT)
     store = FakeStateStore(clock, available=False)
     run_one_tick(clock=clock, state_store=store)

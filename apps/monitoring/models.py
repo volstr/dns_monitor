@@ -16,26 +16,26 @@ ERROR_MAX_LENGTH = 500
 
 # Перечисление живёт в core: исход проверки знает и доменный код, и модель.
 CHECK_OUTCOME_CHOICES = [
-    (CheckOutcome.NORMAL.value, "Норма"),
-    (CheckOutcome.ADDRESS_SET_CHANGED.value, "Набор адресов изменился"),
-    (CheckOutcome.HAS_UNMATCHED.value, "Есть несовпавший адрес"),
-    (CheckOutcome.NOT_CONFIRMED.value, "Совпадений нет"),
-    (CheckOutcome.RESOLVE_ERROR.value, "Ошибка резолва"),
-    (CheckOutcome.NOT_PERFORMED.value, "Не состоялась"),
+    (CheckOutcome.NORMAL.value, 'Норма'),
+    (CheckOutcome.ADDRESS_SET_CHANGED.value, 'Набор адресов изменился'),
+    (CheckOutcome.HAS_UNMATCHED.value, 'Есть несовпавший адрес'),
+    (CheckOutcome.NOT_CONFIRMED.value, 'Совпадений нет'),
+    (CheckOutcome.RESOLVE_ERROR.value, 'Ошибка резолва'),
+    (CheckOutcome.NOT_PERFORMED.value, 'Не состоялась'),
 ]
 
 
 class BucketSize(models.TextChoices):
     """Размер корзины следа — термин из ключа ``cache:trace:*`` (ТЗ 11.12), Q-E1."""
 
-    HOUR = "hour", "Час"
-    DAY = "day", "Сутки"
+    HOUR = 'hour', 'Час'
+    DAY = 'day', 'Сутки'
 
 
 class AddressRegistryEntry(models.Model):
     """Запись реестра адресов — ТЗ 4.4. Уникальна по паре «домен + адрес»."""
 
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="address_registry")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='address_registry')
     address = InetField()
     first_seen_at = models.DateTimeField()
     last_seen_at = models.DateTimeField()
@@ -47,16 +47,16 @@ class AddressRegistryEntry(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["domain", "address"], name="address_registry_entry_unique"
+                fields=['domain', 'address'], name='address_registry_entry_unique'
             ),
         ]
         indexes = [
             # Актуальный набор — это выборка по домену и границе last_seen_at (ТЗ 6.2).
-            models.Index(fields=["domain", "last_seen_at"], name="registry_domain_last_seen"),
+            models.Index(fields=['domain', 'last_seen_at'], name='registry_domain_last_seen'),
         ]
 
     def __str__(self) -> str:
-        return f"{self.domain.name} → {self.address}"
+        return f'{self.domain.name} → {self.address}'
 
 
 class AddressObservationBucket(models.Model):
@@ -70,7 +70,7 @@ class AddressObservationBucket(models.Model):
     """
 
     domain = models.ForeignKey(
-        Domain, on_delete=models.CASCADE, related_name="observation_buckets"
+        Domain, on_delete=models.CASCADE, related_name='observation_buckets'
     )
     address = InetField()
     bucket_size = models.CharField(max_length=BUCKET_SIZE_MAX_LENGTH, choices=BucketSize.choices)
@@ -79,25 +79,25 @@ class AddressObservationBucket(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["domain", "address", "bucket_size", "bucket_start"],
-                name="observation_bucket_unique",
+                fields=['domain', 'address', 'bucket_size', 'bucket_start'],
+                name='observation_bucket_unique',
             ),
         ]
         indexes = [
             models.Index(
-                fields=["domain", "bucket_size", "bucket_start"],
-                name="bucket_domain_size_start",
+                fields=['domain', 'bucket_size', 'bucket_start'],
+                name='bucket_domain_size_start',
             ),
         ]
 
     def __str__(self) -> str:
-        return f"{self.address} · {self.bucket_size} · {self.bucket_start:%Y-%m-%d %H}"
+        return f'{self.address} · {self.bucket_size} · {self.bucket_start:%Y-%m-%d %H}'
 
 
 class Incident(models.Model):
     """Период, в течение которого у домена есть хотя бы один нерешённый адрес — ТЗ 4.6."""
 
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="incidents")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='incidents')
     opened_at = models.DateTimeField()
     closed_at = models.DateTimeField(null=True, blank=True, default=None)
     # Поля `channel_message_id` здесь больше нет. Оно хранило идентификатор открывающего
@@ -114,18 +114,18 @@ class Incident(models.Model):
         constraints = [
             # У домена не может быть двух открытых инцидентов одновременно (ТЗ 7.3).
             models.UniqueConstraint(
-                fields=["domain"],
+                fields=['domain'],
                 condition=models.Q(closed_at__isnull=True),
-                name="incident_single_open_per_domain",
+                name='incident_single_open_per_domain',
             ),
         ]
         indexes = [
             # Блок «Открытые расхождения» сортирует по возрасту (ТЗ 11.9).
-            models.Index(fields=["opened_at"], name="incident_opened_at"),
+            models.Index(fields=['opened_at'], name='incident_opened_at'),
         ]
 
     def __str__(self) -> str:
-        return f"{self.domain.name} с {self.opened_at:%Y-%m-%d %H:%M}"
+        return f'{self.domain.name} с {self.opened_at:%Y-%m-%d %H:%M}'
 
 
 class Check(models.Model):
@@ -142,22 +142,22 @@ class Check(models.Model):
     Поля ``check`` у модели нет намеренно: у Django есть служебный классовый метод с этим именем.
     """
 
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="checks")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='checks')
     checked_at = models.DateTimeField()
     outcome = models.CharField(max_length=ENUM_MAX_LENGTH, choices=CHECK_OUTCOME_CHOICES)
     #: Сервер, который ответил. Пусто у несостоявшейся проверки.
-    answered_by = models.CharField(max_length=SERVER_MAX_LENGTH, blank=True, default="")
+    answered_by = models.CharField(max_length=SERVER_MAX_LENGTH, blank=True, default='')
     #: Почему проверка не состоялась (Q-D5). Уходит и в структурный лог.
-    error = models.CharField(max_length=ERROR_MAX_LENGTH, blank=True, default="")
+    error = models.CharField(max_length=ERROR_MAX_LENGTH, blank=True, default='')
 
     class Meta:
         indexes = [
             # Колонка «История» берёт ровно 20 последних проверок домена (11.5).
-            models.Index(fields=["domain", "-checked_at"], name="check_domain_checked_at"),
+            models.Index(fields=['domain', '-checked_at'], name='check_domain_checked_at'),
         ]
 
     def __str__(self) -> str:
-        return f"{self.domain.name} · {self.checked_at:%Y-%m-%d %H:%M} · {self.outcome}"
+        return f'{self.domain.name} · {self.checked_at:%Y-%m-%d %H:%M} · {self.outcome}'
 
 
 class EventType(models.TextChoices):
@@ -168,15 +168,15 @@ class EventType(models.TextChoices):
     журнале, фильтрах и заголовках сообщений: одно событие называется одним словом.
     """
 
-    ADDRESS_APPEARED = "address_appeared", "Появился адрес"
-    ADDRESS_GONE = "address_gone", "Адрес пропал"
+    ADDRESS_APPEARED = 'address_appeared', 'Появился адрес'
+    ADDRESS_GONE = 'address_gone', 'Адрес пропал'
     #: Не «Адрес не решён»: «решён» по Q-13.8 — это статус адреса, а событие говорит,
     #: что случилось. «Вне разрешённых» — слова режима 8.1, то есть термин ТЗ.
-    NOT_ALLOWED = "not_allowed", "Адрес вне разрешённых"
-    BACK_TO_NORMAL = "back_to_normal", "Возврат в норму"
-    RESOLVE_FAILED = "resolve_failed", "Домен не резолвится"
-    RESOLVE_RECOVERED = "resolve_recovered", "Домен снова резолвится"
-    WATCH_STARTED = "watch_started", "Наблюдение начато"
+    NOT_ALLOWED = 'not_allowed', 'Адрес вне разрешённых'
+    BACK_TO_NORMAL = 'back_to_normal', 'Возврат в норму'
+    RESOLVE_FAILED = 'resolve_failed', 'Домен не резолвится'
+    RESOLVE_RECOVERED = 'resolve_recovered', 'Домен снова резолвится'
+    WATCH_STARTED = 'watch_started', 'Наблюдение начато'
 
 
 class Event(models.Model):
@@ -191,22 +191,22 @@ class Event(models.Model):
     Анна Кирилова», а у событий, порождённых проверкой, автора нет вовсе.
     """
 
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name="events")
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='events')
     event_type = models.CharField(max_length=ENUM_MAX_LENGTH, choices=EventType.choices)
     occurred_at = models.DateTimeField()
     # core.types.events.EventPayload — какие адреса затронуты (4.5).
     payload = models.JSONField(default=dict, blank=True)
     incident = models.ForeignKey(
-        Incident, on_delete=models.SET_NULL, null=True, blank=True, related_name="events"
+        Incident, on_delete=models.SET_NULL, null=True, blank=True, related_name='events'
     )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="events_authored",
+        related_name='events_authored',
     )
-    author_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default="")
+    author_name = models.CharField(max_length=NAME_MAX_LENGTH, blank=True, default='')
 
     # 4.5: «Ссылка на связанное уведомление, если оно отправлялось». Связь **многие ко многим**,
     # и обе стороны нужны по-настоящему:
@@ -221,17 +221,17 @@ class Event(models.Model):
     # Пусто — уведомлений не было: режим «Не уведомлять», базовая проверка (7.4) или событие,
     # которое по 8.1 уведомления не порождает.
     notifications = models.ManyToManyField(
-        "notifications.Notification",
+        'notifications.Notification',
         blank=True,
-        related_name="events",
+        related_name='events',
     )
 
     class Meta:
         indexes = [
-            models.Index(fields=["domain", "occurred_at"], name="event_domain_occurred"),
+            models.Index(fields=['domain', 'occurred_at'], name='event_domain_occurred'),
             # Журнал и выгрузка сортируются по времени с фильтром по типу (ТЗ 11.7).
-            models.Index(fields=["occurred_at"], name="event_occurred_at"),
+            models.Index(fields=['occurred_at'], name='event_occurred_at'),
         ]
 
     def __str__(self) -> str:
-        return f"{self.get_event_type_display()} · {self.domain.name}"
+        return f'{self.get_event_type_display()} · {self.domain.name}'

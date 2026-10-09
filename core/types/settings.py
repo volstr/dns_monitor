@@ -15,9 +15,9 @@ from enum import StrEnum
 class SettingOrigin(StrEnum):
     """Откуда взялось разрешённое значение (ТЗ 5)."""
 
-    GLOBAL = "global"
-    GROUP = "group"
-    OWN = "own"
+    GLOBAL = 'global'
+    GROUP = 'group'
+    OWN = 'own'
 
 
 @dataclass(frozen=True, slots=True)

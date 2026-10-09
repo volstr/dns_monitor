@@ -26,14 +26,14 @@ pytestmark = pytest.mark.django_db
 
 START = datetime(2026, 9, 22, 12, 0, tzinfo=UTC)
 PERIOD = timedelta(minutes=5)
-NAME = "pay-gw.contoso.ru"
-OUTSIDER = "185.44.9.201"
+NAME = 'pay-gw.contoso.ru'
+OUTSIDER = '185.44.9.201'
 
 
 @pytest.fixture
 def domain() -> Domain:
     domain = Domain.objects.create(name=NAME)
-    AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+    AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
     return domain
 
 
@@ -58,7 +58,7 @@ def _threshold_of_one_day() -> None:
 
 
 def test_7_4_first_check_is_baseline_and_silent(domain: Domain) -> None:
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", "10.20.2.60")]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', '10.20.2.60')]})
 
     report = run_check(domain_id=domain.pk, at=START, resolver=resolver)
 
@@ -71,7 +71,7 @@ def test_7_4_first_check_is_baseline_and_silent(domain: Domain) -> None:
 def test_1_steady_matched_domain_produces_no_events(domain: Domain) -> None:
     # Критерий 1: три адреса, все входят в подсеть списка → статусы «Совпал», событий нет.
     # Базовая проверка порождает ровно одно WATCH_STARTED (7.4), дальше — тишина.
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", "10.20.2.60", "10.20.2.61")]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', '10.20.2.60', '10.20.2.61')]})
     run_check(domain_id=domain.pk, at=START, resolver=resolver)
     assert Event.objects.filter(domain=domain).count() == 1
 
@@ -90,7 +90,7 @@ def test_1_steady_matched_domain_produces_no_events(domain: Domain) -> None:
 
 def test_2_address_outside_the_list_opens_an_incident(domain: Domain) -> None:
     # 7.4: вхождение в список — критерий абсолютный, на базовой проверке он не глушится.
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', OUTSIDER)]})
 
     report = run_check(domain_id=domain.pk, at=START, resolver=resolver)
 
@@ -102,8 +102,8 @@ def test_2_address_outside_the_list_opens_an_incident(domain: Domain) -> None:
 def test_16_domain_without_an_allowlist_never_raises_an_incident() -> None:
     # Критерий 16 и 8.2: при пустом списке уведомлений нет никогда. Значит и инцидента нет —
     # иначе на обзоре висело бы открытое расхождение на каждом домене без списка (Q-D25).
-    bare = Domain.objects.create(name="cdn.contoso.ru")
-    resolver = FakeResolver({"cdn.contoso.ru": [answered("185.44.9.201", "10.20.1.14")]})
+    bare = Domain.objects.create(name='cdn.contoso.ru')
+    resolver = FakeResolver({'cdn.contoso.ru': [answered('185.44.9.201', '10.20.1.14')]})
 
     at = START
     for _ in range(3):
@@ -115,7 +115,7 @@ def test_16_domain_without_an_allowlist_never_raises_an_incident() -> None:
 
 
 def test_3_the_same_unmatched_address_does_not_repeat_the_event(domain: Domain) -> None:
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', OUTSIDER)]})
     check(domain, resolver, START)
 
     at = START
@@ -128,10 +128,10 @@ def test_3_the_same_unmatched_address_does_not_repeat_the_event(domain: Domain) 
 
 
 def test_7_3_second_unmatched_address_reports_without_a_second_incident(domain: Domain) -> None:
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', OUTSIDER)]})
     check(domain, resolver, START)
 
-    resolver.set(NAME, [answered("10.20.1.14", OUTSIDER, "185.44.9.202")])
+    resolver.set(NAME, [answered('10.20.1.14', OUTSIDER, '185.44.9.202')])
     check(domain, resolver, START + PERIOD)
 
     assert events(domain, EventType.NOT_ALLOWED) == 2
@@ -146,9 +146,9 @@ def test_13_2_incident_holds_while_the_address_is_still_current(domain: Domain) 
     чередующем адреса, это давало ложное «Снова в норме» при семи нерешённых адресах на
     экране. Пересмотр Q-13.2 от 2026-09-28.
     """
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', OUTSIDER)]})
     check(domain, resolver, START)
-    resolver.set(NAME, [answered("10.20.1.14")])
+    resolver.set(NAME, [answered('10.20.1.14')])
 
     at = START
     for _ in range(5):
@@ -161,9 +161,9 @@ def test_13_2_incident_holds_while_the_address_is_still_current(domain: Domain) 
 
 def test_13_2_incident_closes_when_the_address_leaves_the_current_set(domain: Domain) -> None:
     """Закрытие идёт по тому же порогу актуальности, что и статусы на экране (6.4, 7.3)."""
-    resolver = FakeResolver({NAME: [answered("10.20.1.14", OUTSIDER)]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14', OUTSIDER)]})
     check(domain, resolver, START)
-    resolver.set(NAME, [answered("10.20.1.14")])
+    resolver.set(NAME, [answered('10.20.1.14')])
 
     # Порог прибит фикстурой к суткам: тест про закрытие инцидента, а не про умолчание.
     at = START + timedelta(hours=24, minutes=5)
@@ -204,36 +204,36 @@ def test_7_1_resolve_recovered_after_failures(domain: Domain) -> None:
         check(domain, resolver, at)
         at += PERIOD
 
-    resolver.set(NAME, [answered("10.20.1.14")])
+    resolver.set(NAME, [answered('10.20.1.14')])
     check(domain, resolver, at)
 
     assert events(domain, EventType.RESOLVE_RECOVERED) == 1
 
 
 def test_d5_unavailable_check_changes_nothing(domain: Domain) -> None:
-    resolver = FakeResolver({NAME: [answered("10.20.1.14")]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14')]})
     check(domain, resolver, START)
-    resolver.set(NAME, [unavailable("все серверы молчат")])
+    resolver.set(NAME, [unavailable('все серверы молчат')])
 
     report = run_check(domain_id=domain.pk, at=START + PERIOD, resolver=resolver)
 
     assert report.outcome is CheckOutcome.NOT_PERFORMED
     assert Event.objects.filter(domain=domain, occurred_at=START + PERIOD).count() == 0
-    last = Check.objects.filter(domain=domain).order_by("-checked_at").first()
+    last = Check.objects.filter(domain=domain).order_by('-checked_at').first()
     assert last is not None
     assert last.outcome == CheckOutcome.NOT_PERFORMED
-    assert last.error == "все серверы молчат"
+    assert last.error == 'все серверы молчат'
 
 
 def test_d12_cname_target_is_written_only_with_the_flag() -> None:
     with_flag = Domain.objects.create(
-        name="cdn.contoso.ru", record_types=[RecordType.A.value, RecordType.CNAME.value]
+        name='cdn.contoso.ru', record_types=[RecordType.A.value, RecordType.CNAME.value]
     )
-    without_flag = Domain.objects.create(name="api.contoso.ru")
+    without_flag = Domain.objects.create(name='api.contoso.ru')
     resolver = FakeResolver(
         {
-            "cdn.contoso.ru": [answered("10.20.1.14", canonical_name="edge.cdn.example")],
-            "api.contoso.ru": [answered("10.20.1.14", canonical_name="edge.cdn.example")],
+            'cdn.contoso.ru': [answered('10.20.1.14', canonical_name='edge.cdn.example')],
+            'api.contoso.ru': [answered('10.20.1.14', canonical_name='edge.cdn.example')],
         }
     )
 
@@ -242,8 +242,8 @@ def test_d12_cname_target_is_written_only_with_the_flag() -> None:
 
     with_flag.refresh_from_db()
     without_flag.refresh_from_db()
-    assert with_flag.cname_target == "edge.cdn.example"
-    assert without_flag.cname_target == ""
+    assert with_flag.cname_target == 'edge.cdn.example'
+    assert without_flag.cname_target == ''
 
 
 # ─────────────── исход проверки домена без белого списка — Q-D37 ───────────────
@@ -256,13 +256,13 @@ def test_d37_a_domain_without_an_allowlist_is_not_a_normal_check() -> None:
     Без этой ступени каждая проверка такого домена объявлялась бы нормой, а в колонке «История»
     красилась бы зелёным — то есть экран утверждал бы, что всё проверено и в порядке.
     """
-    bare = Domain.objects.create(name="github.com")
-    resolver = FakeResolver({"github.com": [answered("140.82.121.3")]})
+    bare = Domain.objects.create(name='github.com')
+    resolver = FakeResolver({'github.com': [answered('140.82.121.3')]})
 
     run_check(domain_id=bare.pk, at=START, resolver=resolver)
     run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
 
-    assert Check.objects.filter(domain=bare).latest("checked_at").outcome == (
+    assert Check.objects.filter(domain=bare).latest('checked_at').outcome == (
         CheckOutcome.NOT_CONFIRMED
     )
 
@@ -273,28 +273,28 @@ def test_d37_the_same_domain_becomes_normal_once_the_list_is_set() -> None:
 
     Так видно момент, с которого домен действительно начали проверять.
     """
-    bare = Domain.objects.create(name="github.com")
-    resolver = FakeResolver({"github.com": [answered("140.82.121.3")]})
+    bare = Domain.objects.create(name='github.com')
+    resolver = FakeResolver({'github.com': [answered('140.82.121.3')]})
     run_check(domain_id=bare.pk, at=START, resolver=resolver)
     run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
 
-    AllowlistEntry.objects.create(domain=bare, entry="140.82.121.0/24", raw="140.82.121.0/24")
+    AllowlistEntry.objects.create(domain=bare, entry='140.82.121.0/24', raw='140.82.121.0/24')
     run_check(domain_id=bare.pk, at=START + 2 * PERIOD, resolver=resolver)
 
     outcomes = list(
-        Check.objects.filter(domain=bare).order_by("checked_at").values_list("outcome", flat=True)
+        Check.objects.filter(domain=bare).order_by('checked_at').values_list('outcome', flat=True)
     )
     assert outcomes[-2:] == [CheckOutcome.NOT_CONFIRMED, CheckOutcome.NORMAL]
 
 
 def test_d37_a_domain_with_a_matching_list_stays_normal(domain: Domain) -> None:
     """Обратная сторона: там, где сравнение было и сошлось, норма остаётся нормой."""
-    resolver = FakeResolver({NAME: [answered("10.20.1.14")]})
+    resolver = FakeResolver({NAME: [answered('10.20.1.14')]})
     run_check(domain_id=domain.pk, at=START, resolver=resolver)
 
     run_check(domain_id=domain.pk, at=START + PERIOD, resolver=resolver)
 
-    assert Check.objects.filter(domain=domain).latest("checked_at").outcome == CheckOutcome.NORMAL
+    assert Check.objects.filter(domain=domain).latest('checked_at').outcome == CheckOutcome.NORMAL
 
 
 def test_d37_a_stale_address_does_not_bring_the_green_back() -> None:
@@ -305,19 +305,19 @@ def test_d37_a_stale_address_does_not_bring_the_green_back() -> None:
     ложным, и лента снова зеленела. Правило записано через наличие совпадения, а не через
     отсутствие списка, и от этого свободно.
     """
-    bare = Domain.objects.create(name="github.com")
+    bare = Domain.objects.create(name='github.com')
     AddressRegistryEntry.objects.create(
         domain=bare,
-        address="140.82.121.99",
+        address='140.82.121.99',
         first_seen_at=START - timedelta(days=30),
         last_seen_at=START - timedelta(days=30),
     )
-    resolver = FakeResolver({"github.com": [answered("140.82.121.3")]})
+    resolver = FakeResolver({'github.com': [answered('140.82.121.3')]})
     run_check(domain_id=bare.pk, at=START, resolver=resolver)
 
     run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
 
-    latest = Check.objects.filter(domain=bare).latest("checked_at")
+    latest = Check.objects.filter(domain=bare).latest('checked_at')
     assert latest.outcome == CheckOutcome.NOT_CONFIRMED
 
 
@@ -329,29 +329,29 @@ def test_d37_nothing_matched_is_not_normal_even_with_a_list() -> None:
     подтверждать нечего. Зелёная отметка утверждала бы обратное.
     """
     GlobalSettings.objects.filter(pk=1).update(check_ipv6=False)
-    ipv6_only = Domain.objects.create(name="ipv6.contoso.ru")
+    ipv6_only = Domain.objects.create(name='ipv6.contoso.ru')
     AllowlistEntry.objects.create(
-        domain=ipv6_only, entry="2a00:1450::/32", raw="2a00:1450::/32"
+        domain=ipv6_only, entry='2a00:1450::/32', raw='2a00:1450::/32'
     )
-    resolver = FakeResolver({"ipv6.contoso.ru": [answered("2a00:1450:400e:809::200e")]})
+    resolver = FakeResolver({'ipv6.contoso.ru': [answered('2a00:1450:400e:809::200e')]})
     run_check(domain_id=ipv6_only.pk, at=START, resolver=resolver)
 
     run_check(domain_id=ipv6_only.pk, at=START + PERIOD, resolver=resolver)
 
-    latest = Check.objects.filter(domain=ipv6_only).latest("checked_at")
+    latest = Check.objects.filter(domain=ipv6_only).latest('checked_at')
     assert latest.outcome != CheckOutcome.NORMAL
 
 
 def test_d37_a_changed_set_wins_over_the_missing_list() -> None:
     """Порядок исходов: «набор изменился» — про эту проверку, «список не задан» — про домен."""
-    bare = Domain.objects.create(name="github.com")
+    bare = Domain.objects.create(name='github.com')
     resolver = FakeResolver(
-        {"github.com": [answered("140.82.121.3"), answered("140.82.121.4")]}
+        {'github.com': [answered('140.82.121.3'), answered('140.82.121.4')]}
     )
     run_check(domain_id=bare.pk, at=START, resolver=resolver)
 
     run_check(domain_id=bare.pk, at=START + PERIOD, resolver=resolver)
 
-    assert Check.objects.filter(domain=bare).latest("checked_at").outcome == (
+    assert Check.objects.filter(domain=bare).latest('checked_at').outcome == (
         CheckOutcome.ADDRESS_SET_CHANGED
     )

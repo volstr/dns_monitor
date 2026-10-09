@@ -6,10 +6,10 @@ import sys
 
 
 def main() -> None:
-    if not os.environ.get("DJANGO_SETTINGS_MODULE"):
+    if not os.environ.get('DJANGO_SETTINGS_MODULE'):
         sys.exit(
-            "Приложение не запущено: не задана DJANGO_SETTINGS_MODULE "
-            "(config.settings.dev или config.settings.prod)."
+            'Приложение не запущено: не задана DJANGO_SETTINGS_MODULE '
+            '(config.settings.dev или config.settings.prod).'
         )
 
     from config.env import EnvironmentConfigError, load_env
@@ -25,5 +25,5 @@ def main() -> None:
     execute_from_command_line(sys.argv)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

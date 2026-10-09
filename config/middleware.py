@@ -32,7 +32,7 @@ from apps.monitoring.services.health import HealthReport, check_health
 from core.adapters.redis_state import RedisStateStore
 from core.adapters.system_clock import SystemClock
 
-HEALTH_PATH = "/health/"
+HEALTH_PATH = '/health/'
 UNHEALTHY = 503
 
 #: Сколько живёт результат пробы. 11.12 про кэш представлений говорит «отставание на секунды
@@ -58,8 +58,8 @@ class InfrastructureHealthMiddleware:
 
         return render(
             request,
-            "503.html",
-            {"component": report.failed_component},
+            '503.html',
+            {'component': report.failed_component},
             status=UNHEALTHY,
         )
 

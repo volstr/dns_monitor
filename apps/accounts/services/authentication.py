@@ -125,7 +125,7 @@ def new_totp_secret() -> str:
 
 def provisioning_uri(*, secret: str, email: str) -> str:
     """Строка для QR-кода. Рисует её приложение-аутентификатор, не мы."""
-    return str(pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="DNS monitoring"))
+    return str(pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name='DNS monitoring'))
 
 
 def _accept_code(member: Member, code: str, at: datetime, state_store: StateStore) -> bool:
@@ -149,7 +149,7 @@ def _mark_used(member_id: int, code: str, at: datetime, state_store: StateStore)
 def _failed(login_hash: str, ip: str, state_store: StateStore) -> Rejected | Locked:
     """Увеличить счётчик и, если порог достигнут, заблокировать на 15 минут."""
     threshold = GlobalSettings.objects.get().login_failure_threshold
-    attempts = state_store.accumulate(login_failures(login_hash, ip), "1")
+    attempts = state_store.accumulate(login_failures(login_hash, ip), '1')
 
     if attempts >= threshold:
         # Блокировка снимается сама истечением срока ключа: отдельного задания быть не должно

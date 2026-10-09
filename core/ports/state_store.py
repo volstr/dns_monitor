@@ -38,43 +38,43 @@ class StateKey:
 
 def login_failures(login_hash: str, ip: str) -> StateKey:
     """Счётчик неудачных попыток входа. Логин хешируется (11.11)."""
-    return StateKey(f"auth:fail:{login_hash}:{ip}", LOGIN_WINDOW)
+    return StateKey(f'auth:fail:{login_hash}:{ip}', LOGIN_WINDOW)
 
 
 def login_lock(login_hash: str, ip: str) -> StateKey:
-    return StateKey(f"auth:lock:{login_hash}:{ip}", LOGIN_WINDOW)
+    return StateKey(f'auth:lock:{login_hash}:{ip}', LOGIN_WINDOW)
 
 
 def used_otp(member_id: int, step: int) -> StateKey:
     """Отметка об использованном коде TOTP: один код дважды не принимается (ТЗ 3)."""
-    return StateKey(f"auth:otp:{member_id}:{step}", OTP_STEP_WINDOW)
+    return StateKey(f'auth:otp:{member_id}:{step}', OTP_STEP_WINDOW)
 
 
 def domain_cooldown(domain_id: int) -> StateKey:
-    return StateKey(f"check:cooldown:domain:{domain_id}", DOMAIN_COOLDOWN)
+    return StateKey(f'check:cooldown:domain:{domain_id}', DOMAIN_COOLDOWN)
 
 
 def group_cooldown(group_id: int) -> StateKey:
-    return StateKey(f"check:cooldown:group:{group_id}", GROUP_COOLDOWN)
+    return StateKey(f'check:cooldown:group:{group_id}', GROUP_COOLDOWN)
 
 
 def scheduler_lock(domain_id: int) -> StateKey:
     """Блокировка домена на время проверки: два экземпляра не резолвят его одновременно (11.1)."""
-    return StateKey(f"sched:lock:domain:{domain_id}", SCHEDULER_LOCK)
+    return StateKey(f'sched:lock:domain:{domain_id}', SCHEDULER_LOCK)
 
 
 def merge_window(channel: str, event_type: str) -> StateKey:
-    return StateKey(f"notify:merge:{channel}:{event_type}", MERGE_WINDOW)
+    return StateKey(f'notify:merge:{channel}:{event_type}', MERGE_WINDOW)
 
 
 def invitation_token(invitation_id: int, lifetime: timedelta) -> StateKey:
     """Открытый текст токена приглашения — Q-D16. Срок равен сроку действия ссылки."""
-    return StateKey(f"auth:invite:{invitation_id}", lifetime)
+    return StateKey(f'auth:invite:{invitation_id}', lifetime)
 
 
 def session(session_key: str, lifetime: timedelta) -> StateKey:
     """Сессия — Q-D20. Живёт в базе состояния, а не в кэше: сброс `cache:*` её не трогает."""
-    return StateKey(f"session:{session_key}", lifetime)
+    return StateKey(f'session:{session_key}', lifetime)
 
 
 class StateStore(Protocol):

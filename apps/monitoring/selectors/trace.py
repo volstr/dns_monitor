@@ -37,8 +37,8 @@ def trace_of_domain(
         AddressObservationBucket.objects.filter(
             domain_id=domain_id, bucket_size=BucketSize.DAY.value
         )
-        .values_list("address", "bucket_start")
-        .order_by("bucket_start")
+        .values_list('address', 'bucket_start')
+        .order_by('bucket_start')
     )
 
     seen: dict[str, list[date]] = {}

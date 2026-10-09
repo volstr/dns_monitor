@@ -22,7 +22,7 @@ pytestmark = pytest.mark.django_db
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
 WINDOW = timedelta(seconds=60)
 AFTER_WINDOW = MOMENT + WINDOW
-CHAT = "-1001234567890"
+CHAT = '-1001234567890'
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def configured_channel() -> None:
 
 def queue_events(store: FakeStateStore, count: int, *, with_incident: bool = False) -> None:
     for index in range(count):
-        domain = Domain.objects.create(name=f"domain-{index}.contoso.ru")
+        domain = Domain.objects.create(name=f'domain-{index}.contoso.ru')
         incident = (
             Incident.objects.create(domain=domain, opened_at=MOMENT) if with_incident else None
         )
@@ -52,7 +52,7 @@ def queue_events(store: FakeStateStore, count: int, *, with_incident: bool = Fal
             domain=domain,
             event_type=EventType.NOT_ALLOWED,
             occurred_at=MOMENT,
-            payload={"addresses": ["185.44.9.201"]},
+            payload={'addresses': ['185.44.9.201']},
             incident=incident,
         )
         dispatch_event(event_id=event.pk, at=MOMENT, state_store=store)
@@ -112,8 +112,8 @@ def test_39_six_events_in_one_window_become_one_summary(store: FakeStateStore) -
     assert (run.sent, run.merged) == (1, 6)
     assert len(channel.messages) == 1
     text = channel.messages[0].text
-    assert "Затронуто доменов: 6" in text
-    assert "Открыть журнал" in text
+    assert 'Затронуто доменов: 6' in text
+    assert 'Открыть журнал' in text
     # Шесть записей журнала при этом остаются раздельными (8.6).
     assert Event.objects.count() == 6
     assert Notification.objects.filter(status=DeliveryStatus.SENT).count() == 6
@@ -139,12 +139,12 @@ def test_d9_summary_id_reaches_every_incident_it_covered(store: FakeStateStore) 
         incident.pk: set(
             Notification.objects.filter(
                 events__incident_id=incident.pk, status=DeliveryStatus.SENT
-            ).values_list("channel_message_id", flat=True)
+            ).values_list('channel_message_id', flat=True)
         )
         for incident in Incident.objects.all()
     }
-    assert list(covered.values()) == [{"1"}] * 6, (
-        "иначе о закрытии двенадцати инцидентов никто не узнает"
+    assert list(covered.values()) == [{'1'}] * 6, (
+        'иначе о закрытии двенадцати инцидентов никто не узнает'
     )
 
 
@@ -163,8 +163,8 @@ def test_8_6_summary_lists_up_to_ten_names(store: FakeStateStore) -> None:
     )
 
     text = channel.messages[0].text
-    assert "Затронуто доменов: 12" in text
-    assert "и ещё 2" in text
+    assert 'Затронуто доменов: 12' in text
+    assert 'и ещё 2' in text
 
 
 def test_38_baseline_violation_is_delivered_inside_a_summary(store: FakeStateStore) -> None:
@@ -176,10 +176,10 @@ def test_38_baseline_violation_is_delivered_inside_a_summary(store: FakeStateSto
     """
     resolver = FakeResolver({})
     for index in range(6):
-        name = f"domain-{index}.contoso.ru"
+        name = f'domain-{index}.contoso.ru'
         domain = Domain.objects.create(name=name, next_check_at=MOMENT)
-        AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
-        resolver.set(name, [answered("185.44.9.201")])
+        AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
+        resolver.set(name, [answered('185.44.9.201')])
 
     # limit задаём явно: по умолчанию тик берёт concurrency × 4 домена, то есть четыре из шести.
     tick(at=MOMENT, resolver=resolver, state_store=store, concurrency=1, limit=6)
@@ -198,12 +198,12 @@ def test_38_baseline_violation_is_delivered_inside_a_summary(store: FakeStateSto
     # Одно сводное сообщение вместо шести отдельных.
     assert (run.sent, run.merged) == (1, 6)
     assert len(channel.messages) == 1
-    assert "Затронуто доменов: 6" in channel.messages[0].text
+    assert 'Затронуто доменов: 6' in channel.messages[0].text
 
 
 def test_8_3_retryable_failure_stays_in_the_queue(store: FakeStateStore) -> None:
     queue_events(store, 1)
-    channel = FakeChannel(results=[NotSent(error="429 Too Many Requests", retryable=True)])
+    channel = FakeChannel(results=[NotSent(error='429 Too Many Requests', retryable=True)])
 
     run = deliver_due(
 
@@ -224,7 +224,7 @@ def test_8_3_retryable_failure_stays_in_the_queue(store: FakeStateStore) -> None
 
 def test_8_3_permanent_failure_gives_up_at_once(store: FakeStateStore) -> None:
     queue_events(store, 1)
-    channel = FakeChannel(results=[NotSent(error="chat not found", retryable=False)])
+    channel = FakeChannel(results=[NotSent(error='chat not found', retryable=False)])
 
     run = deliver_due(
 
@@ -258,7 +258,7 @@ def test_8_3_delivery_result_is_recorded_next_to_the_event(store: FakeStateStore
 
     notification = Event.objects.get().notifications.get()
     assert notification.status == DeliveryStatus.SENT
-    assert notification.channel_message_id == "1"
+    assert notification.channel_message_id == '1'
 
 
 def test_empty_queue_does_nothing(store: FakeStateStore) -> None:

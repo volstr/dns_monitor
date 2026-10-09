@@ -51,13 +51,13 @@ def save_group(
         return GroupNotSaved(reasons=reasons)
 
     fields = {
-        "name": name.strip(),
-        "comment": comment,
-        "check_period_seconds": check_period_seconds,
-        "freshness_threshold_seconds": freshness_threshold_seconds,
-        "notification_mode": notification_mode or "",
-        "notify_back_to_normal": notify_back_to_normal,
-        "reminder_interval_seconds": reminder_interval_seconds,
+        'name': name.strip(),
+        'comment': comment,
+        'check_period_seconds': check_period_seconds,
+        'freshness_threshold_seconds': freshness_threshold_seconds,
+        'notification_mode': notification_mode or '',
+        'notify_back_to_normal': notify_back_to_normal,
+        'reminder_interval_seconds': reminder_interval_seconds,
     }
 
     try:
@@ -69,7 +69,7 @@ def save_group(
                 group = Group.objects.get(pk=group_id)
     except IntegrityError:
         # Имя группы уникально. Гонку двух сохранений ловим здесь, а не проверкой заранее.
-        return GroupNotSaved(reasons=(f"Группа с именем «{name.strip()}» уже есть.",))
+        return GroupNotSaved(reasons=(f'Группа с именем «{name.strip()}» уже есть.',))
 
     return GroupSaved(
         group_id=group.pk,
@@ -82,9 +82,9 @@ def _reasons(
 ) -> tuple[str, ...]:
     collected = []
     if not name.strip():
-        collected.append("У группы должно быть название.")
+        collected.append('У группы должно быть название.')
     if check_period_seconds is not None and check_period_seconds < MIN_PERIOD_SECONDS:
-        collected.append("Период проверки не может быть меньше минуты (ТЗ 11.1).")
+        collected.append('Период проверки не может быть меньше минуты (ТЗ 11.1).')
     if freshness_threshold_seconds is not None and freshness_threshold_seconds <= 0:
-        collected.append("Порог актуальности должен быть больше нуля.")
+        collected.append('Порог актуальности должен быть больше нуля.')
     return tuple(collected)

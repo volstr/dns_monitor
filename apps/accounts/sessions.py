@@ -74,7 +74,7 @@ class SessionStore(SessionBase):
                 continue
             self.modified = True
             return
-        message = "не удалось получить свободный ключ сессии"
+        message = 'не удалось получить свободный ключ сессии'
         raise RuntimeError(message)
 
     def save(self, must_create: bool = False) -> None:

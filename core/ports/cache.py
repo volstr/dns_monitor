@@ -36,7 +36,7 @@ from typing import Protocol
 
 #: Общий префикс. Сброс по шаблону `cache:*` обязан быть безопасной операцией под нагрузкой
 #: (11.12, критерий 62), а значит ничего, кроме кэша, под этот шаблон попадать не должно.
-PREFIX = "cache:"
+PREFIX = 'cache:'
 
 # Сроки из таблицы 11.12.
 SETTINGS_TTL = timedelta(hours=1)
@@ -57,32 +57,32 @@ class CacheKey:
 
 def settings_of_domain(domain_id: int, version: int) -> CacheKey:
     """Разрешённые по цепочке наследования настройки домена. Обновление — по версии."""
-    return CacheKey(f"{PREFIX}settings:domain:{domain_id}:v{version}", SETTINGS_TTL)
+    return CacheKey(f'{PREFIX}settings:domain:{domain_id}:v{version}', SETTINGS_TTL)
 
 
 def allowlist_of_domain(domain_id: int, version: int) -> CacheKey:
     """Разобранный белый список в виде диапазонов. Обновление — по версии."""
-    return CacheKey(f"{PREFIX}allowlist:domain:{domain_id}:v{version}", ALLOWLIST_TTL)
+    return CacheKey(f'{PREFIX}allowlist:domain:{domain_id}:v{version}', ALLOWLIST_TTL)
 
 
 def trace_of_domain(domain_id: int, bucket_seconds: int) -> CacheKey:
     """След для графика реестра, агрегированный по корзинам (9.2). Обновление — по сроку."""
-    return CacheKey(f"{PREFIX}trace:domain:{domain_id}:{bucket_seconds}", TRACE_TTL)
+    return CacheKey(f'{PREFIX}trace:domain:{domain_id}:{bucket_seconds}', TRACE_TTL)
 
 
 def overview_view() -> CacheKey:
     """Счётчики и открытые расхождения на обзоре (11.9). Обновление — по сроку."""
-    return CacheKey(f"{PREFIX}view:overview", OVERVIEW_TTL)
+    return CacheKey(f'{PREFIX}view:overview', OVERVIEW_TTL)
 
 
 def domain_list_view(filter_hash: str) -> CacheKey:
     """Страница списка доменов со статусами. Обновление — по сроку."""
-    return CacheKey(f"{PREFIX}view:domains:{filter_hash}", DOMAIN_LIST_TTL)
+    return CacheKey(f'{PREFIX}view:domains:{filter_hash}', DOMAIN_LIST_TTL)
 
 
 def user(member_id: int) -> CacheKey:
     """Роль и признак активности участника. Удаляется немедленно при их изменении."""
-    return CacheKey(f"{PREFIX}user:{member_id}", USER_TTL)
+    return CacheKey(f'{PREFIX}user:{member_id}', USER_TTL)
 
 
 class Cache(Protocol):

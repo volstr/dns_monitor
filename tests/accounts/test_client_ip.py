@@ -16,8 +16,8 @@ from django.test import RequestFactory
 
 from apps.accounts.views import _client_ip
 
-PROXY = "172.19.0.7"
-CLIENT = "203.0.113.7"
+PROXY = '172.19.0.7'
+CLIENT = '203.0.113.7'
 
 
 @pytest.fixture
@@ -29,14 +29,14 @@ def test_11_11_address_behind_a_proxy_is_the_client_not_the_proxy(
     factory: RequestFactory,
 ) -> None:
     """Проверено на стенде: без этого в ключе стоял адрес контейнера nginx."""
-    request = factory.get("/login/", REMOTE_ADDR=PROXY, HTTP_X_REAL_IP=CLIENT)
+    request = factory.get('/login/', REMOTE_ADDR=PROXY, HTTP_X_REAL_IP=CLIENT)
 
     assert _client_ip(request) == CLIENT
 
 
 def test_11_11_without_a_proxy_the_peer_address_is_used(factory: RequestFactory) -> None:
     """Режим разработчика: `runserver` без nginx, заголовка нет."""
-    request = factory.get("/login/", REMOTE_ADDR=CLIENT)
+    request = factory.get('/login/', REMOTE_ADDR=CLIENT)
 
     assert _client_ip(request) == CLIENT
 
@@ -47,7 +47,7 @@ def test_11_11_address_is_never_empty(factory: RequestFactory) -> None:
 
     Случай не выдуманный: `REMOTE_ADDR` отсутствует, например, у запроса по сокету.
     """
-    request = factory.get("/login/")
-    request.META.pop("REMOTE_ADDR", None)
+    request = factory.get('/login/')
+    request.META.pop('REMOTE_ADDR', None)
 
-    assert _client_ip(request) == "unknown"
+    assert _client_ip(request) == 'unknown'

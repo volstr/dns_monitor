@@ -42,7 +42,7 @@ def without_ipv6(queryset: QuerySet[AddressRegistryEntry]) -> QuerySet[AddressRe
     колонка типа `inet` знает его сама.
     """
     return queryset.annotate(
-        family=Func(F("address"), function="family", output_field=IntegerField())
+        family=Func(F('address'), function='family', output_field=IntegerField())
     ).filter(family=IPV4)
 
 
@@ -63,10 +63,10 @@ def fresh_set(
     )
     if skip_ipv6:
         selected = without_ipv6(selected)
-    addresses = selected.values_list("address", flat=True)
+    addresses = selected.values_list('address', flat=True)
     # Колонка NOT NULL, поэтому None в выборке не появится: Optional приходит из объявления
     # поля, которое в общем случае допускает NULL, а не из данных.
-    return frozenset(cast("Iterable[IPAddress]", addresses))
+    return frozenset(cast('Iterable[IPAddress]', addresses))
 
 
 def address_statuses(
@@ -78,41 +78,41 @@ def address_statuses(
 ) -> tuple[AddressStatusView, ...]:
     """Статусы всех адресов реестра домена — ТЗ 6.4. Один запрос на весь реестр."""
     matched = AllowlistEntry.objects.filter(
-        domain=OuterRef("domain"), entry__net_contains_or_equals=OuterRef("address")
+        domain=OuterRef('domain'), entry__net_contains_or_equals=OuterRef('address')
     )
     selected = AddressRegistryEntry.objects.filter(domain_id=domain_id)
     if skip_ipv6:
         selected = without_ipv6(selected)
     rows = (
         selected.annotate(
-            matched_raw=Subquery(matched.values("raw")[:1]),
-            matched_entry=Subquery(matched.values("entry")[:1], output_field=CidrField()),
+            matched_raw=Subquery(matched.values('raw')[:1]),
+            matched_entry=Subquery(matched.values('entry')[:1], output_field=CidrField()),
             # Есть ли у домена список вообще — тем же запросом, а не отдельным `exists()`.
-            has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef("domain"))),
+            has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef('domain'))),
         )
         .values(
-            "address",
-            "first_seen_at",
-            "last_seen_at",
-            "matched_raw",
-            "matched_entry",
-            "has_allowlist",
+            'address',
+            'first_seen_at',
+            'last_seen_at',
+            'matched_raw',
+            'matched_entry',
+            'has_allowlist',
         )
-        .order_by("address")
+        .order_by('address')
     )
 
     border = at - freshness_threshold
     return tuple(
         AddressStatusView(
-            address=row["address"],
+            address=row['address'],
             status=_status(
-                is_fresh=row["last_seen_at"] >= border,
-                has_match=row["matched_raw"] is not None,
-                has_allowlist=row["has_allowlist"],
+                is_fresh=row['last_seen_at'] >= border,
+                has_match=row['matched_raw'] is not None,
+                has_allowlist=row['has_allowlist'],
             ),
-            match=_match(row["matched_raw"], row["matched_entry"]),
-            first_seen_at=row["first_seen_at"],
-            last_seen_at=row["last_seen_at"],
+            match=_match(row['matched_raw'], row['matched_entry']),
+            first_seen_at=row['first_seen_at'],
+            last_seen_at=row['last_seen_at'],
         )
         for row in rows
     )
@@ -150,7 +150,7 @@ def registry_of_domains(
         return {}
 
     matched = AllowlistEntry.objects.filter(
-        domain=OuterRef("domain"), entry__net_contains_or_equals=OuterRef("address")
+        domain=OuterRef('domain'), entry__net_contains_or_equals=OuterRef('address')
     )
     selected = AddressRegistryEntry.objects.filter(domain_id__in=domain_ids)
     if skip_ipv6:
@@ -158,33 +158,33 @@ def registry_of_domains(
     rows = (
         selected.annotate(
             has_match=Exists(matched),
-            has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef("domain"))),
+            has_allowlist=Exists(AllowlistEntry.objects.filter(domain=OuterRef('domain'))),
         )
         .values(
-            "domain_id",
-            "address",
-            "first_seen_at",
-            "last_seen_at",
-            "has_match",
-            "has_allowlist",
+            'domain_id',
+            'address',
+            'first_seen_at',
+            'last_seen_at',
+            'has_match',
+            'has_allowlist',
         )
-        .order_by("domain_id", "address")
+        .order_by('domain_id', 'address')
     )
 
     collected: dict[int, list[RegistryRow]] = {}
     for row in rows:
-        domain_id = row["domain_id"]
+        domain_id = row['domain_id']
         border = at - thresholds[domain_id]
         collected.setdefault(domain_id, []).append(
             RegistryRow(
-                address=row["address"],
+                address=row['address'],
                 status=_status(
-                    is_fresh=row["last_seen_at"] >= border,
-                    has_match=row["has_match"],
-                    has_allowlist=row["has_allowlist"],
+                    is_fresh=row['last_seen_at'] >= border,
+                    has_match=row['has_match'],
+                    has_allowlist=row['has_allowlist'],
                 ),
-                first_seen_at=row["first_seen_at"],
-                last_seen_at=row["last_seen_at"],
+                first_seen_at=row['first_seen_at'],
+                last_seen_at=row['last_seen_at'],
             )
         )
     return {domain_id: tuple(rows) for domain_id, rows in collected.items()}

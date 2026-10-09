@@ -23,7 +23,7 @@ from typing import Any, Protocol
 from core.ports.notification_channel import NotificationChannel, NotSent, SendResult, Sent
 from core.text import escape_html as escape
 
-API_URL = "https://api.telegram.org"
+API_URL = 'https://api.telegram.org'
 TIMEOUT_SECONDS = 10
 #: Коды, при которых повторять бессмысленно: чат не найден, бот заблокирован, текст неверен.
 PERMANENT_CODES = frozenset({400, 403, 404})
@@ -40,8 +40,8 @@ class UrllibTransport(Transport):
         request = urllib.request.Request(  # noqa: S310 — схема фиксирована константой API_URL
             url,
             data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
+            headers={'Content-Type': 'application/json'},
+            method='POST',
         )
         try:
             with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
@@ -51,12 +51,12 @@ class UrllibTransport(Transport):
             try:
                 body = json.loads(error.read())
             except ValueError:
-                body = {"description": error.reason}
+                body = {'description': error.reason}
             return int(error.code), body
 
 
 #: Имя оставлено экспортированным: экранирование — часть контракта разметки этого канала.
-__all__ = ["API_URL", "TelegramChannel", "Transport", "UrllibTransport", "escape"]
+__all__ = ['API_URL', 'TelegramChannel', 'Transport', 'UrllibTransport', 'escape']
 
 
 class TelegramChannel(NotificationChannel):
@@ -71,28 +71,28 @@ class TelegramChannel(NotificationChannel):
 
     def send(self, *, recipient: str, text: str, reply_to: str | None = None) -> SendResult:
         if not self._token:
-            return NotSent(error="TELEGRAM_BOT_TOKEN не задан", retryable=False)
+            return NotSent(error='TELEGRAM_BOT_TOKEN не задан', retryable=False)
 
         payload: dict[str, Any] = {
-            "chat_id": recipient,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
+            'chat_id': recipient,
+            'text': text,
+            'parse_mode': 'HTML',
+            'disable_web_page_preview': True,
         }
         if reply_to:
-            payload["reply_to_message_id"] = reply_to
+            payload['reply_to_message_id'] = reply_to
 
         try:
             status, body = self._transport.post(
-                f"{API_URL}/bot{self._token}/sendMessage", payload
+                f'{API_URL}/bot{self._token}/sendMessage', payload
             )
         except OSError as error:
             # Сеть недоступна — повторять имеет смысл.
-            return NotSent(error=f"сеть недоступна: {error}", retryable=True)
+            return NotSent(error=f'сеть недоступна: {error}', retryable=True)
 
-        if status == 200 and body.get("ok"):
-            message_id = body.get("result", {}).get("message_id")
+        if status == 200 and body.get('ok'):
+            message_id = body.get('result', {}).get('message_id')
             return Sent(channel_message_id=str(message_id))
 
-        description = str(body.get("description") or f"HTTP {status}")
+        description = str(body.get('description') or f'HTTP {status}')
         return NotSent(error=description, retryable=status not in PERMANENT_CODES)

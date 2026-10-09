@@ -59,7 +59,7 @@ class RedisCache(Cache):
         cursor = 0
         while True:
             cursor, keys = self._client.scan(  # type: ignore[misc]
-                cursor, match=f"{PREFIX}*", count=SCAN_BATCH
+                cursor, match=f'{PREFIX}*', count=SCAN_BATCH
             )
             if keys:
                 batches.append([str(key) for key in keys])

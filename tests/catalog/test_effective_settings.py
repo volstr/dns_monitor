@@ -19,8 +19,8 @@ def test_21_group_with_default_period_takes_the_global_one() -> None:
     settings = GlobalSettings.objects.get()
     settings.check_period_seconds = 15 * 60
     settings.save()
-    group = Group.objects.create(name="Продакшн-периметр", check_period_seconds=None)
-    domain = make_domain("api.contoso.ru", group)
+    group = Group.objects.create(name='Продакшн-периметр', check_period_seconds=None)
+    domain = make_domain('api.contoso.ru', group)
 
     effective = effective_settings(domain.pk)
 
@@ -29,10 +29,10 @@ def test_21_group_with_default_period_takes_the_global_one() -> None:
 
 
 def test_22_changing_the_global_period_moves_only_inheriting_groups() -> None:
-    inheriting = Group.objects.create(name="Продакшн-периметр", check_period_seconds=None)
-    overriding = Group.objects.create(name="Внешние подрядчики", check_period_seconds=15 * 60)
-    inheriting_domain = make_domain("api.contoso.ru", inheriting)
-    overriding_domain = make_domain("cdn.contoso.ru", overriding)
+    inheriting = Group.objects.create(name='Продакшн-периметр', check_period_seconds=None)
+    overriding = Group.objects.create(name='Внешние подрядчики', check_period_seconds=15 * 60)
+    inheriting_domain = make_domain('api.contoso.ru', inheriting)
+    overriding_domain = make_domain('cdn.contoso.ru', overriding)
 
     settings = GlobalSettings.objects.get()
     settings.check_period_seconds = 60 * 60
@@ -55,7 +55,7 @@ def test_23_domain_without_group_takes_everything_from_global_settings() -> None
     settings.notify_back_to_normal = False
     settings.reminder_interval_seconds = 60 * 60
     settings.save()
-    domain = make_domain("status.contoso.ru", group=None)
+    domain = make_domain('status.contoso.ru', group=None)
 
     effective = effective_settings(domain.pk)
 
@@ -75,15 +75,15 @@ def test_23_domain_without_group_takes_everything_from_global_settings() -> None
 
 
 def test_24_deleting_a_group_keeps_domains_and_their_allowlists() -> None:
-    group = Group.objects.create(name="Устаревшее, под снос", check_period_seconds=6 * 60 * 60)
-    domain = make_domain("legacy.contoso.ru", group)
-    AllowlistEntry.objects.create(domain=domain, entry="10.20.0.0/22", raw="10.20.0.0/22")
+    group = Group.objects.create(name='Устаревшее, под снос', check_period_seconds=6 * 60 * 60)
+    domain = make_domain('legacy.contoso.ru', group)
+    AllowlistEntry.objects.create(domain=domain, entry='10.20.0.0/22', raw='10.20.0.0/22')
 
     group.delete()
 
     domain.refresh_from_db()
     assert domain.group is None
-    assert [entry.raw for entry in domain.allowlist.all()] == ["10.20.0.0/22"]
+    assert [entry.raw for entry in domain.allowlist.all()] == ['10.20.0.0/22']
     # Домен без группы наследует общие настройки (ТЗ 5).
     assert effective_settings(domain.pk).check_period.origin is SettingOrigin.GLOBAL
 
@@ -93,8 +93,8 @@ def test_group_value_of_false_is_not_mistaken_for_default() -> None:
     settings = GlobalSettings.objects.get()
     settings.notify_back_to_normal = True
     settings.save()
-    group = Group.objects.create(name="Платёжный контур", notify_back_to_normal=False)
-    domain = make_domain("pay-gw.contoso.ru", group)
+    group = Group.objects.create(name='Платёжный контур', notify_back_to_normal=False)
+    domain = make_domain('pay-gw.contoso.ru', group)
 
     effective = effective_settings(domain.pk).notify_back_to_normal
 
@@ -103,8 +103,8 @@ def test_group_value_of_false_is_not_mistaken_for_default() -> None:
 
 
 def test_reminder_interval_zero_means_do_not_remind() -> None:
-    group = Group.objects.create(name="Тестовые стенды", reminder_interval_seconds=0)
-    domain = make_domain("stage.contoso.ru", group)
+    group = Group.objects.create(name='Тестовые стенды', reminder_interval_seconds=0)
+    domain = make_domain('stage.contoso.ru', group)
 
     effective = effective_settings(domain.pk).reminder_interval
 

@@ -27,10 +27,10 @@ from apps.notifications.services.outbox import (
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 23, 14, 38, tzinfo=UTC)
-CHAT = "-1001234567890"
+CHAT = '-1001234567890'
 
 
-def put(*, at: datetime = MOMENT, text: str = "Адрес вне разрешённых") -> Notification:
+def put(*, at: datetime = MOMENT, text: str = 'Адрес вне разрешённых') -> Notification:
     return enqueue(channel=ChannelKind.TELEGRAM, recipient=CHAT, text=text, at=at)
 
 
@@ -54,27 +54,27 @@ def test_8_3_due_returns_what_is_ready_to_send() -> None:
 def test_8_3_delivered_message_leaves_the_queue() -> None:
     notification = put()
 
-    result = mark_delivered(notification_id=notification.pk, at=MOMENT, channel_message_id="42")
+    result = mark_delivered(notification_id=notification.pk, at=MOMENT, channel_message_id='42')
 
-    assert result == Delivered(notification_id=notification.pk, channel_message_id="42")
+    assert result == Delivered(notification_id=notification.pk, channel_message_id='42')
     notification.refresh_from_db()
     assert notification.status == DeliveryStatus.SENT
     assert notification.sent_at == MOMENT
     # Идентификатор нужен, чтобы отвечать в ветку при закрытии инцидента (7.3).
-    assert notification.channel_message_id == "42"
+    assert notification.channel_message_id == '42'
     assert due(at=MOMENT) == ()
 
 
 def test_8_3_failure_schedules_an_exponential_retry() -> None:
     notification = put()
 
-    result = mark_failed(notification_id=notification.pk, at=MOMENT, error="429 Too Many Requests")
+    result = mark_failed(notification_id=notification.pk, at=MOMENT, error='429 Too Many Requests')
 
     assert isinstance(result, Retrying)
     assert result.attempt == 1
     assert result.next_attempt_at == MOMENT + BACKOFF_BASE
     notification.refresh_from_db()
-    assert notification.last_error == "429 Too Many Requests"
+    assert notification.last_error == '429 Too Many Requests'
     # До назначенного момента строка из очереди не берётся.
     assert due(at=MOMENT) == ()
 
@@ -85,7 +85,7 @@ def test_8_3_delay_doubles_with_every_attempt() -> None:
     delays = []
     at = MOMENT
     for _ in range(MAX_ATTEMPTS - 1):
-        result = mark_failed(notification_id=notification.pk, at=at, error="таймаут")
+        result = mark_failed(notification_id=notification.pk, at=at, error='таймаут')
         assert isinstance(result, Retrying)
         delays.append(result.next_attempt_at - at)
         at = result.next_attempt_at
@@ -97,11 +97,11 @@ def test_8_3_attempts_are_finite() -> None:
     notification = put()
     at = MOMENT
     for _ in range(MAX_ATTEMPTS - 1):
-        result = mark_failed(notification_id=notification.pk, at=at, error="таймаут")
+        result = mark_failed(notification_id=notification.pk, at=at, error='таймаут')
         assert isinstance(result, Retrying)
         at = result.next_attempt_at
 
-    final = mark_failed(notification_id=notification.pk, at=at, error="канал недоступен")
+    final = mark_failed(notification_id=notification.pk, at=at, error='канал недоступен')
 
     assert isinstance(final, GaveUp)
     assert final.attempts == MAX_ATTEMPTS
@@ -114,7 +114,7 @@ def test_8_3_attempts_are_finite() -> None:
 def test_long_error_does_not_break_the_column() -> None:
     notification = put()
 
-    mark_failed(notification_id=notification.pk, at=MOMENT, error="я" * 900)
+    mark_failed(notification_id=notification.pk, at=MOMENT, error='я' * 900)
 
     notification.refresh_from_db()
     assert len(notification.last_error) == 500
@@ -122,12 +122,12 @@ def test_long_error_does_not_break_the_column() -> None:
 
 def test_d7_reply_keeps_the_thread() -> None:
     opening = put()
-    mark_delivered(notification_id=opening.pk, at=MOMENT, channel_message_id="42")
+    mark_delivered(notification_id=opening.pk, at=MOMENT, channel_message_id='42')
 
     closing = enqueue(
         channel=ChannelKind.TELEGRAM,
         recipient=CHAT,
-        text="Снова в норме",
+        text='Снова в норме',
         at=MOMENT + timedelta(minutes=26),
         reply_to_id=opening.pk,
     )
@@ -137,7 +137,7 @@ def test_d7_reply_keeps_the_thread() -> None:
 
 def test_4_5_one_notification_covers_many_events() -> None:
     """Слияние 8.6: одно сообщение покрывает много событий — сторона «многие к одному»."""
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
     notification = put()
     for _ in range(3):
         event = Event.objects.create(
@@ -157,7 +157,7 @@ def test_4_5_one_event_goes_to_many_channels() -> None:
     Ради неё связь и стала многие-ко-многим: у каждого канала своя строка очереди со своей
     судьбой доставки, и одиночная ссылка выразить это не могла.
     """
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
     event = Event.objects.create(
         domain=domain, event_type=EventType.NOT_ALLOWED, occurred_at=MOMENT
     )
@@ -169,7 +169,7 @@ def test_4_5_one_event_goes_to_many_channels() -> None:
 
 def test_4_5_event_without_a_notification_is_normal() -> None:
     # Режим «Не уведомлять», базовая проверка (7.4) или событие, не порождающее уведомления.
-    domain = Domain.objects.create(name="pay-gw.contoso.ru")
+    domain = Domain.objects.create(name='pay-gw.contoso.ru')
 
     event = Event.objects.create(
         domain=domain, event_type=EventType.WATCH_STARTED, occurred_at=MOMENT

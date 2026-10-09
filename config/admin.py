@@ -54,9 +54,9 @@ def _is_admin(request: HttpRequest) -> bool:
 class DevAdminSite(AdminSite):
     """Сайт админки, который пускает по роли участника — ТЗ 3."""
 
-    site_header = "DNS monitoring · данные установки"
-    site_title = "DNS monitoring"
-    index_title = "Таблицы"
+    site_header = 'DNS monitoring · данные установки'
+    site_title = 'DNS monitoring'
+    index_title = 'Таблицы'
 
     def has_permission(self, request: HttpRequest) -> bool:
         return _is_admin(request)
@@ -80,16 +80,16 @@ class DevAdminSite(AdminSite):
         """
         del extra_context
         if self.has_permission(request):
-            return redirect(reverse("admin:index", current_app=self.name))
+            return redirect(reverse('admin:index', current_app=self.name))
         if request.user.is_authenticated:
             raise PermissionDenied
         # Адрес берётся из `next`, а не из полного пути: иначе он вложился бы сам в себя —
         # `/login/?next=/admin/login/%3Fnext%3D%252Fadmin%252F`.
-        target = request.GET.get(REDIRECT_FIELD_NAME) or reverse("admin:index")
-        return redirect_to_login(target, reverse("login"))
+        target = request.GET.get(REDIRECT_FIELD_NAME) or reverse('admin:index')
+        return redirect_to_login(target, reverse('login'))
 
 
-site = DevAdminSite(name="dev-admin")
+site = DevAdminSite(name='dev-admin')
 
 
 class DevAdmin(admin.ModelAdmin):
@@ -112,15 +112,15 @@ class DevAdmin(admin.ModelAdmin):
 
 
 class DomainAdmin(DevAdmin):
-    list_display = ("name", "group", "watch_enabled", "next_check_at", "last_successful_check_at")
-    list_filter = ("watch_enabled", "group")
-    search_fields = ("name", "comment")
-    list_select_related = ("group",)
+    list_display = ('name', 'group', 'watch_enabled', 'next_check_at', 'last_successful_check_at')
+    list_filter = ('watch_enabled', 'group')
+    search_fields = ('name', 'comment')
+    list_select_related = ('group',)
 
 
 class GroupAdmin(DevAdmin):
-    list_display = ("name", "check_period_seconds", "notification_mode")
-    search_fields = ("name",)
+    list_display = ('name', 'check_period_seconds', 'notification_mode')
+    search_fields = ('name',)
 
 
 class GlobalSettingsAdmin(DevAdmin):
@@ -139,9 +139,9 @@ class GlobalSettingsAdmin(DevAdmin):
 
 
 class AllowlistEntryAdmin(DevAdmin):
-    list_display = ("domain", "raw", "entry")
-    search_fields = ("raw", "domain__name")
-    list_select_related = ("domain",)
+    list_display = ('domain', 'raw', 'entry')
+    search_fields = ('raw', 'domain__name')
+    list_select_related = ('domain',)
 
 
 class MemberAdmin(DevAdmin):
@@ -153,62 +153,62 @@ class MemberAdmin(DevAdmin):
     `manage.py create_admin`.
     """
 
-    list_display = ("email", "name", "role", "is_active", "must_change_password", "last_login")
-    list_filter = ("role", "is_active")
-    search_fields = ("email", "name")
-    readonly_fields = ("password", "last_login", "session_epoch")
+    list_display = ('email', 'name', 'role', 'is_active', 'must_change_password', 'last_login')
+    list_filter = ('role', 'is_active')
+    search_fields = ('email', 'name')
+    readonly_fields = ('password', 'last_login', 'session_epoch')
 
 
 class AuditRecordAdmin(DevAdmin):
-    list_display = ("occurred_at", "action", "author_name")
-    list_filter = ("action",)
-    date_hierarchy = "occurred_at"
+    list_display = ('occurred_at', 'action', 'author_name')
+    list_filter = ('action',)
+    date_hierarchy = 'occurred_at'
 
 
 class InvitationAdmin(DevAdmin):
-    list_display = ("member", "created_at", "expires_at", "opened_at")
-    list_select_related = ("member",)
+    list_display = ('member', 'created_at', 'expires_at', 'opened_at')
+    list_select_related = ('member',)
 
 
 class EventAdmin(DevAdmin):
-    list_display = ("occurred_at", "domain", "event_type", "author_name")
-    list_filter = ("event_type",)
-    search_fields = ("domain__name",)
-    date_hierarchy = "occurred_at"
-    list_select_related = ("domain",)
+    list_display = ('occurred_at', 'domain', 'event_type', 'author_name')
+    list_filter = ('event_type',)
+    search_fields = ('domain__name',)
+    date_hierarchy = 'occurred_at'
+    list_select_related = ('domain',)
 
 
 class CheckAdmin(DevAdmin):
-    list_display = ("checked_at", "domain", "outcome", "answered_by")
-    list_filter = ("outcome",)
-    search_fields = ("domain__name",)
-    date_hierarchy = "checked_at"
-    list_select_related = ("domain",)
+    list_display = ('checked_at', 'domain', 'outcome', 'answered_by')
+    list_filter = ('outcome',)
+    search_fields = ('domain__name',)
+    date_hierarchy = 'checked_at'
+    list_select_related = ('domain',)
 
 
 class AddressRegistryEntryAdmin(DevAdmin):
-    list_display = ("domain", "address", "first_seen_at", "last_seen_at", "consecutive_misses")
-    search_fields = ("domain__name",)
-    list_select_related = ("domain",)
+    list_display = ('domain', 'address', 'first_seen_at', 'last_seen_at', 'consecutive_misses')
+    search_fields = ('domain__name',)
+    list_select_related = ('domain',)
 
 
 class AddressObservationBucketAdmin(DevAdmin):
-    list_display = ("domain", "address", "bucket_size", "bucket_start")
-    list_filter = ("bucket_size",)
-    search_fields = ("domain__name",)
-    list_select_related = ("domain",)
+    list_display = ('domain', 'address', 'bucket_size', 'bucket_start')
+    list_filter = ('bucket_size',)
+    search_fields = ('domain__name',)
+    list_select_related = ('domain',)
 
 
 class IncidentAdmin(DevAdmin):
-    list_display = ("domain", "opened_at", "closed_at", "last_message_at")
-    search_fields = ("domain__name",)
-    list_select_related = ("domain",)
+    list_display = ('domain', 'opened_at', 'closed_at', 'last_message_at')
+    search_fields = ('domain__name',)
+    list_select_related = ('domain',)
 
 
 class NotificationAdmin(DevAdmin):
-    list_display = ("created_at", "channel", "status", "attempt", "sent_at")
-    list_filter = ("channel", "status")
-    date_hierarchy = "created_at"
+    list_display = ('created_at', 'channel', 'status', 'attempt', 'sent_at')
+    list_filter = ('channel', 'status')
+    date_hierarchy = 'created_at'
 
 
 site.register(Domain, DomainAdmin)

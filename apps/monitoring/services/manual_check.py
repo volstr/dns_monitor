@@ -30,11 +30,11 @@ CONFIRMATION_THRESHOLD = 200
 
 class RejectionReason(StrEnum):
     #: Кулдаун ещё не истёк: 30 секунд у домена, 60 у группы (11.11).
-    COOLDOWN = "cooldown"
+    COOLDOWN = 'cooldown'
     #: Доменов в группе больше порога — нужно подтверждение (11.6).
-    NEEDS_CONFIRMATION = "needs_confirmation"
+    NEEDS_CONFIRMATION = 'needs_confirmation'
     #: Проверять нечего: домен выключен или в группе нет включённых доменов (11.1).
-    NOTHING_TO_CHECK = "nothing_to_check"
+    NOTHING_TO_CHECK = 'nothing_to_check'
 
 
 @dataclass(frozen=True, slots=True)

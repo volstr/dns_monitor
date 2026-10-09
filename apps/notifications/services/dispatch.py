@@ -66,7 +66,7 @@ def dispatch_event(
     *, event_id: int, at: datetime, state_store: StateStore
 ) -> DispatchResult:
     """Поставить уведомление по событию в очередь, если оно вообще уведомляет."""
-    event = Event.objects.select_related("domain", "domain__group", "incident").get(pk=event_id)
+    event = Event.objects.select_related('domain', 'domain__group', 'incident').get(pk=event_id)
     resolved = effective_settings(event.domain_id)
     global_settings = GlobalSettings.objects.get()
 
@@ -142,19 +142,19 @@ def _opening_notification(event: Event, kind: ChannelKind) -> Notification | Non
     одно на инцидент. Теперь оно ищется по связи: у инцидента столько веток, сколько каналов.
     """
     sent = Notification.objects.filter(channel=kind, status=DeliveryStatus.SENT).exclude(
-        channel_message_id=""
+        channel_message_id=''
     )
     if event.event_type == EventType.BACK_TO_NORMAL.value:
         if event.incident_id is None:
             return None
-        return sent.filter(events__incident_id=event.incident_id).order_by("created_at").first()
+        return sent.filter(events__incident_id=event.incident_id).order_by('created_at').first()
     if event.event_type == EventType.RESOLVE_RECOVERED.value:
         return (
             sent.filter(
                 events__domain_id=event.domain_id,
                 events__event_type=EventType.RESOLVE_FAILED.value,
             )
-            .order_by("-created_at")
+            .order_by('-created_at')
             .first()
         )
     return None
@@ -163,9 +163,9 @@ def _opening_notification(event: Event, kind: ChannelKind) -> Notification | Non
 def _remember_mode(event: Event, mode: str) -> None:
     """Дописать режим в полезную нагрузку события, не трогая остальное."""
     payload = dict(event.payload or {})
-    if payload.get("notification_mode") == mode:
+    if payload.get('notification_mode') == mode:
         return
-    payload["notification_mode"] = mode
+    payload['notification_mode'] = mode
     event.payload = payload
     Event.objects.filter(pk=event.pk).update(payload=payload)
 
@@ -174,7 +174,7 @@ def _text(
     event: Event, threshold: timedelta, at: datetime, global_settings: GlobalSettings
 ) -> str:
     payload = event.payload or {}
-    addresses = tuple(str(address) for address in payload.get("addresses", ()))
+    addresses = tuple(str(address) for address in payload.get('addresses', ()))
     current = tuple(sorted(str(address) for address in fresh_set(event.domain_id, at, threshold)))
     duration = _duration(event)
 
@@ -182,12 +182,12 @@ def _text(
         MessageInput(
             event_type=event.event_type,
             domain_name=event.domain.name,
-            domain_url=f"{settings.ENV.app_base_url}/domains/{event.domain_id}/",
+            domain_url=f'{settings.ENV.app_base_url}/domains/{event.domain_id}/',
             changed=addresses,
             current=current,
             group_name=event.domain.group.name if event.domain.group else None,
             domain_comment=event.domain.comment,
-            group_comment=event.domain.group.comment if event.domain.group else "",
+            group_comment=event.domain.group.comment if event.domain.group else '',
             duration=duration,
         ),
         include_current=global_settings.message_include_full_set,

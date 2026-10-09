@@ -36,7 +36,7 @@ from core.text import humanize_duration
 from core.types.checking import AddressStatus
 
 #: Тип «события» для окна слияния: напоминания сливаются так же, как события (Q-D9).
-REMINDER_KIND = "reminder"
+REMINDER_KIND = 'reminder'
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +83,7 @@ def queue_due_reminders(*, at: datetime, state_store: StateStore) -> RemindersQu
 
 def _open_incidents() -> list[Incident]:
     return list(
-        Incident.objects.select_related("domain").filter(
+        Incident.objects.select_related('domain').filter(
             closed_at__isnull=True,
             # Q-D14: у выключенного домена напоминания приостанавливаются.
             domain__watch_enabled=True,
@@ -106,8 +106,8 @@ def _openings(
         Notification.objects.filter(
             events__incident_id=incident.pk, status=DeliveryStatus.SENT
         )
-        .exclude(channel_message_id="")
-        .order_by("created_at")
+        .exclude(channel_message_id='')
+        .order_by('created_at')
     )
     for notification in sent:
         kind = ChannelKind(notification.channel)
@@ -143,7 +143,7 @@ def _queue_one(
             domain_name=incident.domain.name,
             age=_age(at - incident.opened_at),
             unmatched=unmatched,
-            domain_url=f"{settings.ENV.app_base_url}/domains/{incident.domain_id}/",
+            domain_url=f'{settings.ENV.app_base_url}/domains/{incident.domain_id}/',
         ),
         at=at,
         reply_to_id=opening.pk,

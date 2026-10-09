@@ -3,11 +3,11 @@ import pytest
 # Минимум, с которым боевой процесс стартует: обязательные переменные 11.10 плюс
 # ALLOWED_HOSTS, без которой `prod` не поднимается. Остальное должно брать умолчания.
 REQUIRED_ENV: dict[str, str] = {
-    "DATABASE_URL": "postgresql://dns_monitoring:secret@postgres:5432/dns_monitoring",
-    "REDIS_URL": "redis://redis:6379",
-    "APP_BASE_URL": "https://dns-monitoring.example.com",
-    "SESSION_SECRET": "test-session-secret-" + "0123456789" * 4,
-    "ALLOWED_HOSTS": "dns-monitoring.example.com",
+    'DATABASE_URL': 'postgresql://dns_monitoring:secret@postgres:5432/dns_monitoring',
+    'REDIS_URL': 'redis://redis:6379',
+    'APP_BASE_URL': 'https://dns-monitoring.example.com',
+    'SESSION_SECRET': 'test-session-secret-' + '0123456789' * 4,
+    'ALLOWED_HOSTS': 'dns-monitoring.example.com',
 }
 
 

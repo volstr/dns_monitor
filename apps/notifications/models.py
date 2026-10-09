@@ -24,18 +24,18 @@ TEXT_MAX_LENGTH = 4096
 class ChannelKind(models.TextChoices):
     """Виды каналов доставки — ТЗ 8.3. В первой версии работает только Telegram."""
 
-    TELEGRAM = "telegram", "Telegram"
-    EMAIL = "email", "Почта"
-    WEBHOOK = "webhook", "Вебхук"
+    TELEGRAM = 'telegram', 'Telegram'
+    EMAIL = 'email', 'Почта'
+    WEBHOOK = 'webhook', 'Вебхук'
 
 
 class DeliveryStatus(models.TextChoices):
     """Результат доставки — виден рядом с событием (8.3) и уходит в выгрузку журнала (11.7)."""
 
-    PENDING = "pending", "Ожидает отправки"
-    SENT = "sent", "Доставлено"
+    PENDING = 'pending', 'Ожидает отправки'
+    SENT = 'sent', 'Доставлено'
     #: Повторы исчерпаны. Дальше не берётся — конечное число попыток из 8.3.
-    FAILED = "failed", "Не доставлено"
+    FAILED = 'failed', 'Не доставлено'
 
 
 class Notification(models.Model):
@@ -56,18 +56,18 @@ class Notification(models.Model):
     created_at = models.DateTimeField()
     attempt = models.PositiveIntegerField(default=0)
     next_attempt_at = models.DateTimeField()
-    last_error = models.CharField(max_length=ERROR_MAX_LENGTH, blank=True, default="")
+    last_error = models.CharField(max_length=ERROR_MAX_LENGTH, blank=True, default='')
     sent_at = models.DateTimeField(null=True, blank=True, default=None)
 
     #: Идентификатор сообщения в канале: по нему отвечают в ветку при закрытии инцидента и при
     #: напоминании (7.3, 8.5).
     channel_message_id = models.CharField(
-        max_length=CHANNEL_MESSAGE_ID_MAX_LENGTH, blank=True, default=""
+        max_length=CHANNEL_MESSAGE_ID_MAX_LENGTH, blank=True, default=''
     )
     #: Ответ в ветку. Пусто — сообщение самостоятельное. Правило Q-D7: продолжение существует
     #: только при наличии открывающего сообщения.
     reply_to = models.ForeignKey(
-        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="replies"
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='replies'
     )
 
     #: Окно слияния (8.6): «канал:тип события». Сообщения одного окна ждут в очереди до момента
@@ -76,13 +76,13 @@ class Notification(models.Model):
     #: Сами сообщения ждут **в PostgreSQL**, а не в накопителе Redis: срок жизни ключа истёк бы
     #: раньше, чем окно закроется, и сводку стало бы не из чего собирать. По 11.11 Redis не
     #: источник истины, поэтому в нём остаётся только счёт (Q-D9).
-    merge_key = models.CharField(max_length=ENUM_MAX_LENGTH * 2, blank=True, default="")
+    merge_key = models.CharField(max_length=ENUM_MAX_LENGTH * 2, blank=True, default='')
 
     class Meta:
         indexes = [
             # Выборка очереди: что пора отправлять (8.3).
-            models.Index(fields=["status", "next_attempt_at"], name="notification_due"),
+            models.Index(fields=['status', 'next_attempt_at'], name='notification_due'),
         ]
 
     def __str__(self) -> str:
-        return f"{self.channel} → {self.recipient} ({self.status})"
+        return f'{self.channel} → {self.recipient} ({self.status})'

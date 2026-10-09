@@ -37,7 +37,7 @@ RECENTLY = NOW - timedelta(days=2)
 
 @pytest.fixture
 def domain() -> Domain:
-    return Domain.objects.create(name="pay-gw.contoso.ru")
+    return Domain.objects.create(name='pay-gw.contoso.ru')
 
 
 def event(domain: Domain, at: datetime, incident: Incident | None = None) -> Event:
@@ -61,8 +61,8 @@ def registry(domain: Domain, address: str, last_seen_at: datetime) -> AddressReg
 def notification(at: datetime, status: str) -> Notification:
     return Notification.objects.create(
         channel=ChannelKind.TELEGRAM,
-        recipient="-100500",
-        text="сообщение",
+        recipient='-100500',
+        text='сообщение',
         status=status,
         created_at=at,
         next_attempt_at=at,
@@ -95,7 +95,7 @@ def test_11_3_retention_is_configurable(domain: Domain) -> None:
 def test_11_3_audit_records_follow_the_same_term(domain: Domain) -> None:
     """Журнал в интерфейсе один (Q-D4), и срок хранения у него обязан быть один."""
     member = Member.objects.create_member(
-        email="boss@contoso.ru", name="Анна Кирилова", created_at=LONG_AGO, role=Role.ADMIN
+        email='boss@contoso.ru', name='Анна Кирилова', created_at=LONG_AGO, role=Role.ADMIN
     )
     AuditRecord.objects.create(
         action=AuditAction.MEMBER_INVITED, occurred_at=LONG_AGO, author=member
@@ -137,7 +137,7 @@ def test_11_3_events_of_a_closed_incident_go_as_usual(domain: Domain) -> None:
 
 def test_11_3_registry_is_kept_forever_by_default(domain: Domain) -> None:
     """Значение по умолчанию из 11.3 — «бессрочно». Его легко не заметить и стереть реестр."""
-    registry(domain, "10.20.3.7", LONG_AGO)
+    registry(domain, '10.20.3.7', LONG_AGO)
 
     purged = purge_history(at=NOW)
 
@@ -147,7 +147,7 @@ def test_11_3_registry_is_kept_forever_by_default(domain: Domain) -> None:
 
 def test_11_3_registry_term_deletes_what_stopped_being_answered(domain: Domain) -> None:
     GlobalSettings.objects.filter(pk=1).update(registry_retention_seconds=30 * 24 * 60 * 60)
-    registry(domain, "10.20.3.7", LONG_AGO)
+    registry(domain, '10.20.3.7', LONG_AGO)
 
     purged = purge_history(at=NOW)
 
@@ -159,7 +159,7 @@ def test_11_3_an_address_still_answered_survives_any_term(domain: Domain) -> Non
     Отбор по `last_seen_at`: у адреса, который отдаётся третий год, стара только дата
     появления."""
     GlobalSettings.objects.filter(pk=1).update(registry_retention_seconds=30 * 24 * 60 * 60)
-    registry(domain, "10.20.3.7", NOW)
+    registry(domain, '10.20.3.7', NOW)
 
     purge_history(at=NOW)
 
@@ -172,13 +172,13 @@ def test_11_3_an_address_still_answered_survives_any_term(domain: Domain) -> Non
 def test_hourly_buckets_live_thirty_days_as_the_model_promises(domain: Domain) -> None:
     AddressObservationBucket.objects.create(
         domain=domain,
-        address="10.20.3.7",
+        address='10.20.3.7',
         bucket_size=BucketSize.HOUR,
         bucket_start=NOW - HOURLY_BUCKET_LIFETIME - timedelta(hours=1),
     )
     AddressObservationBucket.objects.create(
         domain=domain,
-        address="10.20.3.7",
+        address='10.20.3.7',
         bucket_size=BucketSize.HOUR,
         bucket_start=NOW - timedelta(hours=1),
     )
@@ -192,7 +192,7 @@ def test_hourly_buckets_live_thirty_days_as_the_model_promises(domain: Domain) -
 def test_daily_buckets_are_kept_forever_by_default(domain: Domain) -> None:
     AddressObservationBucket.objects.create(
         domain=domain,
-        address="10.20.3.7",
+        address='10.20.3.7',
         bucket_size=BucketSize.DAY,
         bucket_start=LONG_AGO,
     )
@@ -247,7 +247,7 @@ def test_purge_moment_survives_a_restart(domain: Domain) -> None:
 def test_11_3_deleting_a_domain_takes_its_journal_and_registry(domain: Domain) -> None:
     """11.3 прямо: «удаление домена удаляет его реестр и события»."""
     event(domain, RECENTLY)
-    registry(domain, "10.20.3.7", NOW)
+    registry(domain, '10.20.3.7', NOW)
 
     domain.delete()
 
