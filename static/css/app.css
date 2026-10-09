@@ -666,8 +666,11 @@ input.mono,select.inp{font-family:"JetBrains Mono",ui-monospace,monospace}
      в трёх местах, и это не одно из них. Пункты остаются на виду: недостижимый на
      телефоне раздел хуже, чем на одну колонку теснее. */
   .nav{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;overflow:visible;padding:5px 5px calc(5px + env(safe-area-inset-bottom))}
+  /* Правка переноса: в прототипе содержимое пункта центрировано по вертикали, и подпись
+     без счётчика («Журнал», «Настройки», любой раздел с нулём) оказывается ниже соседних.
+     Прижатое к верху содержимое ставит все подписи в одну строку, счётчик — под ней. */
   .nav button,.nav a{
-    flex-direction:column;gap:2px;justify-content:center;text-align:center;
+    flex-direction:column;gap:2px;justify-content:flex-start;text-align:center;
     padding:7px 2px;font-size:10.5px;line-height:1.25;border-radius:4px;
   }
   .nav button[data-go="settings"],.nav button[data-go="users"]{display:none}
