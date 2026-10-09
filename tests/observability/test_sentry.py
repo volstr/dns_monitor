@@ -35,7 +35,9 @@ from tests.observability.conftest import Recorder
 pytestmark = pytest.mark.django_db
 
 MOMENT = datetime(2026, 9, 26, 14, 38, tzinfo=UTC)
-BOT_TOKEN = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"
+# Вымышленный, той же формы, что настоящий. Собирается при выполнении: целиком записанный
+# литерал сканер секретов GitHub принимает за утёкший токен.
+BOT_TOKEN = "123456789:" + "A" * 35
 
 
 @pytest.fixture
